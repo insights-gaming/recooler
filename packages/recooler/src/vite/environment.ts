@@ -3,9 +3,11 @@ interface Environment {
   config: { consumer: 'server' | 'client' };
 }
 
-/** Selection happens on import, so idle SSR/Worker/test environments are harmless. */
-export function serverEnvironment(environment: Environment, selected?: string, explicit?: string): string {
+/** Server consumers may import the app unless an explicit environment restricts it. */
+export function serverEnvironment(environment: Environment, explicit?: string): string {
   if (environment.config.consumer === 'client') throw new Error('recooler: virtual:recooler/app is server-only');
-  const name = explicit ?? selected ?? environment.name;
-  return name;
+  if (explicit !== undefined && environment.name !== explicit) {
+    throw new Error(`recooler: virtual:recooler/app is restricted to serverEnvironment ${JSON.stringify(explicit)}; cannot load it in ${JSON.stringify(environment.name)}`);
+  }
+  return environment.name;
 }

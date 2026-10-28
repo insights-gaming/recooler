@@ -56,12 +56,14 @@ precompiled imports of a different JSX runtime; recompile or alias those imports
 as described in the [JSX README](../jsx/README.md).
 
 With `@cloudflare/vite-plugin`, keep that plugin's normal configuration and
-builder. Selection is lazy: the first server environment importing the virtual
-app is selected; `serverEnvironment` overrides that name when needed. Idle SSR
-and auxiliary Worker environments do not force configuration. All server
-consumers, including Vitest's SSR transforms, may import the app; browser imports
-are rejected. In Cloudflare v1, an environment's name is its Worker name with
-hyphens replaced by underscores: `main-worker` becomes `main_worker`. This does
+builder. By default every server consumer may import the virtual app, including
+Vitest's test environments. Set `serverEnvironment` to restrict imports to one
+configured server environment; other environments receive an error. A missing
+name or a client consumer is a configuration error. Idle SSR and auxiliary
+Worker environments do not force selection. Browser imports are rejected.
+Vitest 5's default runner uses `ssr` for app imports. In Cloudflare v1, an
+environment's name is its Worker name with hyphens replaced by underscores:
+`main-worker` becomes `main_worker`. This does
 not change `builder.buildApp` or require `sharedPlugins`.
 
 Dev generation errors are logged once per distinct diagnostic and sent to Vite's

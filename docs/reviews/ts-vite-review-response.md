@@ -9,12 +9,12 @@ checkpoint is `ff0770f`. No changes were pushed.
 ## Findings
 
 1. **Vitest and auxiliary environments:** removed eager environment selection.
-   The first server import selects the environment, with `serverEnvironment`
-   overriding that selection. Resolution rejects client consumers only, so
-   Vitest can perform its SSR transforms even when its configured environment
-   has another name. Actual Vitest subprocess tests import/render the virtual
-   app both with defaults and `serverEnvironment: '__vitest__'`. Cloudflare v1
-   Worker names replace `-` with `_`; the Vite README documents this.
+   By default all server consumers may import the virtual app. The second-round
+   fix below enforces an explicit `serverEnvironment` restriction and validates
+   that its name exists and is a server consumer. Vitest 5's default runner uses
+   `ssr` for these imports: subprocess tests pass with defaults and `ssr`, and
+   reject `__vitest__`. Cloudflare v1 Worker names replace `-` with `_`; the Vite
+   README documents this.
 2. **Custom server environments:** `configEnvironment` adds
    `resolve.noExternal` to every server consumer, including Vite's implicit SSR
    environment. It preserves `noExternal: true` and existing entries. A custom
@@ -119,3 +119,64 @@ Local raw verification artifacts: `/private/tmp/recooler-package-tests.log`,
 `/private/tmp/recooler-dev-loop.log`,
 `/private/tmp/recooler-external-declared.log`, and
 `/private/tmp/recooler-cf-v2.log`.
+
+
+## Second-round review resolutions
+
+- The nearest tsconfig now uses the same files matcher as referenced projects.
+  Excluded files and files outside `include` receive the recooler JSX default.
+  Real Vitest renders both cases, and dev transforms/builds cover each case.
+- `serverEnvironment` restricts both virtual app resolution and loading.
+  A missing name or a client consumer fails configuration. Tests exercise
+  accepted/rejected builds and dev transforms, and positive/negative Vitest runs.
+  The README and option JSDoc describe the enforced restriction.
+- JSX pragmas come from OXC's comment list, before the first non-directive
+  statement. The last valid directive wins. Strings, template literals, prose
+  mentioning `@jsx`, late comments and bare factories/fragments do not select
+  a runtime. A bare `@jsx` selects classic only with `@jsxRuntime classic`.
+- Default pragmas are inserted after a hashbang. LF and CRLF fixtures pass in
+  development and production. `react-native` uses the automatic default rather
+  than being classified as preserved JSX. The stable `recooler:jsx-defaults`
+  plugin name has an ordering comment for Phase 4b's earlier htmx slice transform.
+- A shared get-tsconfig filesystem cache, nearest-config lookup cache and project
+  cache avoid repeated parsing of references/extends and glob compilation.
+  JSON add/change/unlink events and build watch changes clear the caches;
+  close hooks remove watcher listeners. Real dev config edits verify fresh
+  compiler options and include matchers. Pragma edits use `hires: 'boundary'`.
+- Failed generation invalidates the virtual app and its importers without
+  requesting an eager runner reload. Requests still throw the diagnostic and
+  recovery reloads. The reviewer's `dev-runner.mjs` reports initial/recovered
+  200s, the invalid-tree error once, no extra full-reload error, and no unhandled
+  rejection. Vite can still log its own reload error for a direct source syntax
+  error racing its normal file HMR; this change deduplicates route-generation
+  diagnostics without replacing Vite's logger or runner internals.
+
+Second-round verification:
+
+- Package: **796 passed**, 27 files; package typechecks/build and conformance
+  typecheck passed.
+- Both conformance targets: **TS 385 passed / 134 skipped**, **Farm 512 passed /
+  7 skipped**, with **0 failures**. Including shared runner checks: **920 passed /
+  141 skipped**, unchanged from the reviewed baseline.
+- Reviewer `jsx2.mjs` ran across j1–j12. All affected automatic-runtime cases
+  use recooler in dev/build, while explicit hono settings remain hono.
+  Existing fixture limitations remain: j1 deliberately preserves JSX, j3 has
+  a missing reference rejected by OXC, and j11 imports an unavailable `x` package
+  during bundling (its dev runtime and the equivalent standalone regression pass).
+- Original `env-select.mjs` allows both server environments by default, rejects
+  SSR with explicit `edge`, builds `edge`, and then intentionally exits at the
+  new missing-name config error. A copy omitting the missing-name case exercises
+  dev too. Custom environment/dependency, startup-error, esbuild conversion,
+  source-map, determinism, dev-loop, and Cloudflare repro scripts also ran.
+  The undeclared-dependency repro retains its documented externalization limit.
+- Reviewer performance scripts: **77 ms / 3,000 files** for the three-reference
+  solution, **75 ms / 3,000 files** for the flat config (~0.025 ms/file), and
+  **6.6 ms/transform** for the 285 KiB file on this machine.
+
+Raw logs: `/private/tmp/recooler-package-round2.log`,
+`/private/tmp/recooler-conformance-round2.json`,
+`/private/tmp/recooler-review-round2.log`,
+`/private/tmp/recooler-round2-runner.log`,
+`/private/tmp/recooler-review-env-dev-round2.log`,
+`/private/tmp/recooler-review-cf-selected-round2.log`, and
+`/private/tmp/recooler-review-compat-round2.log`.

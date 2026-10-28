@@ -79,14 +79,13 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error) => void
 export interface RecoolerOptions {
   /** Generation, watch and --check use the same options as routes(). */
   routes?: GenerateOptions;
-  /** Override the first server environment that imports the virtual app. */
+  /** Restrict virtual app imports to this configured server environment. */
   serverEnvironment?: string;
 }
 
 /** JSX server integration. htmx remains a separate transform/runtime layer. */
 export function recooler(options: RecoolerOptions = {}): Plugin[] {
   let manifest: string;
-  let selected: string | undefined;
   let generationError: Error | undefined;
   let devServer: ViteDevServer | undefined;
   let noExternal = ['recooler', 'easy-jsx-html-engine'];
@@ -98,7 +97,10 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
       const module = environment.moduleGraph.getModuleById(resolvedAppId);
       if (module) {
         environment.moduleGraph.invalidateModule(module);
-        environment.hot.send({ type: 'full-reload' });
+        // A failed generation is reported by routes() and the error overlay.
+        // Invalidating importers makes the next runner import fail too, without
+        // an eager reload that logs the same diagnostic a second time.
+        if (!error) environment.hot.send({ type: 'full-reload' });
       }
     }
     if (previous && !error) devServer?.ws.send({ type: 'full-reload' });
@@ -125,16 +127,21 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
     },
     configResolved(config) {
       manifest = normalizePath(locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root }).out);
-      selected = undefined;
+      if (options.serverEnvironment !== undefined) {
+        const environment = config.environments[options.serverEnvironment];
+        if (!environment) throw new Error(`recooler: serverEnvironment ${JSON.stringify(options.serverEnvironment)} does not exist`);
+        if (environment.consumer !== 'server') throw new Error(`recooler: serverEnvironment ${JSON.stringify(options.serverEnvironment)} must be a server consumer`);
+      }
     },
     configureServer(server) { devServer = server; },
     resolveId(id) {
       if (id !== appId) return;
-      selected = serverEnvironment(this.environment, selected, options.serverEnvironment);
+      serverEnvironment(this.environment, options.serverEnvironment);
       return resolvedAppId;
     },
     load(id) {
       if (id !== resolvedAppId) return;
+      serverEnvironment(this.environment, options.serverEnvironment);
       if (generationError) throw generationError;
       return `import { createApp } from 'recooler/router';\nimport { jsxPages } from 'recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\nexport default createApp(manifest, { pages: jsxPages() });\n`;
     },

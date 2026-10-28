@@ -12,14 +12,19 @@ beforeAll(async () => {
 });
 describe('server environment selection', () => {
   const env = (name: string, consumer: 'server' | 'client' = 'server') => ({ name, config: { consumer } });
-  test('selects on import and honours the override', () => {
+  test('allows server consumers and enforces an explicit selection', () => {
     expect(serverEnvironment(env('__vitest__'))).toBe('__vitest__');
     expect(serverEnvironment(env('worker'))).toBe('worker');
-    expect(serverEnvironment(env('worker'), undefined, 'worker')).toBe('worker');
+    expect(serverEnvironment(env('worker'), 'worker')).toBe('worker');
     expect(() => serverEnvironment(env('browser', 'client'))).toThrow('server-only');
-    expect(serverEnvironment(env('other'), 'worker')).toBe('worker');
-    expect(serverEnvironment(env('other'), undefined, 'worker')).toBe('worker');
+    expect(() => serverEnvironment(env('other'), 'worker')).toThrow('restricted to serverEnvironment');
   });
+});
+
+test('rejects a missing or client serverEnvironment during configuration', async () => {
+  const base = { configFile: false as const, logLevel: 'silent' as const, build: { ssr: true } };
+  await expect(resolveConfig({ ...base, plugins: recooler({ serverEnvironment: 'does-not-exist' }) }, 'build')).rejects.toThrow('does not exist');
+  await expect(resolveConfig({ ...base, plugins: recooler({ serverEnvironment: 'client' }) }, 'build')).rejects.toThrow('must be a server consumer');
 });
 
 test('keeps Vite JSX configuration and legacy esbuild conversion intact', async () => {
