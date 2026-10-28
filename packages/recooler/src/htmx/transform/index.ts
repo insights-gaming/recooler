@@ -22,11 +22,24 @@ export function transform(code: string, options: TransformOptions): TransformRes
   const ms = new MagicString(code, { filename: options.id });
   const diagnostics: Diagnostic[] = [];
   let hasOnLoad = false;
-  const result = (candidates: Candidate[] = []): TransformResult => ({
-    code: ms.toString(), map: ms.generateMap({ hires: true, source: options.id, includeContent: true }),
+  const redactions: Span[] = [];
+  const result = (candidates: Candidate[] = []): TransformResult => {
+    const map = ms.generateMap({ hires: true, source: options.id, includeContent: true });
+    if (options.mode === "client-slice") {
+      // Source maps are public assets too. Keep offsets (including UTF-16 code
+      // units and newlines) while disclosing only the surviving client source.
+      const content = code.split("");
+      for (const { start, end } of redactions) for (let i = start; i < end; i++) {
+        if (content[i] !== "\n" && content[i] !== "\r") content[i] = " ";
+      }
+      map.sourcesContent = [content.join("")];
+    }
+    return {
+    code: ms.toString(), map,
     actions: candidates.filter(c => c.kind === "action").map(c => ({ ...metadata(c), method: c.method! })),
     handlers: candidates.filter(c => c.kind === "handler").map(metadata), hasOnLoad, diagnostics,
-  });
+    };
+  };
   let analysis: Analysis;
   try { analysis = parseAndAnalyze(code, options.id, options.rawTransfer); }
   catch (error) {
@@ -79,12 +92,16 @@ export function transform(code: string, options: TransformOptions): TransformRes
   const drop = (start: number, end: number) => { if (start < end) dropped.push({ start, end }); };
 
   if (mode === "client-slice") {
+    redactions.push(...analysis.comments);
     for (const item of analysis.program.body) {
       if (item.type === "ExportAllDeclaration" && slice!.onLoadItems.has(item)) continue;
       if (item.type === "ImportDeclaration") {
         const kept = item.specifiers.filter(s => slice!.kept.has(s));
         if (!kept.length) drop(item.start, item.end);
-        else rewriteImport(ms, code, item, kept);
+        else {
+          rewriteImport(ms, code, item, kept);
+          redactions.push(...item.specifiers.filter(s => !slice!.kept.has(s)));
+        }
         continue;
       }
       if (item.type === "ExportNamedDeclaration" && !item.declaration) {
@@ -152,6 +169,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
   // would also erase the moved handler's original chunks and its mappings.
   const removed: Span[] = [];
   for (const range of dropped) removeExcept(ms, range, owners.within(range), removed);
+  redactions.push(...removed);
   const removedIndex = new SpanIndex(removed);
   const alive = (span: Span) => !removedIndex.owner(span);
   const handlerSites = new Set(candidates.filter(c => c.kind === "handler").map(c => `${c.start}:${c.end}`));

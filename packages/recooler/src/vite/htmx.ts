@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import MagicString from 'magic-string';
@@ -48,6 +49,7 @@ export function htmxPlugin(options: RecoolerOptions) {
   let buildId: string;
   let builtData: TableData | undefined;
   let clientData: string | undefined;
+  const sliceContents = new Set<string>();
   let files: string[] = [];
   const kinds = new Map<string, 'route' | 'layout' | 'root'>();
   let namespace: string;
@@ -199,7 +201,22 @@ export function htmxPlugin(options: RecoolerOptions) {
         define: { __RECOOLER_PRODUCTION__: JSON.stringify(env.command === 'build') },
         ...(options.htmx === false ? {} : { environments: { client: { consumer: 'client', build: {
           ssr: false, outDir: _config.environments?.client?.build?.outDir ?? 'dist/client',
-          rolldownOptions: { input: { 'recooler-client': clientId }, output: { entryFileNames: clientFile, inlineDynamicImports: false } },
+          sourcemap: _config.environments?.client?.build?.sourcemap ?? false,
+          minify: _config.environments?.client?.build?.minify ?? true,
+          rolldownOptions: {
+            input: (() => {
+              const input = _config.environments?.client?.build?.rolldownOptions?.input
+                ?? (existsSync(path.resolve(_config.root ?? process.cwd(), 'index.html')) ? 'index.html' : {});
+              const entries = typeof input === 'string' ? [input] : Array.isArray(input) ? input : undefined;
+              return { ...(entries ? Object.fromEntries(entries.map(id => [path.basename(id, path.extname(id)), id])) : (typeof input === 'object' && !Array.isArray(input) ? input : {})), 'recooler-client': clientId };
+            })(),
+            output: { entryFileNames: chunk => {
+              if (chunk.facadeModuleId === internalClient) return clientFile;
+              const output = _config.environments?.client?.build?.rolldownOptions?.output;
+              const naming = (Array.isArray(output) ? output[0] : output)?.entryFileNames;
+              return typeof naming === 'function' ? naming(chunk) : naming ?? 'assets/[name]-[hash].js';
+            }, inlineDynamicImports: false },
+          },
         } } } }),
       };
     },
@@ -252,6 +269,15 @@ export function htmxPlugin(options: RecoolerOptions) {
       return [];
     },
     async resolveId(id, importer) {
+      if (this.environment.name === 'client' && id !== clientId && !id.includes(sliceQuery)
+        && isBannedModule(options.htmx && options.htmx.clientBannedImports || [], id)) {
+        const chain = [id];
+        const seen = new Set<string>();
+        for (let current = importer; current && !seen.has(current); current = this.getModuleInfo(current)?.importers[0]) {
+          seen.add(current); chain.unshift(current);
+        }
+        this.error(`recooler: banned imports in client chunk (raw specifier): ${chain.join(' → ')}`);
+      }
       if (id === clientId) return internalClient;
       const query = id.indexOf('?');
       if (query >= 0 && id.slice(query + 1).split('&').includes(sliceQuery)) {
@@ -260,6 +286,10 @@ export function htmxPlugin(options: RecoolerOptions) {
           ? '?' + id.slice(query + 1).split('&').filter(p => p !== sliceQuery && !/^(?:v|t)=/.test(p)).join('&') : '');
         const resolved = await this.resolve(original, importer, { skipSelf: true });
         if (!resolved || resolved.external) this.error(`recooler: cannot resolve handler slice ${original}`);
+        const key = canonicalId(resolved.id);
+        const known = [...states.values()].some(state => state.modules.get(key)?.client);
+        const inSource = !path.relative(roots.srcDir, key.split('?')[0]!).startsWith('..') && sourcePattern.test(key);
+        if (!known && !inSource) this.error(`recooler: unauthorized handler slice ${original}`);
         return resolved.id + (resolved.id.includes('?') ? '&' : '?') + sliceQuery;
       }
       if (id !== tableId) return;
@@ -287,13 +317,22 @@ export function htmxPlugin(options: RecoolerOptions) {
         const original = id.replace(new RegExp('([?&])' + sliceQuery + '(?=&|$)'), '').replace('?&', '?');
         // The slice runs directly on the original source: hoisting AND slicing
         // share one MagicString, with sourcesContent for the real filename.
-        const code = await readFile(original.split('?')[0]!, 'utf8');
+        const key = canonicalId(original);
+        const serverInput = [...states.values()].map(state => state.transforms.get(key)).find(Boolean);
+        const known = [...states.values()].some(state => state.modules.get(key)?.client);
+        const inSource = !path.relative(roots.srcDir, key.split('?')[0]!).startsWith('..') && sourcePattern.test(key);
+        if (!known && !inSource) this.error(`recooler: unauthorized handler slice ${original}`);
+        const code = serverInput?.source ?? await readFile(original.split('?')[0]!, 'utf8');
         const result = transform(code, { id: original, relativePath: relative(original), mode: 'client-slice',
           moduleKind: kinds.get(original.split('?')[0]!) ?? 'component',
           clientBannedImports: options.htmx && options.htmx.clientBannedImports || undefined });
         for (const diagnostic of result.diagnostics) {
           if (diagnostic.severity === 'error') this.error({ message: diagnostic.message, id: original, pos: diagnostic.start });
         }
+        if (serverInput && JSON.stringify(result.handlers.map(h => h.id)) !== JSON.stringify(serverInput.result.handlers.map(h => h.id))) {
+          this.error(`recooler: handler ids differ between server and client slice: ${original}`);
+        }
+        for (const content of result.map.sourcesContent ?? []) if (content) sliceContents.add(content);
         this.addWatchFile(original.split('?')[0]!);
         return { code: result.code, map: result.map.toString() };
       }
@@ -317,7 +356,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         });
         // invalidateAll must refresh module evaluation, but scope analysis is
         // pure. Keep one source version per module across full dev reloads.
-        if (serving) state.transforms.set(id, { source: code, kind: moduleKind, result });
+        state.transforms.set(id, { source: code, kind: moduleKind, result });
         for (const diagnostic of result.diagnostics) {
           const before = code.slice(0, diagnostic.start);
           const line = before.split('\n').length;
@@ -379,10 +418,24 @@ export function htmxPlugin(options: RecoolerOptions) {
     generateBundle(_options, bundle) {
       if (this.environment.name !== 'client') return;
       if (clientData !== JSON.stringify(builtData?.clients)) this.error('recooler: client route → slice table differs from the server build');
+      if (!Object.values(bundle).some(chunk => chunk.type === 'chunk' && chunk.fileName === clientFile && chunk.facadeModuleId === internalClient)) {
+        this.error(`recooler: ${clientFile} is not the Recooler client entry`);
+      }
+      // Unsliced dependencies can contain tree-shaken server exports. Their
+      // maps retain mappings but never embed original source contents.
+      const redactMap = (map: { sourcesContent?: (string | null)[] }) => {
+        if (map.sourcesContent) map.sourcesContent = map.sourcesContent.map(content => content && sliceContents.has(content) ? content : null);
+      };
+      for (const output of Object.values(bundle)) {
+        if (output.type === 'chunk' && output.map) redactMap(output.map);
+        if (output.type === 'asset' && output.fileName.endsWith('.map') && typeof output.source === 'string') {
+          const map = JSON.parse(output.source); redactMap(map); output.source = JSON.stringify(map);
+        }
+      }
       const patterns = options.htmx && options.htmx.clientBannedImports || [];
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
-        const banned = chunk.moduleIds.filter(id => isBannedModule(patterns, id));
+        const banned = chunk.moduleIds.filter(id => id.includes("__vite-browser-external") || isBannedModule(patterns, id));
         if (banned.length) this.error(`recooler: banned imports in client chunk ${chunk.fileName}:\n${banned.join('\n')}`);
       }
     },
