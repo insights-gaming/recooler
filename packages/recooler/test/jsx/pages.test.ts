@@ -425,6 +425,7 @@ describe('Suspense streaming', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       for (const fail of [false, true]) {
+        const tasks: Promise<unknown>[] = [];
         const Shell = async ({ ctx }: RouteProps) => {
           await Promise.resolve();
           if (fail) throw new Response('shell redirect', { status: 303 });
@@ -433,29 +434,69 @@ describe('Suspense streaming', () => {
         };
         const a = app({ default: (props: RouteProps) => h(Fragment, {},
           h(Suspense, { rid: props.rid, fallback: 'loading' }, Promise.resolve('done')), h(Shell, props)) });
-        const response = await a.request('/');
+        const response = await a.request('/', undefined, undefined, { waitUntil: p => { tasks.push(p); }, passThroughOnException() {}, props: {} });
         expect(response.status).toBe(fail ? 303 : 404);
         const body = await response.text();
         expect(body).toContain(fail ? 'shell redirect' : '<p>missing</p>');
+        await Promise.all(tasks);
+        expect(log).not.toHaveBeenCalled();
       }
       await vi.waitFor(() => expect((globalThis as any).SUSPENSE_ROOT.requests.size).toBe(0));
     } finally { log.mockRestore(); }
   });
 
-  it('cleans up cancelled streams and HEAD requests without unhandled rejections', async () => {
+  it('cleans up cancelled streams and HEAD requests without logging errors or unhandled rejections', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const a = app({ default: ({ rid }: RouteProps) => h(Suspense, { rid, fallback: 'loading' }, Promise.resolve('done')) });
-      const response = await a.request('/');
+      const tasks: Promise<unknown>[] = [];
+      const executionCtx = { waitUntil: (p: Promise<unknown>) => { tasks.push(p); }, passThroughOnException() {}, props: {} };
+      const response = await a.request('/', undefined, undefined, executionCtx);
       const reader = response.body!.getReader();
       expect((await reader.read()).done).toBe(false);
       await reader.cancel('disconnected');
       for (let i = 0; i < 5; i++) {
-        const head = await a.request('/', { method: 'HEAD' });
+        const head = await a.request('/', { method: 'HEAD' }, undefined, executionCtx);
         expect(head.status).toBe(200);
         expect(await head.text()).toBe('');
       }
-      await vi.waitFor(() => expect((globalThis as any).SUSPENSE_ROOT.requests.size).toBe(0));
+      await Promise.all(tasks);
+      expect((globalThis as any).SUSPENSE_ROOT.requests.size).toBe(0);
+      expect(log).not.toHaveBeenCalled();
+    } finally { log.mockRestore(); }
+  });
+
+  it('lets Hono handle a shell Error once after Suspense registers', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new Error('shell failure');
+    const tasks: Promise<unknown>[] = [];
+    try {
+      const Shell = async () => { await Promise.resolve(); throw error; };
+      const a = app({ default: ({ rid }: RouteProps) => h(Fragment, {},
+        h(Suspense, { rid, fallback: 'loading' }, Promise.resolve('done')), h(Shell, {})) });
+      onPageError(a, error => { console.error(error); return new Response('failed', { status: 500 }); });
+      const response = await a.request('/', undefined, undefined, { waitUntil: p => { tasks.push(p); }, passThroughOnException() {}, props: {} });
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe('failed');
+      await Promise.all(tasks);
+      expect(log).toHaveBeenCalledExactlyOnceWith(error);
+      expect((globalThis as any).SUSPENSE_ROOT.requests.size).toBe(0);
+    } finally { log.mockRestore(); }
+  });
+
+  it('still logs deferred stream failures after the shell succeeds', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new Error('template failure');
+    const tasks: Promise<unknown>[] = [];
+    try {
+      const a = app({ default: ({ rid }: RouteProps) => h(Suspense, { rid, fallback: 'loading' }, Promise.resolve('done')) }, undefined, [], {
+        ResolvedTemplate: () => { throw error; },
+      });
+      const response = await a.request('/', undefined, undefined, { waitUntil: p => { tasks.push(p); }, passThroughOnException() {}, props: {} });
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain('loading');
+      await Promise.all(tasks);
+      expect(log).toHaveBeenCalledExactlyOnceWith(error);
     } finally { log.mockRestore(); }
   });
 

@@ -161,17 +161,23 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         let ctxWaitUntil: ((promise: Promise<unknown>) => void) | undefined;
         try { ctxWaitUntil = ctx.executionCtx.waitUntil?.bind(ctx.executionCtx); } catch { /* Node has no executionCtx. */ }
         let body: string | ReadableStream<Uint8Array> | undefined;
+        let cancelled = false;
+        let shellRejected = false;
         try {
           const head = await page.head(ctx);
           const requestScripts = [...page.scripts];
           let shell: JSX.Element | undefined;
           body = await renderToStream(
-            (rid: RouteProps['rid']) => shell = createElement(page.Root(page.Content, page.clientScript), {
+            (rid: RouteProps['rid']) => shell = Promise.resolve(createElement(page.Root(page.Content, page.clientScript), {
               rid, url: new URL(ctx.req.url), ctx, params, head, route: route.path,
               scripts: requestScripts, clientScript: page.clientScript,
-            }),
+            })).catch(error => { shellRejected = true; throw error; }),
             { waitUntil: promise => {
-              const handled = promise.catch(error => { console.error(error); });
+              // Shell errors are handled by render below (and Hono's onError).
+              // Cancelling the engine stream makes its final writer.close() reject.
+              const handled = promise.catch(error => {
+                if (!cancelled && !shellRejected) console.error(error);
+              });
               ctxWaitUntil?.(handled);
             }, ResolvedTemplate: options.ResolvedTemplate,
               cleanupScriptMiddleware: options.suspenseCleanupScriptMiddleware },
@@ -179,12 +185,28 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
           // The engine already awaits the shell before writing. Await it here too,
           // so async status changes and thrown Responses precede response creation.
           await shell;
+          if (body instanceof ReadableStream) {
+            const reader = body.getReader();
+            body = new ReadableStream<Uint8Array>({
+              async pull(controller) {
+                const { done, value } = await reader.read();
+                if (cancelled) return;
+                if (done) { controller.close(); reader.releaseLock(); }
+                else controller.enqueue(value);
+              },
+              cancel(reason) {
+                cancelled = true;
+                return reader.cancel(reason).finally(() => reader.releaseLock());
+              },
+            }, { highWaterMark: 0 });
+          }
           if (ctx.req.method === 'HEAD' && body instanceof ReadableStream) {
             await body.cancel();
             body = '';
           }
           return ctx.newResponse(body, { headers: { 'content-type': 'text/html' } });
         } catch (error) {
+          cancelled = true;
           if (body instanceof ReadableStream) await body.cancel().catch(cancelError => { console.error(cancelError); });
           if (error instanceof Response) return error;
           throw error;
