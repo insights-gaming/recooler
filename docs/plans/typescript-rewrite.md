@@ -335,7 +335,7 @@ Implementation:
   - `generateMap({ hires: true })` keeps correct mappings through moves.
 - **Source maps are a requirement.** Every `transform` hook returns `{ code, map }` from magic-string, and the virtual modules (client entry, `?recooler-handlers` slices, the route table placeholder) return maps or `map: null` only when they have no source. Rolldown chains the per-plugin maps, so no extra composition should be needed; the transform tests assert that original positions of hoisted actions, handlers and untouched code map back correctly (via `@jridgewell/trace-mapping`), and the e2e fixture checks that the built server and client bundles' maps resolve stack frames to `src/` files.
 
-### 3.2 Per-route action registration (D5)
+### 3.2 Per-route action registration (D5, decided: registry plus module graph)
 
 Each route must accept exactly the actions reachable from its module, its layouts and the root, at module precision as in 0.0.27.
 
@@ -351,7 +351,23 @@ Each route must accept exactly the actions reachable from its module, its layout
   - type-only imports and `verbatimModuleSyntax` stop mattering
   - re-exports (`export * from`, `export { x } from`) and side-effect imports are followed, because they are graph edges
 
-**Fallback: appended aggregators**, as in `fixtures/aggregator`, validated on Rolldown 1.2.14 and Farm 1.7.11. Use them only if the graph approach fails in dev or under the Cloudflare plugin. If used, they must be:
+**Requirements from the spikes and their review:**
+- **Build.** Snapshot each module's adjacency once per pass. The uncached walk was slower than aggregators and scaled poorly. Emit only the ids of modules that have actions; listing every reachable id cost +1.14 MB at 1,000 routes.
+- **Dev edges and table.**
+  - Static dev edges come from the server environment's lowered `transformResult.deps`, not `importedModules`, which includes dynamic imports.
+  - Cache adjacency across routes and walk in parallel. The spike's per-route walk took about 2.9 s after an edit at 1,000 routes.
+  - Recompute until the graph epoch is stable, and dedupe concurrent walks.
+  - The table reaches the Worker through a virtual module.
+- **Dev registration.** Every server-environment transform of a source module registers, even with `{}`, so an action removed after a dev-server restart can't survive in the persistent registry. Route reachability alone does not prevent stale actions.
+- **Dev reloads.** For v1, a full SSR reload with `invalidateAll` on change. Scoped invalidation is a later investigation, because the Node runner kept stale route modules without it. Gate on dev time-to-response after an edit.
+- **Environments and dependencies.**
+  - Select the configured Worker environment; `consumer === "server"` is necessary but not sufficient.
+  - Canonicalise `?v=`/`?t=` queries.
+  - Exclude action-bearing dependencies from that environment's `optimizeDeps` and from SSR externals.
+- **Type-only imports.** `import { type T }` under `verbatimModuleSyntax` leaves an empty import that the graph follows; `import type` disappears.
+- **Which routes get registrations.** Only routes with a page, as in 0.0.27. Handler-only routes that import page modules don't get action registrations.
+
+**Fallback (not needed): appended aggregators**, as in `fixtures/aggregator`, validated on Rolldown 1.2.14 and Farm 1.7.11. Use them only if the graph approach fails in dev or under the Cloudflare plugin. If used, they must be:
 - emitted only in the SSR environment and never in client slices; an aggregator in a client module pulls server modules into the browser, and Rolldown keeps and evaluates side-effectful modules even after tree-shaking (`clientOnlyEvaluated: true` in the fixture)
 - computed after TS/JSX lowering, from the surviving `ImportDeclaration`, `ExportAllDeclaration` and `ExportNamedDeclaration`-with-source nodes, including side-effect imports
 - left out of the entry module, `routes.gen.ts` and middleware modules, with the reserved export names documented
@@ -360,19 +376,21 @@ Either way:
 - Dynamic `import()` isn't followed in v1; document this.
 - Barrels over-approximate, as in 0.0.27. Action signing (§3.5) is what limits an action to the routes that actually render it.
 
-### 3.3 Action URLs (D3)
+### 3.3 Action URLs (D3, decided)
 
-**★ Ambient request context.** `actionUrl(id, scope)` reads the rendering request through `hono/context-storage`, which uses AsyncLocalStorage. It returns an absolute URL built from the matched route (`c.req.routePath` with `c.req.param()`, URL-encoded per segment) and the app's mount prefix.
-- This removes `__recooler_self` tokens, route binding, the `ctx`-prop plumbing for URLs, and D3's build-time `[segment]` check.
-- It fixes relative-URL breakage after `hx-push-url`, and in fragments fetched from another route.
-- It requires AsyncLocalStorage on every target: Workers with `nodejs_als` or `nodejs_compat`, Node, Bun and Deno. Phase 1 verifies this.
-- The explicit `ctx` prop keeps working as an override.
+**Decided: ambient request context plus a route binding** (Phase 1 spikes, `docs/plans/spikes.md`, and its review).
 
-**Fallback: route binding.**
-- The transform emits `const __recooler_self = {}` plus `export { __recooler_self as __recooler_module }`.
-- The extension binds route modules to `route.path` at startup.
-- Unbound modules post to a relative `?action=…`.
-- A missing `ctx` in a parameterized route is a render-time error, plus a build-time check for `[segment]` files.
+- **Binding.** The htmx extension's per-route handler runs first in every route registration. From its closure it sets an immutable binding with `c.set(binding, { routeId: route.file, pathname })`, where `pathname` is the request's own pathname (`new URL(c.req.url).pathname`). The binding never comes from `routePath(c)` or `c.req.param()`:
+  - Hono 5 removes `c.req.routePath`.
+  - Hono 5 restores the route index after the handler returns, so deferred Suspense children see `/*` and `{}`.
+  - Re-encoding a decoded catch-all loses `%2F`.
+
+  Every handler in the chain sees the binding: `onGet`/`onRequest` JSX, the page, and action responses that render nested actions.
+- **Reading it.** `actionUrl(id, scope)` reads the binding through `hono/context-storage` (AsyncLocalStorage, verified on Node, Bun, Deno and workerd with `nodejs_als` and `nodejs_compat`, including inside deferred Suspense). It returns `<base><pathname>?action=…&sig=…`. The explicit `ctx` prop keeps working as an override.
+- **Never emit an origin-relative URL.** A root catch-all matches `//evil.example/x`, so the emitted URL must never start with `//` (or `/\`); prefix `/.` in that case. Add a conformance case.
+- **Mounts.** `route()` and `basePath()` are covered, because the pathname already contains the prefix. Hono 4's `app.mount()` and prefix-stripping proxies hide the prefix, so `htmx({ base })` supplies it. Without `base`, `mount` is documented as unsupported for actions.
+- **Owner route.** Actions post to the *rendering* route, not the module that defines them. 0.0.27 posted actions defined in a route module to that module's own path, so its middleware ran. A public page that renders a component exported from an `(admin)` route module now runs that action under the public chain. Document this in the migration guide, and add a conformance scenario.
+- **Hono 5 params.** The page adapter passes a params snapshot in `RouteProps`, because `c.req.param()` is empty in deferred Suspense children on Hono 5.
 
 ### 3.4 Client scripts (D4)
 
@@ -391,7 +409,13 @@ Either way:
   - The entry reads `data-recooler-route`, loads that route's chunk, installs `window.$handlers`, and calls `onLoad` itself. There is no inline script, so no CSP nonce is needed.
   - `hx-on` attributes themselves still need `unsafe-eval`, as with htmx in general; document this.
   - Handlers triggered before the chunk loads: queue them in a tiny stub, or document it.
-- **Build.** Declare `environments.client` with `build.rolldownOptions.input` set to the virtual entry, so one `vite build` builds both environments, as `@cloudflare/vite-plugin` already does. The Environment API is RC, and `createBuilder`/`buildApp` are still `@experimental` in 8.3.4, so pin the Vite minor.
+- **Build.** Declare `environments.client` with `build.rolldownOptions.input` set to the virtual entry, so one `vite build` builds both environments, as `@cloudflare/vite-plugin` already does.
+  - The client entry has a **stable file name** with a `?v=<buildId>` query, so the server never needs the client manifest, and the Cloudflare plugin's own Worker → client order is a correct two-pass build.
+  - Don't override `builder.buildApp` in `config`. The spike did, and it dropped the Cloudflare plugin's asset step and forced `sharedPlugins`.
+  - Assert that the route → slice table the client build uses matches the server build's.
+  - The Environment API is RC, and `createBuilder`/`buildApp` are still `@experimental`, so pin the Vite minor.
+- **Isolation.** Per-route chunks are a performance measure, not a confidentiality boundary: the entry's route map and every chunk are public.
+- **Source maps for slices.** `?recooler-handlers` slices are virtual modules with real source. Produce the transform and the slice from one MagicString, or compose with remapping, and test it.
 - **Server mode.** The transform drops `_handler$N` exports and every import used only by handler bodies. This is required: Rolldown keeps and evaluates side-effectful modules whose importing export was tree-shaken.
 - **`clientBannedImports`.** Port both checks:
   - the per-handler reference chain (`_handler$2 → updateTable → dbClient`), with `import()` and global `require` specifiers
@@ -405,7 +429,7 @@ Either way:
 Ported from `src/helpers.ts`:
 
 - **Helpers:** `wrapAction`, `wrapActionWithPayload`, `actionScope`, `handlerScope`, scope serialization checks, and `actionsMiddleware`, with 0.0.27's result handling and 404 for unknown actions.
-- **★ Sign every action URL (D6),** including actions without captures. Sign over the matched route pattern, method, action id and scope, and verify against `c.req.routePath`.
+- **★ Sign every action URL (D6),** including actions without captures. Sign over the binding's route id (`route.file`) and exact pathname, the method, the action id and the scope. Verify against the receiving registration's own binding. On a mismatch, call `next()`, so fall-through still works and a foreign or replayed URL ends in 404. Because params are inside the pathname, a URL signed on `/users/1` doesn't replay on `/users/2`, and identical paths in different groups are distinguished by route id.
   - This limits an action to the routes that rendered it.
   - In 0.0.27, a route that merely imports a barrel re-exporting an admin component accepts that admin action under its own middleware.
   - Optionally add an expiry and a session id.
@@ -521,10 +545,10 @@ Recommended defaults are marked ★.
 |---|---|---|
 | D1 | Packaging | ★ one package with subpath exports and a new name (before the first publish) · separate packages |
 | D2 | `routes.gen.ts` in git | ★ committed, with `generate --check` in CI · gitignored |
-| D3 | Action URLs | ★ ambient request context (AsyncLocalStorage) · route binding tokens plus a `[segment]` build check |
-| D4 | Client scripts | ★ per-route lazy chunks · one global bundle |
-| D5 | Action registration | ★ registry plus build-time module graph · SSR-only aggregators computed after lowering |
-| D6 | Action signing | ★ every action URL, bound to route pattern and method · captured scopes only (as 0.0.27) |
+| D3 | Action URLs | **Decided:** ambient context plus a per-route binding `{routeId, pathname}` (§3.3) |
+| D4 | Client scripts | **Decided:** per-route lazy chunks, with a stable entry file name (§3.4) |
+| D5 | Action registration | **Decided:** registry plus module graph, with the dev requirements in §3.2 |
+| D6 | Action signing | ★ every action URL, bound to route id, pathname and method · captured scopes only (as 0.0.27) |
 | D7 | CSRF | ★ `HX-Request` plus `Sec-Fetch-Site`/`Origin` on all actions, on by default · opt-in |
 | D8 | Scope analysis | ★ `@typescript-eslint/scope-manager` at runtime · hand-written analyzer |
 | D9 | Middleware order across the plain/group boundary | ★ keep 0.0.27 (plain-directory middleware first; documented) · strict depth order, which loses unmatched-path semantics for plain directories |
