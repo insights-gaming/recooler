@@ -41,14 +41,15 @@ const queue = (...args) => {
   (globalThis.$rq ??= []).push(args);
 };
 globalThis.$rc = (id, scope, element, event) => {
-  if (resuming?.element === element && resuming.type === event.type) return;
+  if (resuming?.elements.has(element) && resuming.type === event.type) return;
   if (loading || marker() !== active) { queue(id, scope, element, event); return; }
   checkVersion(active);
   const fn = handlers[id];
   if (!fn) throw new Error('recooler: handler is not loaded for this route: ' + id);
   return (scope === null ? fn : fn(scope)).call(element, event);
 };
-async function replay([id, scope, element, event]) {
+async function replay(records) {
+  const [, , element, event] = records[0];
   if (!element.isConnected) return;
   let cancelled = false, issued = false;
   // Queueing cancelled the original event. Present the handler with its own
@@ -66,12 +67,16 @@ async function replay([id, scope, element, event]) {
     const value = Reflect.get(target, key, target);
     return typeof value === 'function' ? value.bind(target) : value;
   } });
-  await globalThis.$rc(id, scope, element, replayed);
+  for (const [id, scope, target] of records) {
+    if (!target.isConnected) continue;
+    try { await globalThis.$rc(id, scope, target, replayed); }
+    catch (error) { cancelled = true; report(error); }
+  }
   if (!event.cancelable || cancelled || issued || !element.isConnected) return;
   const source = event.type === 'submit' ? event.target?.closest?.('form')
     : event.type === 'click' ? event.target?.closest?.('a,button,input[type="submit"],input[type="button"]')
     : detail?.elt ?? element;
-  resuming = { element, type: event.type };
+  resuming = { elements: new Set(records.map(args => args[2])), type: event.type };
   try {
     if (event.type === 'htmx:confirm' && typeof detail?.issueRequest === 'function') detail.issueRequest();
     else if (event.type === 'submit' && typeof source?.requestSubmit === 'function') source.requestSubmit(event.submitter ?? undefined);
@@ -106,7 +111,12 @@ async function initialize() {
     loading = false;
     const queued = globalThis.$rq ?? [];
     globalThis.$rq = [];
-    for (const args of queued) { try { await replay(args); } catch (error) { report(error); } }
+    const events = new Map();
+    for (const args of queued) {
+      if (!events.has(args[3])) events.set(args[3], []);
+      events.get(args[3]).push(args);
+    }
+    for (const records of events.values()) { try { await replay(records); } catch (error) { report(error); } }
   })();
   return pending;
 }

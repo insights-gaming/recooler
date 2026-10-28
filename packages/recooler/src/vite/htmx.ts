@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,7 +49,7 @@ export function htmxPlugin(options: RecoolerOptions) {
   let entryUrl: string;
   let buildId: string;
   let base: string;
-  const rendered = new Map<string, TableData>();
+  const rendered = new Map<string, Promise<TableData>>();
   let clientBuild: (() => Promise<unknown>) | undefined;
   let rebuildingClient = Promise.resolve<unknown>(undefined);
   let builtData: TableData | undefined;
@@ -218,8 +218,12 @@ export function htmxPlugin(options: RecoolerOptions) {
             input: (() => {
               const input = _config.environments?.client?.build?.rolldownOptions?.input
                 ?? (existsSync(path.resolve(_config.root ?? process.cwd(), 'index.html')) ? 'index.html' : {});
-              const entries = typeof input === 'string' ? [input] : Array.isArray(input) ? input : undefined;
-              return { ...(entries ? Object.fromEntries(entries.map(id => [path.basename(id, path.extname(id)), id])) : (typeof input === 'object' && !Array.isArray(input) ? input : {})), 'recooler-client': clientId };
+              if (Array.isArray(input)) return [clientId]; // Vite concatenates the user's array.
+              const entries = typeof input === 'string' ? [input] : undefined;
+              const merged = { ...(entries ? Object.fromEntries(entries.map(id => [path.basename(id, path.extname(id)), id])) : typeof input === 'object' && !Array.isArray(input) ? input : {}) };
+              let name = 'recooler-client';
+              while (Object.hasOwn(merged, name)) name += '_';
+              return { ...merged, [name]: clientId };
             })(),
             output: { entryFileNames: chunk => {
               if (chunk.facadeModuleId === internalClient) return clientFile;
@@ -421,10 +425,10 @@ export function htmxPlugin(options: RecoolerOptions) {
         return { code: result.code, map: result.map.toString() };
       },
     },
-    renderChunk(code) {
+    async renderChunk(code) {
       if (!selected(this.environment)) return;
       const state = stateFor(this.environment.name);
-      if (!rendered.has(this.environment.name)) {
+      if (!rendered.has(this.environment.name)) rendered.set(this.environment.name, (async () => {
         // Cache bridge calls AND copied adjacency once per build, not per chunk.
         const adjacency = new Map<string, { deps: readonly string[]; page: boolean } | undefined>();
         const edges = (id: string) => {
@@ -455,8 +459,8 @@ export function htmxPlugin(options: RecoolerOptions) {
           clients[relative(file)] = [...slices].sort();
         }
         const enabled = options.htmx !== false && (options.htmx !== undefined || [...state.modules.values()].some(m => m.htmx));
-        // Hash the exact server inputs plus all static/dynamic graph inputs. No
-        // randomness or absolute project paths enter the public build version.
+        // Derive the version from source/configuration inputs rather than a
+        // random UUID. Client-only source inputs are included below too.
         const clientBuild = this.environment.config.environments.client?.build;
         const hash = createHash('sha256').update(JSON.stringify(clients)).update(clientEntry.toString())
           .update(JSON.stringify({ base, minify: clientBuild?.minify, target: clientBuild?.target,
@@ -467,13 +471,35 @@ export function htmxPlugin(options: RecoolerOptions) {
           if (id === internalTable || !info?.code) continue;
           hash.update(relative(id)).update(state.transforms.get(canonicalId(id))?.source ?? info.code);
         }
+        // Server pruning can remove imports used only by a browser handler.
+        // Include source-tree inputs too, so changing such a helper changes the
+        // version even though it never appears in the surviving server graph.
+        const inputs: string[] = [];
+        const discover = async (directory: string): Promise<void> => {
+          const entries = await readdir(directory, { withFileTypes: true });
+          await Promise.all(entries.map(async entry => {
+            if (['node_modules', '.git', '.cache', 'dist'].includes(entry.name)) return;
+            const file = path.join(directory, entry.name);
+            if (entry.isDirectory()) await discover(file);
+            else if (entry.isFile()) inputs.push(file);
+          }));
+        };
+        await discover(roots.srcDir);
+        for (const file of inputs.sort()) {
+          hash.update(relative(file)).update(new Uint8Array(await readFile(file)));
+          this.addWatchFile(file);
+        }
+        for (const name of ['package.json', 'pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lock']) {
+          const file = path.join(roots.cwd, name);
+          if (existsSync(file)) { hash.update(name).update(new Uint8Array(await readFile(file))); this.addWatchFile(file); }
+        }
         buildId = hash.digest('hex').slice(0, 20);
         builtData = { table, clients, enabled };
         builtData.preloads = preloads(builtData);
-        rendered.set(this.environment.name, builtData);
         state.cached = { ...builtData, epoch: state.epoch };
-      }
-      const data = rendered.get(this.environment.name)!;
+        return builtData;
+      })());
+      const data = await rendered.get(this.environment.name)!;
       if (!code.includes(token) && !code.includes(versionToken)) return;
       const ms = new MagicString(code);
       for (const match of code.matchAll(new RegExp(token + '|' + versionToken, 'g'))) {
@@ -494,7 +520,16 @@ export function htmxPlugin(options: RecoolerOptions) {
         if (map.sourcesContent) map.sourcesContent = map.sourcesContent.map(content => content && sliceContents.has(content) ? content : null);
       };
       for (const output of Object.values(bundle)) {
-        if (output.type === 'chunk' && output.map) redactMap(output.map);
+        if (output.type === 'chunk') {
+          if (output.map) redactMap(output.map);
+          // Rolldown has already embedded inline maps by generateBundle. Update
+          // that payload too; changing chunk.map alone leaves the public copy.
+          output.code = output.code.replace(/(sourceMappingURL=data:application\/json[^,]*;base64,)([A-Za-z0-9+/=]+)/g, (_match, prefix: string, encoded: string) => {
+            const map = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
+            redactMap(map);
+            return prefix + Buffer.from(JSON.stringify(map)).toString('base64');
+          });
+        }
         if (output.type === 'asset' && output.fileName.endsWith('.map') && typeof output.source === 'string') {
           const map = JSON.parse(output.source); redactMap(map); output.source = JSON.stringify(map);
         }
