@@ -1,3 +1,4 @@
+import { confirmHold } from "../confirm.js";
 import MagicString from "magic-string";
 import { contains, ParseError, parseAndAnalyze, unwrap, walk } from "./analysis.js";
 import type { Analysis, Node, Span, Variable } from "./analysis.js";
@@ -272,7 +273,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
         if (options.queueHandlers) {
           // Only htmx:confirm exposes a safe continuation. The fallback is
           // local to this listener and never suppresses native event defaults.
-          const hold = `(a[3].preventDefault(),(self.$rq??=[]).push(a))`;
+          const hold = `((${confirmHold})(a[3])&&(self.$rq??=[]).push(a))`;
           const fallback = options.dev
             ? `(...a)=>a[3].type=="htmx:confirm"?${hold}:console.warn('recooler: dropped '+a[3].type+' while route handlers load')`
             : `(...a)=>a[3].type=="htmx:confirm"&&${hold}`;

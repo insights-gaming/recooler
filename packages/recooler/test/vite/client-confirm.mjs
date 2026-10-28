@@ -56,6 +56,7 @@ async function serve({ root, app }) {
       }
       const response = await app.fetch(new Request(new URL(req.url, s.origin), { headers: req.headers }), { RECOOLER_SECRET: 'k' });
       res.statusCode = response.status; res.setHeader('Content-Type', 'text/html');
+      if (s.rewrite) { res.end(s.rewrite(await response.text())); return; }
       for await (const chunk of response.body) res.write(chunk);
       res.end();
     } catch (e) { res.statusCode = 500; res.end(String(e.stack)); }
@@ -102,7 +103,100 @@ export default (Content, clientScript) => async props => {
     <body hx-boost="true">{content}{clientScript ? <script>{dangerouslyPreventEscaping('(()=>{' + clientScript + '})()')}</script> : null}</body></html>;
 };`;
 
+const guardRoot = (guard) => `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
+export default (Content, clientScript) => async props => {
+  const content = await <Content {...props}/>;
+  return <html><head><meta charset="utf-8"/><script src="/htmx.js"></script><script>{dangerouslyPreventEscaping(${JSON.stringify(guard)})}</script></head>
+    <body hx-boost="true">{content}{clientScript ? <script>{dangerouslyPreventEscaping('(()=>{' + clientScript + '})()')}</script> : null}</body></html>;
+};`;
+const all = () => true;
+const handlersOnly = p => !/client/.test(p);
+const mods = s => s.requests.filter(r => r.includes('/m/'));
+const slow = `const Slow = async ({ ms, children }) => { await new Promise(r => setTimeout(r, ms)); return children; };`;
+const tail = `<Suspense rid={props.rid} fallback={<p>w2</p>}><Slow ms={1500}><p id="late">late</p></Slow></Suspense>`;
+// Runs a scenario in three windows: ready, streamed (fallback or dispatch path), boost from a loaded page, cold boost.
+async function windows(s, ids, act, { cold = '/plain', warm = '/start' } = {}) {
+  const out = {};
+  for (const [variant, match, from] of [['ready', null, null], ['stream-all-held', all, null], ['stream-handlers-held', handlersOnly, null], ['warm-boost-held', handlersOnly, warm], ['cold-boost-held', all, cold]]) {
+    s.requests = [];
+    let p;
+    if (from) {
+      p = await page(s, from); await sleep(300);
+      var b = s.block(match);
+      await p.click('#go-main'); await p.waitForSelector('#' + ids.at(-1)); await sleep(50);
+    } else {
+      var b = match ? s.block(match) : null;
+      p = await page(s, '/', { wait: !match });
+      await p.waitForSelector('#' + ids.at(-1), { timeout: 5000 }); await sleep(match ? 50 : 300);
+    }
+    p.dialogHandler = d => d.accept();
+    const before = await p.evaluate(() => ({ rc: typeof self.$rc, rq: self.$rq?.length ?? 0 }));
+    await act(p); await sleep(100);
+    const whileHeld = mods(s);
+    b?.release(); if (!from) await p.nav;
+    await p.waitForFunction(() => (globalThis.c_loads ?? 0) >= 1, null, { timeout: 4000 }).catch(() => {}); await sleep(700);
+    out[variant] = { before, whileHeld, after: mods(s), dialogs: p.dialogs, state: await p.evaluate(() => Object.fromEntries(Object.entries(globalThis).filter(([k]) => k.startsWith('c_')))), errors: p.errors };
+    await p.close();
+  }
+  return out;
+}
+const startRoutes = {
+  'src/routes/start/index.tsx': `${inc}
+export default () => <><a id="go-main" href="/">main</a><button id="sx" hx-on:click={() => inc('c_sx')}>s</button></>;`,
+  'src/routes/plain/index.tsx': `export default () => <><a id="go-main" href="/">main</a></>;`,
+};
 try {
+  if (want('skew')) {
+    const built = await build('skew', {
+      'src/root.tsx': legacyRoot, 'src/entry.ts': legacyConsumerEntry,
+      'src/routes/index.tsx': `${inc}
+export default () => <>
+  <button id="stop" hx-post="/m/stop" hx-swap="none" hx-on--confirm={e => { e.preventDefault(); inc('stopC'); }}>guarded</button>
+  <input id="cb" type="checkbox" hx-on:click={e => e.preventDefault()}/>
+</>;`,
+    });
+    const s = await serve(built);
+    s.rewrite = html => html.replace(/data-recooler-version="[^"]*"/g, 'data-recooler-version="stale-html"');
+    s.requests = [];
+    const p = await page(s, '/'); await sleep(1500);
+    const docs = s.requests.filter(x => x === 'GET /').length;
+    await p.click('#stop'); await sleep(200);
+    await p.click('#cb');
+    const r = results.skew = { docs, stop: s.count('/m/stop'), stopC: await p.evaluate(() => globalThis.stopC ?? 0), cbChecked: await p.isChecked('#cb'), errors: p.errors, logs: p.logs.filter(l => l.startsWith('error')).slice(0, 3) };
+    assert.equal(r.docs, 2);
+    assert.equal(r.stopC, 0);
+    assert.equal(r.cbChecked, true);
+    check('skew: confirm guard not bypassed under persistent mismatch', r.stop === 0, r);
+    await p.close(); await s.close();
+  }
+
+
+  if (want('competing')) {
+    const guard = `document.addEventListener('htmx:confirm', e => {
+  if (e.target.id === 'g1') { e.preventDefault(); globalThis.c_docDenied = (globalThis.c_docDenied ?? 0) + 1; }
+  if (e.target.id === 'sw') { e.preventDefault(); globalThis.c_swAsked = (globalThis.c_swAsked ?? 0) + 1; setTimeout(() => { if (globalThis.swOk) e.detail.issueRequest(); }, 150); }
+});
+document.addEventListener('htmx:confirm', e => { if(e.target.id === 'capture') e.preventDefault(); }, true);`;
+    const built = await build('competing2', {
+      'src/root.tsx': guardRoot(guard), 'src/entry.ts': legacyConsumerEntry, ...startRoutes,
+      'src/routes/index.tsx': `import { Suspense } from 'recooler/jsx'; ${inc} ${slow}
+export const onLoad = () => inc('c_loads');
+export default props => <>
+  <Suspense rid={props.rid} fallback={<p>w</p>}><Slow ms={100}>
+  <button id="capture" hx-post="/m/capture" hx-swap="none" hx-on--confirm={() => inc('c_capture')}>capture</button>
+  <div hx-on--confirm="event.preventDefault()"><button id="raw-after" hx-post="/m/raw-after" hx-swap="none" hx-on--confirm={() => inc('c_rawAfter')}>raw outer cancels</button></div>
+  <button id="g1" hx-post="/m/g1" hx-swap="none" hx-on--confirm={() => inc('c_g1')}>doc-guarded</button>
+  <button id="sw" hx-post="/m/sw" hx-swap="none" hx-on--confirm={() => inc('c_sw')}>sweetalert pattern</button>
+  <div hx-on--confirm={() => inc('c_outer')}><button id="raw" hx-post="/m/raw" hx-swap="none" hx-on--confirm="event.preventDefault()">raw inner cancels</button></div>
+  </Slow></Suspense>${tail}
+</>;`,
+    });
+    const s = await serve(built);
+    results.competing = await windows(s, ['g1', 'sw', 'raw'], async p => { await p.click('#capture'); await p.click('#raw-after'); await p.click('#g1'); await p.click('#sw'); await p.click('#raw'); });
+    for (const [k, v] of Object.entries(results.competing)) check(`competing ${k}: other listeners' cancels respected`, v.after.length === 0, v);
+    await s.close();
+  }
+
   // ---------------------------------------------------------------------------
   // A. hx-confirm (htmx's own dialog) on a client-bearing page vs a handler-free page.
   if (want('hx-confirm')) {
@@ -199,9 +293,9 @@ export default props => <>
       'entry-wrapper-slow': p => p.endsWith('/recooler-client.js'),
       'route-slow': p => p.includes('recooler-route-'),
       'both-modules-slow': p => p.includes('recooler-route-') || p.endsWith('/recooler-client.js'),
-      'all-but-gate-slow': p => !p.includes('recooler-gate'),
-      'route-graph-first': [p => !p.includes('recooler-gate'), p => p.endsWith('/recooler-client.js')],
-      'entry-first': [p => !p.includes('recooler-gate'), p => p.includes('recooler-route-')],
+      'all-modules-slow': p => true,
+      'route-graph-first': [p => true, p => p.endsWith('/recooler-client.js')],
+      'entry-first': [p => true, p => p.includes('recooler-route-')],
     };
     for (const [variant, match] of Object.entries(variants)) {
       s.requests = []; s.assets = [];
@@ -237,6 +331,49 @@ export default props => <>
 
   // ---------------------------------------------------------------------------
   // D. Gate cost: presence by route, fetches per load/boost, parser blocking.
+  // Processed streamed/swapped controls must execute the fallback without canceling defaults.
+  if (want('native-fallback')) {
+    const built = await build('native-fallback', {
+      'src/root.tsx': legacyRoot, 'src/entry.ts': legacyConsumerEntry, ...startRoutes,
+      'src/routes/index.tsx': `import { Suspense } from 'recooler/jsx'; ${inc} ${slow}
+export const onLoad = () => inc('c_loads');
+export default props => <>
+  <Suspense rid={props.rid} fallback={<p>wait</p>}><Slow ms={100}>
+    <iframe name="native-target"/>
+    <input id="cb" type="checkbox" hx-on:click={e => { e.preventDefault(); inc('c_cb'); }}/>
+    <a id="native-link" href="/m/native-link" target="native-target" hx-boost="false" hx-on:click={e => { e.preventDefault(); inc('c_link'); }}>native link</a>
+    <form action="/m/native-form" method="post" target="native-target" hx-boost="false" hx-on:submit={e => { e.preventDefault(); inc('c_form'); }}><button id="native-submit">native submit</button></form>
+  </Slow></Suspense>${tail}
+</>;`,
+    });
+    const s = await serve(built);
+    const r = results['native-fallback'] = {};
+    for (const from of [null, '/start', '/plain']) {
+      const p = from ? await page(s, from) : null;
+      const b = s.block(() => true);
+      const active = p ?? await page(s, '/', { wait: false });
+      if (p) await p.click('#go-main');
+      await active.waitForSelector('#native-submit');
+      // Check htmx installed real hx-on listeners; parsing alone is insufficient.
+      await active.waitForFunction(() => document.querySelector('#cb')['htmx-internal-data']?.onHandlers?.length > 0);
+      const fallback = await active.evaluate(() => typeof self.$rc === 'undefined');
+      assert.equal(fallback, from !== '/start');
+      s.requests = [];
+      await active.click('#cb');
+      assert.equal(await active.isChecked('#cb'), true);
+      await active.click('#native-link');
+      await active.click('#native-submit');
+      await sleep(100);
+      assert.equal(s.count('/m/native-link'), 1);
+      assert.equal(s.count('/m/native-form'), 1);
+      assert.equal(await active.evaluate(() => (self.c_cb ?? 0) + (self.c_link ?? 0) + (self.c_form ?? 0)), 0);
+      r[from ?? 'streamed'] = { fallback, link: s.count('/m/native-link'), form: s.count('/m/native-form') };
+      b.release(); if (!p) await active.nav;
+      await active.close();
+    }
+    await s.close();
+  }
+
   if (want('gate-cost')) {
     const built = await build('gatecost', {
       'src/root.tsx': legacyRoot,
@@ -272,8 +409,6 @@ export default () => <><a id="toa" href="/">a</a><button id="bc" hx-on:click={()
     r.whileGateHeld = await p2.evaluate(() => ({ afterParsed: !!document.querySelector('#after'), readyState: document.readyState }));
     assert.equal(r.whileGateHeld.afterParsed, true);
     assert.equal(await p2.evaluate(() => typeof self.$rc), 'undefined');
-    await p2.click('#early-check');
-    assert.equal(await p2.isChecked('#early-check'), true, 'unavailable native guards leave browser defaults intact');
     assert.equal(r.gateTagA, undefined);
     assert.equal(r.gateFetchesInitial, 0);
     assert.deepEqual(r.gateFetchesAfterEachBoost, [0, 0, 0, 0]);

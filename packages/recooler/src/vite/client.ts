@@ -1,3 +1,5 @@
+import { confirmHold } from "../htmx/confirm.js";
+
 /** Generated entry; slice maps disclose only surviving client source. */
 export const clientId = 'virtual:recooler/client';
 export const internalClient = '\0' + clientId;
@@ -128,8 +130,12 @@ function register(entries) {
   init();
 }
 const waiting = new WeakMap();
+const holdConfirm = ${confirmHold};
 function dispatch(id, scope, element, event, deferred = false) {
-  if (markers().some(node => !checkVersion(node))) return;
+  if (markers().some(node => !checkVersion(node))) {
+    if (event.type === 'htmx:confirm') event.preventDefault();
+    return;
+  }
   if (!deferred && available(id) && !waiting.has(event)) {
     return invoke(id, scope, element, event);
   }
@@ -140,16 +146,17 @@ function dispatch(id, scope, element, event, deferred = false) {
     ${dev ? `console.warn('recooler: dropped ' + event.type + ' while route handlers load');` : ''}
     return;
   }
+  if (!holdConfirm(event)) return;
   let batch = waiting.get(event);
   if (!batch) {
-    const confirm = event.type === 'htmx:confirm' && typeof event.detail?.issueRequest === 'function';
-    if (confirm) event.preventDefault();
+    const confirm = true;
+    const hold = event.__recoolerHold;
     batch = { records: [], confirm };
     waiting.set(event, batch);
     queueMicrotask(async () => {
       try {
         await init();
-        if (markers().some(node => !checkVersion(node))) return;
+        if (hold.cancelled || markers().some(node => !checkVersion(node))) return;
         let cancelled = false, issued = false;
         const detail = confirm ? new Proxy(event.detail, { get(target, key) {
           if (key === 'issueRequest') return (...args) => { issued = true; return target.issueRequest(...args); };
@@ -167,7 +174,7 @@ function dispatch(id, scope, element, event, deferred = false) {
           if (!available(id)) { cancelled = true; continue; }
           try { await invoke(id, scope, target, late); } catch (error) { cancelled = true; report(error); }
         }
-        if (confirm && !cancelled && !issued && event.detail.elt?.isConnected !== false) event.detail.issueRequest();
+        if (confirm && !hold.cancelled && !cancelled && !issued && event.detail.elt?.isConnected !== false) event.detail.issueRequest();
       } catch (error) { report(error); }
     });
   }
