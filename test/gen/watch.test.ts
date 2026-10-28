@@ -1,11 +1,14 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { watch as fsWatch } from 'node:fs';
+import { mkdirSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { watchRoutes } from '../../src/gen/index.js';
 
-const io = vi.hoisted(() => ({ beforeRead: undefined as ((file: string) => Promise<void>) | undefined }));
+const io = vi.hoisted(() => ({
+  beforeRead: undefined as ((file: string) => Promise<void>) | undefined,
+  beforeWatch: undefined as ((dir: string) => void) | undefined,
+}));
 vi.mock('node:fs/promises', async importOriginal => {
   const original = await importOriginal<typeof import('node:fs/promises')>();
   return { ...original, readFile: async (...args: Parameters<typeof original.readFile>) => {
@@ -15,11 +18,15 @@ vi.mock('node:fs/promises', async importOriginal => {
 });
 vi.mock('node:fs', async importOriginal => {
   const original = await importOriginal<typeof import('node:fs')>();
-  return { ...original, watch: vi.fn(original.watch) };
+  return { ...original, watch: vi.fn((...args: Parameters<typeof original.watch>) => {
+    io.beforeWatch?.(String(args[0]));
+    return original.watch(...args);
+  }) };
 });
 const temporary: string[] = [];
 afterEach(async () => {
   io.beforeRead = undefined;
+  io.beforeWatch = undefined;
   await Promise.all(temporary.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
 });
 async function fixture() {
@@ -103,11 +110,27 @@ it('uses only non-recursive ancestor watches for a missing nested srcDir', async
     expect(vi.mocked(fsWatch).mock.calls.map(call => [call[0], call[1]])).toContainEqual([cwd, { recursive: false }]);
     expect(vi.mocked(fsWatch).mock.calls.filter(call => (call[1] as { recursive?: boolean }).recursive).map(call => call[0]))
       .toEqual([path.join(cwd, 'src/routes')]);
-    await mkdir(path.join(cwd, 'missing/source'), { recursive: true });
-    await writeFile(path.join(cwd, 'missing/source/root.tsx'), 'export const head = {};');
+    // Create the child between the ancestor stat and watch enrollment. Linux
+    // does not replay that creation to the newly attached ancestor watcher.
+    io.beforeWatch = dir => {
+      if (dir !== path.join(cwd, 'missing')) return;
+      io.beforeWatch = undefined;
+      mkdirSync(path.join(cwd, 'missing/source'));
+      writeFileSync(path.join(cwd, 'missing/source/root.tsx'), 'export const head = {};');
+    };
+    await mkdir(path.join(cwd, 'missing'));
     await vi.waitFor(() => expect(results.at(-1)).toContain('rootFile: "root.tsx"'), { timeout: 10000 });
     // The newly created source watcher must also notice subsequent root edits.
     await rm(path.join(cwd, 'missing/source/root.tsx'));
     await vi.waitFor(() => expect(results.at(-1)).not.toContain('rootFile:'), { timeout: 10000 });
+    // Replacing either parent must reattach watches to the new inodes.
+    for (const dir of ['missing', 'missing/source']) {
+      await rm(path.join(cwd, dir), { recursive: true });
+      await mkdir(path.join(cwd, 'missing/source'), { recursive: true });
+      await writeFile(path.join(cwd, 'missing/source/root.tsx'), 'export const head = {};');
+      await vi.waitFor(() => expect(results.at(-1)).toContain('rootFile: "root.tsx"'), { timeout: 10000 });
+      await rm(path.join(cwd, 'missing/source/root.tsx'));
+      await vi.waitFor(() => expect(results.at(-1)).not.toContain('rootFile:'), { timeout: 10000 });
+    }
   } finally { await watcher.close(); }
 }, 30000);

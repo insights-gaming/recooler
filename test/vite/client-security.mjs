@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, readdir, writeFile, symlink, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, realpath, writeFile, symlink, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createBuilder, createServer } from 'vite';
@@ -12,7 +13,7 @@ const packageDir = fileURLToPath(new URL('../../', import.meta.url));
 await mkdir(path.join(packageDir, '.cache'), { recursive: true });
 const root = await mkdtemp(path.join(packageDir, '.cache/client-security-'));
 const write = async (name, code) => { await mkdir(path.dirname(path.join(root, name)), { recursive: true }); await writeFile(path.join(root, name), code); };
-const outside = await mkdtemp('/private/tmp/recooler-client-outside-');
+const outside = await realpath(await mkdtemp(path.join(tmpdir(), 'recooler-client-outside-')));
 let generation = 0, server;
 const build = async (client = {}, plugins = [], htmx = {}) => {
   const builder = await createBuilder({ root, configFile: false, logLevel: 'silent', plugins: [...plugins, ...recooler({ htmx })],
@@ -23,6 +24,7 @@ const build = async (client = {}, plugins = [], htmx = {}) => {
   return { builder, app, html: await (await app.fetch(new Request('http://test/'), { RECOOLER_SECRET: 'map-key' })).text() };
 };
 try {
+  assert(!outside.startsWith(await realpath(packageDir) + path.sep), 'fixture must be outside the package allow list');
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules')); await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);

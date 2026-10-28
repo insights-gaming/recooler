@@ -11,7 +11,7 @@ Reproduce from the repository root (Farm resolves/scans relative to cwd):
 
 ```sh
 fixtures="$PWD/test/jsx/fixtures"
-oracle="$(mktemp -d /private/tmp/recooler-jsx-oracle.XXXXXX)"
+oracle="$(mktemp -d "${TMPDIR:-/tmp}/recooler-jsx-oracle.XXXXXX")"
 cp "$fixtures/farm-package.json" "$oracle/package.json"
 cp "$fixtures/farm-pnpm-lock.yaml" "$oracle/pnpm-lock.yaml"
 cp "$fixtures/capture-farm.mjs" "$oracle/capture-farm.mjs"

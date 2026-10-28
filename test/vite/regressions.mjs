@@ -23,7 +23,12 @@ const sockets = [];
 const waitFor = async (check) => {
   const end = Date.now() + 10000;
   while (true) {
-    if (await check()) return;
+    if (await check()) {
+      // Chokidar drops same-file changes within 50ms on inotify. Let the
+      // observed update leave that window before making the next edit.
+      await new Promise(resolve => setTimeout(resolve, 60));
+      return;
+    }
     if (Date.now() > end) throw new Error('watch update timed out');
     await new Promise(resolve => setTimeout(resolve, 40));
   }

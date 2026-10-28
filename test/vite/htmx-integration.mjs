@@ -186,6 +186,8 @@ try {
     await new Promise(resolve => setTimeout(resolve, 25));
   } while (true);
   const editResponseMs = performance.now() - editStart;
+  // Let chokidar's 50ms same-file inotify throttle expire before removal.
+  await new Promise(resolve => setTimeout(resolve, 60));
   const oldUrl = actions(await (await request('/')).text())[2];
   await write('src/components/Button.tsx', `export const Button = () => <p>removed</p>;`);
   const removalDeadline = Date.now() + 15000;

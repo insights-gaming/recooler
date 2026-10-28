@@ -165,7 +165,7 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
   let closed = false;
   let queue = Promise.resolve();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const watchers: FSWatcher[] = [];
+  const watchers = new Set<FSWatcher>();
   const close = async () => {
     closed = true;
     clearTimeout(timer);
@@ -185,7 +185,7 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
     timer = setTimeout(() => { queue = queue.then(generate).catch(report); }, 20);
   };
   const attach = (watcher: FSWatcher) => {
-    watchers.push(watcher);
+    watchers.add(watcher);
     watcher.on('error', error => { void close(); report(error); });
   };
   // fs.watch has no ready event. Observe a private sentinel before allowing callers
@@ -196,10 +196,11 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
     let ready!: () => void;
     let isReady = false;
     const observed = new Promise<void>(resolve => { ready = () => { isReady = true; resolve(); }; });
-    attach(fsWatch(dir, { recursive }, (_event, filename) => {
+    const watcher = fsWatch(dir, { recursive }, (_event, filename) => {
       if (String(filename) === sentinel) { ready(); return; }
       changed(filename === null ? null : String(filename));
-    }));
+    });
+    attach(watcher);
     const deadline = Date.now() + 10000;
     try {
       // Enrollment can miss the first write. Retry until an event is observed.
@@ -211,29 +212,51 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
         try { await Promise.race([observed, new Promise<void>(resolve => { timer = setTimeout(resolve, 25); })]); }
         finally { clearTimeout(timer); }
       }
-    } finally { await unlink(file).catch(() => {}); }
+    } catch (error) { watcher.close(); watchers.delete(watcher); throw error; }
+    finally { await unlink(file).catch(() => {}); }
+    return watcher;
   };
-  const sourceWatchDirs = new Set<string>();
+  const sourceWatchDirs = new Map<string, { watcher: FSWatcher; dev: number; ino: number }>();
   let sourceQueue = Promise.resolve();
+  let firstSourceWatch = true;
   const watchSource = async () => {
     // Only direct children matter for root.tsx. If srcDir is missing, watch an
     // existing ancestor non-recursively, then descend when its children appear.
-    let dir = srcDir;
-    while (true) {
-      try { await stat(dir); break; }
-      catch (error) {
+    while (!closed) {
+      // Linux watches stay attached to deleted inodes, not their replacements.
+      for (const [dir, watched] of sourceWatchDirs) {
+        const current = await stat(dir).catch(error => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+        if (current?.dev === watched.dev && current.ino === watched.ino) continue;
+        watched.watcher.close(); watchers.delete(watched.watcher); sourceWatchDirs.delete(dir);
+      }
+      // Keep a parent watch even when the source already exists.
+      let dir = firstSourceWatch ? path.dirname(srcDir) : srcDir;
+      let current;
+      while (true) {
+        try { current = await stat(dir); break; }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          dir = path.dirname(dir);
+        }
+      }
+      if (closed || sourceWatchDirs.has(dir)) return;
+      try {
+        const watcher = await watchReady(dir, false, filename => {
+          const file = filename === null ? dir : path.resolve(dir, filename);
+          if (filename === null || filename === path.basename(dir) || file === path.join(srcDir, 'root.tsx') || file === srcDir || srcDir.startsWith(file + path.sep)) {
+            sourceQueue = sourceQueue.then(watchSource).then(run).catch(report);
+          }
+        });
+        sourceWatchDirs.set(dir, { watcher, dev: current.dev, ino: current.ino });
+        firstSourceWatch = false;
+      } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-        dir = path.dirname(dir);
       }
+      // A child may have appeared between stat and native enrollment. Descend
+      // again before generation, even if that creation event was missed.
     }
-    if (closed || sourceWatchDirs.has(dir)) return;
-    sourceWatchDirs.add(dir);
-    await watchReady(dir, false, filename => {
-      const file = filename === null ? dir : path.resolve(dir, filename);
-      if (filename === null || file === path.join(srcDir, 'root.tsx') || file === srcDir || srcDir.startsWith(file + path.sep)) {
-        sourceQueue = sourceQueue.then(watchSource).then(run).catch(report);
-      }
-    });
   };
   try {
     await watchReady(routesDir, true, filename => {
