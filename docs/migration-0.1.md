@@ -1,5 +1,12 @@
 # Migrating to recooler 0.1
 
+## Package
+
+0.1 is published as `@insights-gaming/recooler` and runs on Vite 8 instead of Farm.
+Replace `farm-plugin-recooler` and `@farmfe/*` with `@insights-gaming/recooler` and
+`vite`, and import `DefaultRootHOC`, `ErrorBoundary` and the other page helpers from
+`@insights-gaming/recooler/jsx` instead of `farm-plugin-recooler/helpers`.
+
 ## Routing and the generator
 
 - Custom-pattern parameters now always sort before plain parameters at the same position
@@ -20,7 +27,7 @@
   in generated imports was incompatible with TypeScript, Vite and routing.
 - Generator `importExtension: '.tsx'` becomes `'source'`, which keeps each source file's
   extension. The `.js` mode keeps `.jsx` source imports as `.jsx` for Vite resolution.
-- Import the `routes()` Vite plugin from `recooler/vite`; `recooler/gen` is the standalone
+- Import the `routes()` Vite plugin from `@insights-gaming/recooler/vite`; `@insights-gaming/recooler/gen` is the standalone
   generator and has no Vite dependency in its declarations.
 - Extension array handlers must declare their `methods`; they run only on those methods
   (`ALL` means every method, GET includes HEAD). Missing or empty `methods` for array
@@ -56,7 +63,7 @@ with deployment: local preview and deployed builds can need different profiles.
 ```ts
 import { defineConfig } from 'vite';
 import { cloudflare } from '@cloudflare/vite-plugin';
-import { recooler } from 'recooler/vite';
+import { recooler } from '@insights-gaming/recooler/vite';
 import { deploymentProfiles } from './build-profiles'; // private, explicit maps
 
 export default defineConfig(({ mode }) => {
@@ -118,21 +125,21 @@ the browser-handler section for client loading and the legacy-root opt-in.
 
 ## JSX pages
 
-Use `recooler/jsx` for the JSX page adapter and runtime:
+Use `@insights-gaming/recooler/jsx` for the JSX page adapter and runtime:
 
 ```json
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "recooler/jsx"
+    "jsxImportSource": "@insights-gaming/recooler/jsx"
   }
 }
 ```
 
-Use `plugins: recooler()` from `recooler/vite` to generate routes and import
+Use `plugins: recooler()` from `@insights-gaming/recooler/vite` to generate routes and import
 `virtual:recooler/app` from your server entry. With Cloudflare, use
 `plugins: [cloudflare(), ...recooler()]` and retain the platform builder.
-The plugin defaults JSX to `recooler/jsx` per file, respects nested/referenced
+The plugin defaults JSX to `@insights-gaming/recooler/jsx` per file, respects nested/referenced
 tsconfigs, file pragmas and explicit OXC or legacy esbuild configuration, and
 warns for other effective runtimes. The htmx transform relies on this runtime to
 remove Context values from intrinsic attributes, including props spreads.
@@ -143,7 +150,7 @@ runtime imports; aliases do not rewrite externalized dependencies. See the
 [JSX README](../src/jsx/README.md) for the alias recipe and Node
 ESM bundling requirements.
 
-Import `RouteProps`, `RouteHead`, and `RouteHeadFn` explicitly from `recooler/jsx`;
+Import `RouteProps`, `RouteHead`, and `RouteHeadFn` explicitly from `@insights-gaming/recooler/jsx`;
 these are no longer ambient global types. Augment `RouteEnv` in that module to
 type the default route context's bindings and variables. `RouteProps.params` is a
 readonly snapshot captured when the page handler runs. Use it in deferred
@@ -184,7 +191,7 @@ for DOMContentLoaded before onLoad, including legacy dynamic imports. See the br
 
 ## htmx action URLs and security (D3/D6/D7)
 
-Configure `htmx({ table, secret })` from `recooler/htmx` as a `createApp` extension
+Configure `htmx({ table, secret })` from `@insights-gaming/recooler/htmx` as a `createApp` extension
 alongside `jsxPages()`. The reachability table maps manifest `route.file` IDs to
 registered action-bearing module IDs, including roots, layouts and shared static
 imports. The table is static; development invalidates the virtual table and reloads the
@@ -289,7 +296,7 @@ preserves page/action paths and the manifest already includes `/_admin`, leave
 
 ## Browser handlers and custom roots (Phase 5)
 
-Use `...recooler()` from `recooler/vite`. One **`vite build`** now builds the
+Use `...recooler()` from `@insights-gaming/recooler/vite`. One **`vite build`** now builds the
 server followed by the browser environment. Programmatic integrations must use
 `createBuilder(config).buildApp()`; Vite's legacy `build(config)` builds a single
 environment. Recooler uses its own post `buildApp` hook for plain Vite and leaves
@@ -401,7 +408,7 @@ Already-string hx-on attributes keep their behavior and unsafe-eval CSP needs.
 htmx 1.9.12 installs wildcard hx-on listeners after synchronous load requests, so
 a raw string load-confirm guard can be bypassed, including a cold boost from a
 handler-free page (also true in 0.0.27). Generated confirm listeners now include a
-legacy `hx-on` alias, emitted by the `recooler/jsx` runtime, that runs before
+legacy `hx-on` alias, emitted by the `@insights-gaming/recooler/jsx` runtime, that runs before
 htmx 1 issues load requests, then is replaced by the normal listener; htmx 2 ignores this alias. This protects generated guards
 even with slow assets and the streamed `.forEach(htmx.process)` pattern, without
 intercepting unrelated confirms. Consumers retaining
@@ -478,9 +485,9 @@ an application-owned entry. The virtual app does not accept custom page-adapter
 options. Preserve streamed-template and cleanup hooks explicitly:
 
 ```ts
-import { createApp } from 'recooler/router';
-import { jsxPages, type RouteEnv } from 'recooler/jsx';
-import { htmx } from 'recooler/htmx';
+import { createApp } from '@insights-gaming/recooler/router';
+import { jsxPages, type RouteEnv } from '@insights-gaming/recooler/jsx';
+import { htmx } from '@insights-gaming/recooler/htmx';
 import { manifest } from './routes.gen';
 import { table, clients, clientEntry, clientPreloads, clientModules, namespace } from 'virtual:recooler/htmx';
 
@@ -504,15 +511,15 @@ generated-environment checklist below. Supply `htmx<YourEnv>` explicitly when a 
 entry needs a typed binding callback; the surrounding `createApp<YourEnv>` does
 not infer that generic for a nested call. Provision the binding for every Worker
 that renders or dispatches actions. Do not turn it into a Vite define. Import
-`Suspense`, `ErrorBoundary` and `renderHeadElements` from `recooler/jsx` in place
+`Suspense`, `ErrorBoundary` and `renderHeadElements` from `@insights-gaming/recooler/jsx` in place
 of the old helpers module.
 
 The old global `HonoContext`, `FormActionFn` and `EventHandlerFn` declarations
 are gone along with the ambient route types. Import `RouteContext` (or Hono's
-`Context<YourEnv>`) and the callback types from `recooler/jsx`; its automatic
+`Context<YourEnv>`) and the callback types from `@insights-gaming/recooler/jsx`; its automatic
 runtime supplies contextual types for inline htmx attributes. Tests that mock
 `easy-jsx-html-engine/jsx-runtime` to inspect JSX nodes must mock
-`recooler/jsx/jsx-runtime` after changing the import source. `RouteProps` gained
+`@insights-gaming/recooler/jsx/jsx-runtime` after changing the import source. `RouteProps` gained
 `params`, `route` and `scripts`; helper components that only need `ctx` and `url`
 should use `Pick<RouteProps, 'ctx' | 'url'>` rather than omitting a few fields
 from the full page contract.

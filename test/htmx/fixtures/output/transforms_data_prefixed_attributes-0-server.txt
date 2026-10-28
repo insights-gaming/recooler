@@ -1,4 +1,4 @@
-import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, handlerScope as __recooler_handlerScope, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
+import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, handlerScope as __recooler_handlerScope, registerActions as __recooler_registerActions } from "@insights-gaming/recooler/htmx/runtime";
 export default function C(__recooler_props) {
 	let { msg } = __recooler_props;
 	return <form data-hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", { "msg": msg }, c)} ctx={c}>

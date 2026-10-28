@@ -1,9 +1,9 @@
-# recooler/vite
+# @insights-gaming/recooler/vite
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { recooler } from 'recooler/vite';
+import { recooler } from '@insights-gaming/recooler/vite';
 
 export default defineConfig({
   plugins: recooler({ routes: { /* srcDir, routesDir, out, check, ... */ } }),
@@ -17,7 +17,7 @@ import app from 'virtual:recooler/app';
 export default app;
 ```
 
-For TypeScript entries, add `/// <reference types="recooler/vite/client" />` to
+For TypeScript entries, add `/// <reference types="@insights-gaming/recooler/vite/client" />` to
 your `env.d.ts`.
 
 The virtual module exports **only default**, equivalent to
@@ -43,7 +43,7 @@ manifest inputs containing `:`; it does not disable the filesystem allow-list.
 These directory names cannot be checked out on Windows; prefer `routes/[id]/`.
 The generator returns a portability warning for names containing `:`.
 
-JSX defaults to the automatic `recooler/jsx` runtime per file. The plugin adds
+JSX defaults to the automatic `@insights-gaming/recooler/jsx` runtime per file. The plugin adds
 pragmas only when the file's own tsconfig and pragmas do not select a source or
 classic/preserved JSX. Solution-style tsconfig references, nested configs,
 JSONC/extends and explicit `oxc.jsx` settings are respected. When `oxc` is unset,
@@ -51,7 +51,7 @@ Vite converts legacy `esbuild` options, including `jsxInject`, as usual. Any
 other effective runtime warns because it bypasses request-bound Context filtering.
 
 Every server-consumer environment gets `resolve.noExternal` entries for
-`recooler` and `easy-jsx-html-engine`: the engine's extensionless internal imports
+`@insights-gaming/recooler` and `easy-jsx-html-engine`: the engine's extensionless internal imports
 cannot run as native Node ESM. A [vitefu dependency crawl](https://github.com/svitejs/vitefu)
 also bundles packages declaring either package in `dependencies` or
 `peerDependencies`, keeping the JSX runtime in the same bundle. Declare consumed
@@ -80,8 +80,8 @@ generation invalidates the app so requests cannot silently use a stale route tab
 The virtual app uses the same augmentable `RouteEnv` as page components:
 
 ```ts
-import 'recooler/jsx';
-declare module 'recooler/jsx' {
+import '@insights-gaming/recooler/jsx';
+declare module '@insights-gaming/recooler/jsx' {
   interface RouteEnv { Bindings: { API_KEY: string } }
 }
 ```
@@ -121,7 +121,7 @@ Custom entries configure `htmx({ secret })` themselves and can import the graph:
 
 ```ts
 import { table, clients, clientEntry, clientPreloads, clientModules, namespace } from 'virtual:recooler/htmx';
-import { htmx } from 'recooler/htmx';
+import { htmx } from '@insights-gaming/recooler/htmx';
 // createApp(manifest, { pages: jsxPages(), extensions: [htmx({
 //   table, clients, clientEntry, clientPreloads, clientModules, namespace, secret: env => env.RECOOLER_SECRET,
 // })] });
@@ -171,7 +171,7 @@ including `{}` when actions are absent. Idle and auxiliary environments receive 
 empty-registration imports before they load the table. Changes invalidate only the virtual table and use a full SSR runner reload. Route generation runs before platform
 startup hooks, so eager workerd imports see the initial graph.
 
-Action packages must remain source inputs. Packages declaring `recooler` or
+Action packages must remain source inputs. Packages declaring `@insights-gaming/recooler` or
 `easy-jsx-html-engine` in dependencies/peerDependencies are discovered by the
 framework dependency crawl, excluded from the selected server's `optimizeDeps`,
 and bundled rather than SSR-externalized. For packages without such a declaration,
@@ -253,7 +253,7 @@ from recooler's own prevention. Use the event's `preventDefault()` method.
 
 htmx 1.9.12 installs wildcard hx-on listeners after issuing synchronous load
 requests. This also affects 0.0.27 and cold boosts from handler-free pages. Generated
-confirm attributes rendered with `recooler/jsx` receive a legacy `hx-on` alias
+confirm attributes rendered with `@insights-gaming/recooler/jsx` receive a legacy `hx-on` alias
 which evaluates their canonical attribute early; htmx 1 replaces this listener during normal processing
 and htmx 2 ignores it. Raw string hx-on load guards still have the upstream htmx 1
 ordering limitation. Consumers retaining `jsxImportSource: easy-jsx-html-engine`

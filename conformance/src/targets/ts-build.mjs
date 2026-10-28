@@ -1,7 +1,7 @@
 // Build outside Vitest's own Vite server; only the self-contained output is
 // evaluated in the runner's realm (where middleware traces are observed).
 import { createBuilder } from 'vite';
-import { recooler } from 'recooler/vite';
+import { recooler } from '@insights-gaming/recooler/vite';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -10,7 +10,7 @@ try {
   const builder = await createBuilder({
     root, mode: 'production', configFile: false, logLevel: 'warn',
     plugins: recooler({ htmx: JSON.parse(await readFile(path.join(root, 'htmx-options.json'), 'utf8')) }),
-    resolve: { alias: { 'farm-plugin-recooler/helpers': 'recooler/jsx' } },
+    resolve: { alias: { 'farm-plugin-recooler/helpers': '@insights-gaming/recooler/jsx' } },
     ssr: { noExternal: true },
     environments: { client: { build: { outDir: 'client' } } },
     build: {

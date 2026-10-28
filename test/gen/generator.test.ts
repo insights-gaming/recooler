@@ -230,11 +230,11 @@ it('generates the missing manifest before a real Vite SSR build resolves the ent
   const { fileURLToPath } = await import('node:url');
   const cwd = await fixture({
     'src/routes/index.ts': 'export function onGet(c: any) { return c.text("api"); }',
-    'src/entry.ts': 'import { createApp } from "recooler/router"; import { manifest } from "./routes.gen.js"; export default createApp(manifest);',
+    'src/entry.ts': 'import { createApp } from "@insights-gaming/recooler/router"; import { manifest } from "./routes.gen.js"; export default createApp(manifest);',
   });
   const result = await build({
     root: cwd, configFile: false, logLevel: 'silent', plugins: [routes({ importExtension: '.js' })],
-    resolve: { alias: { 'recooler/router': fileURLToPath(new URL('../../src/router/index.ts', import.meta.url)) } },
+    resolve: { alias: { '@insights-gaming/recooler/router': fileURLToPath(new URL('../../src/router/index.ts', import.meta.url)) } },
     build: { ssr: 'src/entry.ts', write: false },
   });
   expect(await readFile(path.join(cwd, 'src/routes.gen.ts'), 'utf8')).toContain('routes/index.js');
@@ -322,7 +322,7 @@ it('starts a real Vite 8 dev server with invalid routes, revalidates edits, and 
   const cwd = await fixture({
     'src/routes/index.ts': 'export const onGet = (c: any) => c.text("get");',
     'src/routes/middleware.ts': middleware,
-    'src/entry.ts': 'import { createApp } from "recooler/router"; import { manifest } from "./routes.gen.js"; export default createApp(manifest);',
+    'src/entry.ts': 'import { createApp } from "@insights-gaming/recooler/router"; import { manifest } from "./routes.gen.js"; export default createApp(manifest);',
   });
   // Keep a generated manifest so actual namespaces can report startup errors at runtime.
   await generateRoutes({ cwd, importExtension: '.js' });
@@ -331,7 +331,7 @@ it('starts a real Vite 8 dev server with invalid routes, revalidates edits, and 
   const errors = vi.spyOn(logger, 'error');
   const server = await createServer({
     root: cwd, configFile: false, customLogger: logger, plugins: [routes({ importExtension: '.js' })],
-    resolve: { alias: { 'recooler/router': fileURLToPath(new URL('../../src/router/index.ts', import.meta.url)) } },
+    resolve: { alias: { '@insights-gaming/recooler/router': fileURLToPath(new URL('../../src/router/index.ts', import.meta.url)) } },
     server: { port: 0, host: '127.0.0.1', watch: { usePolling: true, interval: 100 } },
   });
   try {

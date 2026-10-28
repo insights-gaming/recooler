@@ -1,8 +1,8 @@
-# recooler/gen
+# @insights-gaming/recooler/gen
 
 ```ts
-import { generateRoutes } from 'recooler/gen';
-import { routes } from 'recooler/vite';
+import { generateRoutes } from '@insights-gaming/recooler/gen';
+import { routes } from '@insights-gaming/recooler/vite';
 
 await generateRoutes({ importExtension: '.js' });
 // vite.config.ts
@@ -36,11 +36,11 @@ initial generation is still pending. Awaiting `watchRoutes` itself also guarante
 debounced events are serialized. Routes can live outside a missing srcDir; its existing
 ancestors are watched non-recursively until the source directory appears. It watches
 content edits for validation as well as structural changes.
-The `recooler/vite` `routes()` plugin runs before build and on dev add/unlink/change
+The `@insights-gaming/recooler/vite` `routes()` plugin runs before build and on dev add/unlink/change
 (including root.tsx), using Vite's watcher. Build failures throw; serve-mode failures are
 logged so the dev server can start and `createApp` can validate loaded namespaces.
 Generator failures throw `RouteValidationError`; stale checks throw
-`StaleRoutesError`. Generated code imports only `recooler/router` types and user namespaces;
+`StaleRoutesError`. Generated code imports only `@insights-gaming/recooler/router` types and user namespaces;
 loading the manifest and creating an app never require Vite or the generator.
 
 Routes are `index.[jt]sx?`, layouts are `layout.[jt]sx?`, and middleware are

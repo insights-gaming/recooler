@@ -18,7 +18,7 @@ async function execute(source: string, options: Partial<TransformOptions> = {}) 
   expect(result.diagnostics).toEqual([]);
   const js = (await transformWithOxc(result.code, 'test.tsx', {
     jsx: { runtime: 'classic', pragma: '__jsx', pragmaFrag: '__fragment' },
-  })).code.replaceAll('"recooler/htmx/runtime"', JSON.stringify(runtimeUrl));
+  })).code.replaceAll('"@insights-gaming/recooler/htmx/runtime"', JSON.stringify(runtimeUrl));
   const module = await import(/* @vite-ignore */ url(`
     function __jsx(type, props, ...children) { return { type, props: props ?? {}, children }; }
     const __fragment = 'fragment';

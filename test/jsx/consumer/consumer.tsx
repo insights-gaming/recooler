@@ -1,5 +1,5 @@
-import 'recooler/vite/client';
-import { DefaultRootHOC, ErrorBoundary, Suspense, jsxPages, type RouteHead, type RouteHeadFn, type RouteProps } from 'recooler/jsx';
+import '@insights-gaming/recooler/vite/client';
+import { DefaultRootHOC, ErrorBoundary, Suspense, jsxPages, type RouteHead, type RouteHeadFn, type RouteProps } from '@insights-gaming/recooler/jsx';
 import type { Context } from 'hono';
 
 export const head: RouteHead = { title: 'typed', metas: [{ charset: 'utf-8' }] };
@@ -12,7 +12,7 @@ export const context: Context = {} as Context;
 export const invalid = <p title={123}>bad</p>;
 
 // Module augmentation types every default RouteProps/RouteHeadFn context.
-declare module 'recooler/jsx' {
+declare module '@insights-gaming/recooler/jsx' {
   interface RouteEnv { Bindings: { DB: string }; Variables: { user: string } }
 }
 export const bindings = (props: RouteProps) => {
@@ -38,7 +38,7 @@ app.get('/typed', c => {
 
 // Inline htmx callbacks must receive contextual types under strict/noImplicitAny.
 const actionTypes = <form hx-post={(ctx, payload) => {
-  const context: import('recooler/jsx').RouteContext = ctx;
+  const context: import('@insights-gaming/recooler/jsx').RouteContext = ctx;
   return context.text(String(payload.value));
 }} hx-on:click={function (event) {
   const element: Element = this;

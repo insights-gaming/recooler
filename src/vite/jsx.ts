@@ -73,9 +73,9 @@ export function jsxDefaults(): Plugin {
   let stop: (() => void) | undefined;
   const warned = new Set<string>();
   const warn = (source: string) => {
-    if (source === 'recooler/jsx' || warned.has(source)) return;
+    if (source === '@insights-gaming/recooler/jsx' || warned.has(source)) return;
     warned.add(source);
-    config.logger.warn(`recooler: use jsx importSource "recooler/jsx" instead of ${JSON.stringify(source)} for request-bound JSX rendering`);
+    config.logger.warn(`recooler: use jsx importSource "@insights-gaming/recooler/jsx" instead of ${JSON.stringify(source)} for request-bound JSX rendering`);
   };
   return {
     // Phase 4b's htmx client-slice transform must run before this pre plugin.
@@ -115,7 +115,7 @@ export function jsxDefaults(): Plugin {
       const result = new MagicString(code);
       const hashbangEnd = code.startsWith('#!') ? code.indexOf('\n') : -1;
       const offset = code.startsWith('#!') ? (hashbangEnd < 0 ? code.length : hashbangEnd + 1) : 0;
-      result.appendLeft(offset, (offset === code.length && offset > 0 ? '\n' : '') + '/** @jsxRuntime automatic @jsxImportSource recooler/jsx */\n');
+      result.appendLeft(offset, (offset === code.length && offset > 0 ? '\n' : '') + '/** @jsxRuntime automatic @jsxImportSource @insights-gaming/recooler/jsx */\n');
       return { code: result.toString(), map: result.generateMap({ hires: 'boundary', source: id, includeContent: true }) };
     },
   };

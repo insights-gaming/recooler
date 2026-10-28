@@ -631,7 +631,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         const ms = new MagicString(code);
         let helper = '__recooler_clear_' + createHash('sha256').update(id).digest('hex');
         while (code.includes(helper)) helper += '_';
-        ms.append(`\nimport { registerActions as ${helper} } from 'recooler/htmx/runtime';\n${helper}(${JSON.stringify(relative(id))}, {}, ${JSON.stringify(namespace)});\n`);
+        ms.append(`\nimport { registerActions as ${helper} } from '@insights-gaming/recooler/htmx/runtime';\n${helper}(${JSON.stringify(relative(id))}, {}, ${JSON.stringify(namespace)});\n`);
         return { code: ms.toString(), map: ms.generateMap({ hires: true, source: id, includeContent: true }) };
       },
     },

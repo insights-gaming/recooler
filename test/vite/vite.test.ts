@@ -39,11 +39,11 @@ test('keeps Vite JSX configuration and legacy esbuild conversion intact', async 
   logger.warn = message => { warnings.push(message); };
   const config = { configFile: false as const, plugins: recooler(), customLogger: logger, build: { ssr: true } };
   const defaults = await resolveConfig(config, 'build');
-  expect(defaults.environments.ssr!.resolve.noExternal).toEqual(expect.arrayContaining(['recooler', 'easy-jsx-html-engine']));
+  expect(defaults.environments.ssr!.resolve.noExternal).toEqual(expect.arrayContaining(['@insights-gaming/recooler', 'easy-jsx-html-engine']));
   const custom = await resolveConfig({ ...config, oxc: { jsx: { importSource: 'custom-jsx' } }, ssr: { noExternal: true }, environments: { server: { consumer: 'server' } } }, 'build');
   expect(custom.oxc).toMatchObject({ jsx: { importSource: 'custom-jsx' } });
   expect(custom.environments.ssr!.resolve.noExternal).toBe(true);
-  expect(custom.environments.server!.resolve.noExternal).toEqual(expect.arrayContaining(['recooler', 'easy-jsx-html-engine']));
+  expect(custom.environments.server!.resolve.noExternal).toEqual(expect.arrayContaining(['@insights-gaming/recooler', 'easy-jsx-html-engine']));
   expect(warnings.some(w => w.includes('custom-jsx'))).toBe(true);
   const legacy = await resolveConfig({ ...config, esbuild: { jsx: 'automatic', jsxImportSource: 'hono/jsx', jsxInject: 'import { h } from "x"' } }, 'build');
   expect(legacy.oxc).toMatchObject({ jsx: { importSource: 'hono/jsx' }, jsxInject: 'import { h } from "x"' });

@@ -38,9 +38,9 @@ export default () => <><Button value="page"/><Outside/><Dependency/><p>{cycle}</
 let server, builtPreview, auxiliary;
 try {
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('package.json', JSON.stringify({ name: 'recooler-test-app', type: 'module', dependencies: { 'fixture-actions': '1.0.0' } }));
-  await write('node_modules/fixture-actions/package.json', JSON.stringify({ name: 'fixture-actions', type: 'module', exports: './index.tsx', peerDependencies: { recooler: '*' } }));
+  await write('node_modules/fixture-actions/package.json', JSON.stringify({ name: 'fixture-actions', type: 'module', exports: './index.tsx', peerDependencies: { '@insights-gaming/recooler': '*' } }));
   await write('node_modules/fixture-actions/index.tsx', `export const Dependency = () => <form hx-post={() => 'dependency'}/>;`);
   await write('tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', verbatimModuleSyntax: true } }));
   await write('src/routes/index.tsx', pageSource);
@@ -54,7 +54,7 @@ try {
   await write('src/components/dynamic.tsx', `export const Dynamic = () => <form hx-post={() => 'dynamic'}/>;`);
   await write('outside/extra.tsx', `export const Outside = () => <form hx-post={() => 'outside'}/>;`);
   await write('src/routes/layout.tsx', `export default Content => props => <><form hx-post={() => 'layout'}/><Content {...props}/></>;`);
-  await write('src/root.tsx', `import { DefaultRootHOC } from 'recooler/jsx'; export default Content => DefaultRootHOC(props => <><form hx-post={() => 'root'}/><Content {...props}/></>);`);
+  await write('src/root.tsx', `import { DefaultRootHOC } from '@insights-gaming/recooler/jsx'; export default Content => DefaultRootHOC(props => <><form hx-post={() => 'root'}/><Content {...props}/></>);`);
   await write('src/routes/handler/index.ts', `import { Button } from '../../components/Button'; export const onGet = c => c.text(typeof Button);`);
   await write('src/routes/:id/index.ts', `export const onGet = c => c.text('colon route ' + c.req.param('id'));`);
   await write('src/routes/table/index.ts', `import { table, namespace } from 'virtual:recooler/htmx'; export const onGet = c => c.json({ table, namespace });`);
@@ -167,7 +167,7 @@ try {
   if (kind === 'cloudflare') {
     assert.equal(await (await request('/aux')).text(), 'auxiliary worker');
     const auxSource = await server.environments.aux_worker.transformRequest(path.join(auxiliary, 'src/index.ts'));
-    assert(!auxSource.code.includes('recooler/htmx/runtime'), 'idle auxiliary environments must not receive registrations');
+    assert(!auxSource.code.includes('@insights-gaming/recooler/htmx/runtime'), 'idle auxiliary environments must not receive registrations');
   }
   const [devGraph] = await Promise.all([inspectGraph(request), inspectGraph(request)]);
   assert.deepEqual(devGraph.table, builtGraph.table);

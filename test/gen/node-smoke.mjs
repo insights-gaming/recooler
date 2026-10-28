@@ -18,15 +18,15 @@ function run(binary, args, expected = 0) {
 try {
   await put('package.json', '{"type":"module"}');
   await mkdir(path.join(dir, 'node_modules'));
-  await symlink(pkgRoot, path.join(dir, 'node_modules/recooler'));
+  await mkdir(path.join(dir, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(pkgRoot, path.join(dir, 'node_modules/@insights-gaming/recooler'));
   await mkdir(path.dirname(cli));
-  await symlink('../recooler/dist/gen/cli.js', cli);
+  await symlink('../@insights-gaming/recooler/dist/gen/cli.js', cli);
   await put('src/routes/(staff)/middleware.ts', 'export default async (c: any, next: any) => c.req.header("x-staff") === "yes" ? next() : c.text("blocked", 401);');
   await put('src/routes/(staff)/posts/[id]/index.ts', 'export function onPost(c: any) { return c.text("post:" + c.req.param("id")); }');
   await put('src/routes/.well-known/index.ts', 'export function onGet(c: any) { return c.text("hidden"); }');
   await put('src/routes/[n{[0-9]+}]/index.ts', 'export function onGet(c: any) { return c.text("numeric"); }');
   await put('src/routes/[id]/index.ts', 'export function onGet(c: any) { return c.text("plain"); }');
-  await put('src/entry.ts', 'import { createApp } from "recooler/router"; import { manifest } from "./routes.gen.js"; export default createApp(manifest);');
+  await put('src/entry.ts', 'import { createApp } from "@insights-gaming/recooler/router"; import { manifest } from "./routes.gen.js"; export default createApp(manifest);');
   await put('tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext', rootDir: 'src', outDir: 'build', strict: true, skipLibCheck: true }, include: ['src'] }));
   run(process.execPath, [cli, 'generate', '--import-extension', '.js', '--check'], 1);
   run(process.execPath, [realCli, 'generate', '--import-extension', '.js', '--check'], 1);

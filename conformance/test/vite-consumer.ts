@@ -1,4 +1,4 @@
-/// <reference types="recooler/vite/client" />
+/// <reference types="@insights-gaming/recooler/vite/client" />
 import app from 'virtual:recooler/app';
 
 const response: Response | Promise<Response> = app.fetch(new Request('http://test/'));

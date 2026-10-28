@@ -26,7 +26,7 @@ let server, second;
 try {
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/entry.ts', `import app from 'virtual:recooler/app'; app.onError(e => new Response(e.stack, { status: 500 })); export default app;`);
   await write('src/routes/index.tsx', plain('initial'));
   await write('src/components/Late.tsx', `export const Late = () => <form hx-post={() => 'late'}/>;`);

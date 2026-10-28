@@ -1,4 +1,4 @@
-import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
+import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "@insights-gaming/recooler/htmx/runtime";
 export default function C(__recooler_props) {
 	let { items, k } = __recooler_props;
 	const out = [];

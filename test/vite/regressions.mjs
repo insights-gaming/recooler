@@ -27,13 +27,13 @@ const waitFor = async (check) => {
 };
 try {
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('package.json', JSON.stringify({ name: 'recooler-test-app', type: 'module', dependencies: { 'ui-lib': '1.0.0' } }));
   await write('tsconfig.json', '{}');
   await write('src/routes/index.tsx', `import { Badge } from 'ui-lib'; export default () => <h1><Badge/></h1>;`);
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
-  await write('node_modules/ui-lib/package.json', JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', exports: './index.js', peerDependencies: { recooler: '*' } }));
-  await write('node_modules/ui-lib/index.js', `import { jsx } from 'recooler/jsx/jsx-runtime'; export const Badge = () => jsx('b', { children: 'dependency' });`);
+  await write('node_modules/ui-lib/package.json', JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', exports: './index.js', peerDependencies: { '@insights-gaming/recooler': '*' } }));
+  await write('node_modules/ui-lib/index.js', `import { jsx } from '@insights-gaming/recooler/jsx/jsx-runtime'; export const Badge = () => jsx('b', { children: 'dependency' });`);
   const base = { root, configFile: false, logLevel: 'silent', plugins: recooler(), mode: 'production' };
   const builder = await createBuilder({ ...base, plugins: recooler({ serverEnvironment: 'server' }), environments: { ssr: { build: { rolldownOptions: { input: 'src/entry.ts' } } }, server: { consumer: 'server', build: { outDir: 'dist/server', rolldownOptions: { input: 'src/entry.ts' } } } } });
   assert(builder.environments.server.config.resolve.noExternal.includes('ui-lib'));
@@ -49,8 +49,8 @@ try {
   await write('app.test.tsx', `import { expect, test } from 'vitest'; import app from './src/entry'; import excluded from './src/excluded.test'; test('app', async () => { expect(await (await app.fetch(new Request('http://test/'))).text()).toContain('dependency'); expect((await (<p>outside</p>)).toHTML()).toBe('<p>outside</p>'); expect((await excluded()).toHTML()).toBe('<p>excluded</p>'); });`);
   // Vitest 5's default runner transforms imports in ssr, not __vitest__.
   for (const override of [undefined, 'ssr', '__vitest__']) {
-    await write('tsconfig.json', JSON.stringify({ include: ['src'], exclude: ['**/*.test.tsx'], compilerOptions: { jsxImportSource: 'recooler/jsx' } }));
-    await write('vite.config.mjs', `import { recooler } from 'recooler/vite'; export default { plugins: recooler(${JSON.stringify(override ? { serverEnvironment: override } : {})}), test: { include: ['app.test.tsx'] } };`);
+    await write('tsconfig.json', JSON.stringify({ include: ['src'], exclude: ['**/*.test.tsx'], compilerOptions: { jsxImportSource: '@insights-gaming/recooler/jsx' } }));
+    await write('vite.config.mjs', `import { recooler } from '@insights-gaming/recooler/vite'; export default { plugins: recooler(${JSON.stringify(override ? { serverEnvironment: override } : {})}), test: { include: ['app.test.tsx'] } };`);
     const run = () => execute(process.execPath, [path.join(packageDir, 'node_modules/vitest/vitest.mjs'), 'run', '--root', root, '--config', path.join(root, 'vite.config.mjs')], { cwd: root, timeout: 30000, env: { ...process.env, NODE_ENV: 'test' } });
     if (override === '__vitest__') await assert.rejects(run(), error => /restricted to serverEnvironment/.test(error.stdout + error.stderr));
     else await run();
@@ -91,9 +91,9 @@ try {
   await write('src/line-pragma.tsx', '// @jsxImportSource hono/jsx\nexport default <b/>;');
   await write('src/last-pragma.tsx', '/** @jsxImportSource preact */\n/** @jsxImportSource hono/jsx */\nexport default <b/>;');
   await write('src/classic-pragma.tsx', '/** @jsxRuntime classic @jsx h */\n/** @jsxRuntime invalid */\nexport default <b/>;');
-  await write('src/included/tsconfig.json', '{"include":["app"],"compilerOptions":{"jsxImportSource":"recooler/jsx"}}');
+  await write('src/included/tsconfig.json', '{"include":["app"],"compilerOptions":{"jsxImportSource":"@insights-gaming/recooler/jsx"}}');
   await write('src/included/test/outside.tsx', 'export default <b/>;');
-  await write('src/excluded/tsconfig.json', '{"exclude":["**/*.test.tsx"],"compilerOptions":{"jsxImportSource":"recooler/jsx"}}');
+  await write('src/excluded/tsconfig.json', '{"exclude":["**/*.test.tsx"],"compilerOptions":{"jsxImportSource":"@insights-gaming/recooler/jsx"}}');
   await write('src/excluded/app.test.tsx', 'export default <b/>;');
   await write('src/pragma.tsx', '/** @jsxImportSource hono/jsx */\nexport default <b/>;');
   await write('tsconfig.json', '{"files":[],"references":[{"path":"./tsconfig.app.json"}]}');
@@ -103,28 +103,28 @@ try {
   const logger = createLogger('silent');
   logger.warn = value => warnings.push(value);
   const jsxCases = [
-    ['default', 'recooler/jsx'], ['ref/index', 'hono/jsx'], ['nested/index', 'hono/jsx'], ['pragma', 'hono/jsx'],
-    ['directive-pragma', 'hono/jsx'], ['line-pragma', 'hono/jsx'], ['last-pragma', 'hono/jsx'], ['native/index', 'recooler/jsx'],
-    ['included/test/outside', 'recooler/jsx'], ['excluded/app.test', 'recooler/jsx'],
-    ...Object.keys(defaults).map(name => [name, 'recooler/jsx']),
+    ['default', '@insights-gaming/recooler/jsx'], ['ref/index', 'hono/jsx'], ['nested/index', 'hono/jsx'], ['pragma', 'hono/jsx'],
+    ['directive-pragma', 'hono/jsx'], ['line-pragma', 'hono/jsx'], ['last-pragma', 'hono/jsx'], ['native/index', '@insights-gaming/recooler/jsx'],
+    ['included/test/outside', '@insights-gaming/recooler/jsx'], ['excluded/app.test', '@insights-gaming/recooler/jsx'],
+    ...Object.keys(defaults).map(name => [name, '@insights-gaming/recooler/jsx']),
   ];
   server = await createServer({ ...base, plugins: recooler(), customLogger: logger, server: { middlewareMode: true, ws: false } });
   for (const [file, runtime] of jsxCases) {
     const transformed = await server.environments.ssr.transformRequest('/src/' + file + '.tsx');
-    assert.match(transformed.code, new RegExp(runtime.replace('recooler/jsx', 'recooler/(?:dist/)?jsx') + '/jsx-'));
+    assert.match(transformed.code, new RegExp(runtime.replace('@insights-gaming/recooler/jsx', '(?:@insights-gaming/)?recooler/(?:dist/)?jsx') + '/jsx-'));
   }
   assert.match((await server.environments.ssr.transformRequest('/src/classic/index.tsx')).code, /h\(/);
   assert.match((await server.environments.ssr.transformRequest('/src/classic-pragma.tsx')).code, /h\(/);
   assert(!warnings.some(w => /preact|preserved JSX/.test(w)), warnings.join('\n'));
   assert(warnings.some(w => w.includes('hono/jsx')));
   assert(warnings.some(w => w.includes('classic JSX runtime')));
-  await write('src/nested/tsconfig.json', '{"compilerOptions":{"jsxImportSource":"recooler/jsx"}}');
+  await write('src/nested/tsconfig.json', '{"compilerOptions":{"jsxImportSource":"@insights-gaming/recooler/jsx"}}');
   await waitFor(async () => /recooler\/(?:dist\/)?jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/nested/index.tsx')).code));
   await write('src/nested/tsconfig.json', '{"compilerOptions":{"jsxImportSource":"hono/jsx"}}');
   await waitFor(async () => /hono\/jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/nested/index.tsx')).code));
   await write('src/included/tsconfig.json', '{"include":["test"],"compilerOptions":{"jsxImportSource":"hono/jsx"}}');
   await waitFor(async () => /hono\/jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/included/test/outside.tsx')).code));
-  await write('src/included/tsconfig.json', '{"include":["app"],"compilerOptions":{"jsxImportSource":"recooler/jsx"}}');
+  await write('src/included/tsconfig.json', '{"include":["app"],"compilerOptions":{"jsxImportSource":"@insights-gaming/recooler/jsx"}}');
   await waitFor(async () => /recooler\/(?:dist\/)?jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/included/test/outside.tsx')).code));
   await server.close(); server = undefined;
   for (const [file, runtime] of jsxCases) {

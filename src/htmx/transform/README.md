@@ -1,7 +1,7 @@
 # Bundler-independent htmx transform
 
 ```ts
-import { transform } from "recooler/htmx/transform";
+import { transform } from "@insights-gaming/recooler/htmx/transform";
 
 const result = transform(source, {
   id: "/project/src/routes/index.tsx",
@@ -153,7 +153,7 @@ registerActions(moduleId, { post: { "src/routes/index.tsx@0": _action$post$0 } }
 Both defaults are small exported functions in `codegen.ts` and can be overridden
 with `options.codegen.actionUrl` / `registerActions`. Their inputs include a
 collision-free local runtime helper name. All generated runtime imports come from
-`recooler/htmx/runtime`. That subpath is implemented by the
+`@insights-gaming/recooler/htmx/runtime`. That subpath is implemented by the
 [server runtime](../README.md); executing server output requires a route binding
 from the `htmx()` router extension. Client slices register their own handlers and
 do not import that server runtime.

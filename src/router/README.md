@@ -1,7 +1,7 @@
-# recooler/router
+# @insights-gaming/recooler/router
 
 ```ts
-import { createApp } from 'recooler/router';
+import { createApp } from '@insights-gaming/recooler/router';
 import { manifest } from './routes.gen.js';
 
 export default createApp(manifest);

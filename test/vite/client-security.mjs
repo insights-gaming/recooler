@@ -24,7 +24,7 @@ const build = async (client = {}, plugins = [], htmx = {}) => {
 };
 try {
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');
-  await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules')); await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/helper.tsx', `export const unusedServer = () => 'TREE_SHAKEN_SQL_SECRET'; export const Browser = () => 'browser';`);
   await write('src/routes/index.tsx', `import { Browser } from '../helper';
@@ -87,7 +87,7 @@ export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id
   assert(stale.sessionStorage.length > 0, 'version mismatch records a reload guard');
   await stale.happyDOM.close();
   // Alias layout and root slices must use the same resolved chains as D5.
-  await write('src/root.tsx', `import { DefaultRootHOC } from 'recooler/jsx';
+  await write('src/root.tsx', `import { DefaultRootHOC } from '@insights-gaming/recooler/jsx';
     export default Content => DefaultRootHOC(props => <><button id="root-handler" hx-on:click={function() { this.textContent = 'root handler'; }}/><Content {...props}/></>);`);
   await write('src/routes/[id]/layout.tsx', `export default Content => props => <><button id="alias-handler" hx-on:click={function() { this.textContent = 'alias handler'; }}/><Content {...props}/></>;`);
   await write('src/routes/:id/edit/index.tsx', `export const onLoad = () => { globalThis.aliasLoaded = true; }; export default () => <p>alias child</p>;`);

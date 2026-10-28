@@ -54,5 +54,5 @@ router manifest. It compares complete strings after exactly these intended chang
 
 There is no whitespace normalization or broad script/attribute stripping.
 `exports/` separately covers real namespace imports for the head export forms.
-`runtime-wrapper.tsx` compiles actual props spreads with `recooler/jsx` as its
+`runtime-wrapper.tsx` compiles actual props spreads with `@insights-gaming/recooler/jsx` as its
 import source; it receives no htmx transform.

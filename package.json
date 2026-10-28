@@ -1,11 +1,11 @@
 {
-  "name": "recooler",
+  "name": "@insights-gaming/recooler",
   "version": "0.1.0",
   "description": "File-based routing, JSX pages and htmx actions for Hono on Vite",
   "type": "module",
   "license": "MIT",
   "repository": {
-    "url": "https://github.com/ssttevee/recooler"
+    "url": "https://github.com/insights-gaming/recooler"
   },
   "exports": {
     "./router": {
@@ -60,6 +60,9 @@
     "dist",
     "src"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.build.json && tsc -p test/jsx/consumer/tsconfig.json --noEmit",

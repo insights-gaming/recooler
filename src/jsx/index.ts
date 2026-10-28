@@ -9,7 +9,7 @@ import type { Children, Component, ErrorBoundaryProps, ResolvedTemplateProps, Su
 import { mergePageExtras, RouteValidationError, type PageAdapter, type ResolvedRoute } from '../router/index.js';
 export { createElement } from './jsx-runtime.js';
 
-/** Augment this interface in recooler/jsx to type route bindings and variables. */
+/** Augment this interface in @insights-gaming/recooler/jsx to type route bindings and variables. */
 export interface RouteEnv extends Env {}
 export type RouteContext = Context<RouteEnv>;
 

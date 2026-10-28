@@ -1,9 +1,9 @@
 // Bundled only into private probe Workers. Namespace slots retain source provenance.
-import { createApp as originalCreateApp, resolveRoutes } from 'recooler/router';
-import { htmx as originalHtmx } from 'recooler/htmx';
-import { getActionRegistry, findRegisteredAction } from 'recooler/htmx/runtime';
-export * from 'recooler/router';
-export * from 'recooler/htmx';
+import { createApp as originalCreateApp, resolveRoutes } from '@insights-gaming/recooler/router';
+import { htmx as originalHtmx } from '@insights-gaming/recooler/htmx';
+import { getActionRegistry, findRegisteredAction } from '@insights-gaming/recooler/htmx/runtime';
+export * from '@insights-gaming/recooler/router';
+export * from '@insights-gaming/recooler/htmx';
 
 import { sourceFile } from './source-label.mjs';
 const sourceRoot = /* equivalence-source-root */ 'src';

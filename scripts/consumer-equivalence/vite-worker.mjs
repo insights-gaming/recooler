@@ -22,7 +22,7 @@ process.chdir(packageRoot);
 const require = createRequire(join(packageRoot, 'package.json'));
 const viteRequire = fixture ? createRequire(join(repo, 'package.json')) : require;
 const { createBuilder, loadConfigFromFile } = await import(pathToFileURL(viteRequire.resolve('vite')));
-const recoolerRoot = fixture ? repo : dirname(require.resolve('recooler/package.json'));
+const recoolerRoot = fixture ? repo : dirname(require.resolve('@insights-gaming/recooler/package.json'));
 const { default: MagicString } = await import(pathToFileURL(createRequire(join(recoolerRoot, 'package.json')).resolve('magic-string')));
 const shimId = '\0virtual:recooler-equivalence';
 let instrumented = false;
@@ -45,8 +45,8 @@ const instrumentation = {
     return (await readFile(join(here, 'vite-instrument.mjs'), 'utf8'))
       .replace("/* equivalence-source-root */ 'src'", JSON.stringify(spec.sourceRoot ?? 'src'))
       .replace("'./source-label.mjs'", JSON.stringify(join(here, 'source-label.mjs')))
-      .replaceAll("'recooler/router'", JSON.stringify(join(recoolerRoot, 'dist/router/index.js')))
-      .replaceAll("'recooler/htmx'", JSON.stringify(join(recoolerRoot, 'dist/htmx/index.js')));
+      .replaceAll("'@insights-gaming/recooler/router'", JSON.stringify(join(recoolerRoot, 'dist/router/index.js')))
+      .replaceAll("'@insights-gaming/recooler/htmx'", JSON.stringify(join(recoolerRoot, 'dist/htmx/index.js')));
   },
 };
 const fixturePort = {
@@ -56,9 +56,9 @@ const fixturePort = {
       return code.replace('export default createApp', `import pages from ${JSON.stringify(join(packageRoot, 'src/handler.ts'))};\nexport default createApp`).replace('pages: jsxPages()', 'pages');
     }
     if (!id.startsWith(packageRoot + '/') || id.includes('node_modules')) return;
-    code = code.replaceAll('recooler::app', 'virtual:recooler/app').replaceAll('farm-plugin-recooler/helpers', 'recooler/jsx')
+    code = code.replaceAll('recooler::app', 'virtual:recooler/app').replaceAll('farm-plugin-recooler/helpers', '@insights-gaming/recooler/jsx')
       .replaceAll('CreateJSXRouteHandlerFactory', 'jsxPages').replace(/(from\s+["'][^"']+\.css)(["'])/g, '$1?inline$2');
-    if (/\.[jt]sx$/.test(id)) code = '/** @jsxImportSource recooler/jsx */\n' + code;
+    if (/\.[jt]sx$/.test(id)) code = '/** @jsxImportSource @insights-gaming/recooler/jsx */\n' + code;
     return code;
   },
 };

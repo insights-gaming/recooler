@@ -309,7 +309,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
       ms.append(`\nconst ${table} = globalThis.$handlers ??= {};\n${handlers.map(c => `${table}[${JSON.stringify(c.id)}] = ${c.exportName};`).join("\n")}\n`);
     }
   }
-  if (helpers.size) ms.prepend(`import { ${[...helpers].map(([name, alias]) => `${name} as ${alias}`).join(", ")} } from "recooler/htmx/runtime";\n`);
+  if (helpers.size) ms.prepend(`import { ${[...helpers].map(([name, alias]) => `${name} as ${alias}`).join(", ")} } from "@insights-gaming/recooler/htmx/runtime";\n`);
   return result(candidates);
 }
 

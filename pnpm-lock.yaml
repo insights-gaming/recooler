@@ -84,6 +84,9 @@ importers:
       '@farmfe/plugin-react':
         specifier: 1.2.6
         version: 1.2.6
+      '@insights-gaming/recooler':
+        specifier: workspace:*
+        version: link:..
       '@types/node':
         specifier: ^22.1.0
         version: 22.1.0
@@ -96,9 +99,6 @@ importers:
       hono:
         specifier: ^4.13.14
         version: 4.13.14
-      recooler:
-        specifier: workspace:*
-        version: link:..
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -155,6 +155,9 @@ importers:
 
   playground:
     dependencies:
+      '@insights-gaming/recooler':
+        specifier: workspace:*
+        version: link:..
       easy-jsx-html-engine:
         specifier: ^0.1.13
         version: 0.1.13
@@ -164,9 +167,6 @@ importers:
       htmx.org:
         specifier: ^2.0.11
         version: 2.0.11
-      recooler:
-        specifier: workspace:*
-        version: link:..
     devDependencies:
       '@types/node':
         specifier: ^22.1.0

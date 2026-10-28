@@ -22,10 +22,10 @@ async function evaluate(source: string, relativePath: string, options: Partial<T
   const output = transform(source, { id: relativePath, relativePath, moduleKind: 'route', mode: 'server', ...options });
   expect(output.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
   let lowered = (await transformWithOxc(output.code, relativePath, {
-    jsx: { runtime: 'automatic', importSource: 'recooler/jsx' },
-  })).code.replaceAll('"recooler/htmx/runtime"', JSON.stringify(bridge))
-    .replaceAll('"recooler/jsx/jsx-runtime"', JSON.stringify(bridge))
-    .replaceAll('"recooler/jsx"', JSON.stringify(bridge));
+    jsx: { runtime: 'automatic', importSource: '@insights-gaming/recooler/jsx' },
+  })).code.replaceAll('"@insights-gaming/recooler/htmx/runtime"', JSON.stringify(bridge))
+    .replaceAll('"@insights-gaming/recooler/jsx/jsx-runtime"', JSON.stringify(bridge))
+    .replaceAll('"@insights-gaming/recooler/jsx"', JSON.stringify(bridge));
   for (const [specifier, resolved] of Object.entries(imports)) lowered = lowered.replaceAll(JSON.stringify(specifier), JSON.stringify(resolved));
   const url = dataUrl(`// evaluation ${serial++}\n${lowered}`);
   return { module: await import(/* @vite-ignore */ url), url, output };

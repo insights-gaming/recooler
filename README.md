@@ -9,14 +9,14 @@ Since 0.1, recooler is a set of TypeScript modules and a [Vite](https://vite.dev
 ## Quick Start
 
 ```sh
-pnpm add recooler hono easy-jsx-html-engine htmx.org
+pnpm add @insights-gaming/recooler hono easy-jsx-html-engine htmx.org
 pnpm add -D vite
 ```
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { recooler } from 'recooler/vite';
+import { recooler } from '@insights-gaming/recooler/vite';
 
 export default defineConfig({
   plugins: recooler(),
@@ -31,14 +31,14 @@ export { default } from 'virtual:recooler/app';
 
 ```ts
 // src/env.d.ts
-/// <reference types="recooler/vite/client" />
+/// <reference types="@insights-gaming/recooler/vite/client" />
 ```
 
 Pages are the default exports of `index.tsx` files under `src/routes`. A function passed to an `hx-*` attribute becomes a signed form action that runs on the server:
 
 ```tsx
 // src/routes/posts/[id]/index.tsx
-import type { RouteProps } from 'recooler/jsx';
+import type { RouteProps } from '@insights-gaming/recooler/jsx';
 
 export default function Post({ ctx }: RouteProps) {
   return (
@@ -55,7 +55,7 @@ htmx itself is loaded like any other script, for example from the head of the op
 ```tsx
 // src/root.tsx
 import htmxURL from 'htmx.org/dist/htmx.min.js?url';
-import type { RouteHead } from 'recooler/jsx';
+import type { RouteHead } from '@insights-gaming/recooler/jsx';
 
 export const head: RouteHead = { title: 'Recooler', scripts: [{ src: htmxURL }] };
 ```
@@ -68,11 +68,11 @@ With [`@cloudflare/vite-plugin`](https://developers.cloudflare.com/workers/vite-
 
 | Module | |
 | --- | --- |
-| [`recooler/vite`](src/vite/README.md) | Vite plugin: route generation, JSX, htmx actions and client event handlers |
-| [`recooler/router`](src/router/README.md) | builds a Hono app from the route manifest; runs without Vite |
-| [`recooler/gen`](src/gen/README.md) | standalone route manifest generator and `recooler-routes` CLI |
-| [`recooler/jsx`](src/jsx/README.md) | JSX pages, layouts, head functions and the root component |
-| [`recooler/htmx`](src/htmx/README.md) | signed action dispatch and the runtime interface |
+| [`@insights-gaming/recooler/vite`](src/vite/README.md) | Vite plugin: route generation, JSX, htmx actions and client event handlers |
+| [`@insights-gaming/recooler/router`](src/router/README.md) | builds a Hono app from the route manifest; runs without Vite |
+| [`@insights-gaming/recooler/gen`](src/gen/README.md) | standalone route manifest generator and `recooler-routes` CLI |
+| [`@insights-gaming/recooler/jsx`](src/jsx/README.md) | JSX pages, layouts, head functions and the root component |
+| [`@insights-gaming/recooler/htmx`](src/htmx/README.md) | signed action dispatch and the runtime interface |
 
 ## Development
 

@@ -35,7 +35,7 @@ let server, builtPreview, socket;
 try {
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/routes/index.tsx', pageSource);
   await write('src/components/Shared.tsx', sharedSource);

@@ -17,14 +17,14 @@ const importModule = async (name: string): Promise<Record<string, unknown>> => {
     throw Object.assign(new Error(`Missing public entrypoint ${name}`), { code: "ERR_MODULE_NOT_FOUND", url: entry });
   }
   // JSX's engine is deliberately bundled by Vite: it is not native Node ESM.
-  if (name === "recooler/jsx") return {};
+  if (name === "@insights-gaming/recooler/jsx") return {};
   return import(/* @vite-ignore */ entry);
 };
 
 /** Missing public entrypoints mean "not built". Missing transitive dependencies,
  * evaluation errors and invalid exports mean a broken build and must fail. */
 export async function tsUnavailable(load = importModule): Promise<string | undefined> {
-  for (const name of ["recooler/router", "recooler/jsx", "recooler/vite"]) {
+  for (const name of ["@insights-gaming/recooler/router", "@insights-gaming/recooler/jsx", "@insights-gaming/recooler/vite"]) {
     let module: Record<string, unknown>;
     try {
       module = await load(name);
@@ -33,14 +33,14 @@ export async function tsUnavailable(load = importModule): Promise<string | undef
       if (failure.code === "ERR_MODULE_NOT_FOUND") {
         let entry: string | undefined;
         try { entry = import.meta.resolve(name); } catch { /* package itself may be absent */ }
-        if ((entry && failure.url === entry) || failure.message?.startsWith("Cannot find package 'recooler'")) {
+        if ((entry && failure.url === entry) || failure.message?.startsWith("Cannot find package '@insights-gaming/recooler'")) {
           return `${name} is not built yet`;
         }
       }
       throw error;
     }
-    if (name === "recooler/router" && typeof module.createApp !== "function") {
-      throw new Error("Broken recooler/router build: must export createApp");
+    if (name === "@insights-gaming/recooler/router" && typeof module.createApp !== "function") {
+      throw new Error("Broken @insights-gaming/recooler/router build: must export createApp");
     }
   }
   return undefined;

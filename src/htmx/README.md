@@ -1,9 +1,9 @@
 # htmx server runtime (Phase 4a)
 
 ```ts
-import { createApp } from 'recooler/router';
-import { jsxPages } from 'recooler/jsx';
-import { htmx, type ActionTable } from 'recooler/htmx';
+import { createApp } from '@insights-gaming/recooler/router';
+import { jsxPages } from '@insights-gaming/recooler/jsx';
+import { htmx, type ActionTable } from '@insights-gaming/recooler/htmx';
 import { manifest } from './routes.gen';
 
 const table = {
@@ -130,7 +130,7 @@ URLs stay on the rendering origin. The signed pathname remains the incoming one.
 
 ## Runtime helpers and client boundary
 
-`recooler/htmx/runtime` implements the transform contract: `registerActions`,
+`@insights-gaming/recooler/htmx/runtime` implements the transform contract: `registerActions`,
 `actionUrl`, `wrapAction`, `wrapActionWithPayload`, `actionScope`, `handlerScope`.
 Captured factories read their JSON scope after extension signature verification.
 Wrappers alone are not secure HTTP dispatchers. Missing or malformed factory
@@ -154,7 +154,7 @@ The Vite entry loads lazy slices, runs the owning page's onLoad, then replays
 early events. Boosted navigation and history restoration initialize swapped content. Middleware-rendered login forms need an unguarded route; actions are
 never registered before guards.
 
-`recooler/htmx/testing` exports only the test capability helper:
+`@insights-gaming/recooler/htmx/testing` exports only the test capability helper:
 
 ```ts
 signActionUrl({ namespace, base, moduleHash, routeId, pathname, method, actionId, scope }, secret): string
@@ -167,7 +167,7 @@ registration hash, plus the same normalized base configured on `htmx()`. These
 identities default to empty strings for manual registrations; Vite actions require
 the values emitted by Vite. Adapters can read the hash from
 `findRegisteredAction(modules, method, actionId, namespace)?.moduleHash` in
-`recooler/htmx/runtime`, using the receiving table’s module list and uppercase method. An adapter must not prepend the base twice. This is for
+`@insights-gaming/recooler/htmx/runtime`, using the receiving table’s module list and uppercase method. An adapter must not prepend the base twice. This is for
 conformance/consumer dispatch adapters. Do not expose capability minting as an
 application endpoint.
 

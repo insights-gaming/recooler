@@ -1,8 +1,8 @@
-# recooler/jsx
+# @insights-gaming/recooler/jsx
 
 ```ts
-import { createApp } from 'recooler/router';
-import { jsxPages } from 'recooler/jsx';
+import { createApp } from '@insights-gaming/recooler/router';
+import { jsxPages } from '@insights-gaming/recooler/jsx';
 import { manifest } from './routes.gen.js';
 
 export default createApp(manifest, { pages: jsxPages() });
@@ -47,8 +47,8 @@ Augment `RouteEnv` to type the default route context (or pass a Context type as
 the generic argument):
 
 ```ts
-import type { RouteProps } from 'recooler/jsx';
-declare module 'recooler/jsx' {
+import type { RouteProps } from '@insights-gaming/recooler/jsx';
+declare module '@insights-gaming/recooler/jsx' {
   interface RouteEnv {
     Bindings: { DB: Database };
     Variables: { user: string };
@@ -76,7 +76,7 @@ Opt in to the automatic JSX runtime:
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "recooler/jsx"
+    "jsxImportSource": "@insights-gaming/recooler/jsx"
   }
 }
 ```
@@ -97,8 +97,8 @@ runtime imports when that dependency is bundled:
 ```ts
 resolve: {
   alias: {
-    'easy-jsx-html-engine/jsx-runtime': 'recooler/jsx/jsx-runtime',
-    'easy-jsx-html-engine/jsx-dev-runtime': 'recooler/jsx/jsx-dev-runtime',
+    'easy-jsx-html-engine/jsx-runtime': '@insights-gaming/recooler/jsx/jsx-runtime',
+    'easy-jsx-html-engine/jsx-dev-runtime': '@insights-gaming/recooler/jsx/jsx-dev-runtime',
   },
 }
 ```
@@ -108,7 +108,7 @@ need this adaptation (for example with `ssr.noExternal`), or recompile them.
 Engine 0.1.13 also has extensionless ESM imports and cannot be loaded directly by
 Node's native ESM loader; it must be bundled for that deployment.
 
-`createElement` from `recooler/jsx` applies the same Context filtering, including
+`createElement` from `@insights-gaming/recooler/jsx` applies the same Context filtering, including
 the classic JSX fallback used for `<li {...item} key={id}>`. Calls directly to
 the engine's `createElement` bypass filtering.
 No global engine or Context prototype is modified.
@@ -130,7 +130,7 @@ UTF-8 charset only when head metas declare no rendered charset attribute.
 Custom roots should render those URLs themselves, for example:
 
 ```tsx
-import { renderHeadElements, type RouteProps } from 'recooler/jsx';
+import { renderHeadElements, type RouteProps } from '@insights-gaming/recooler/jsx';
 import type { Component } from 'easy-jsx-html-engine';
 
 export default function Root(Content: Component<RouteProps>) {
@@ -174,7 +174,7 @@ its request while modules load. Generated hx-on attributes have a small inline
 fallback that holds unavailable confirms and drops other events without canceling
 defaults. A legacy hx-on alias for generated confirms handles htmx 1's synchronous
 load-listener ordering; htmx 2 ignores the alias. This alias requires the
-`recooler/jsx` runtime. Consumers retaining `jsxImportSource: easy-jsx-html-engine`
+`@insights-gaming/recooler/jsx` runtime. Consumers retaining `jsxImportSource: easy-jsx-html-engine`
 lack it and their htmx 1 generated load guards remain unprotected until normal
 listener installation (the plugin warns). Native guards may be bypassed before registration;
 see the migration guide. Enable htmx.legacyClientScript explicitly for roots that

@@ -10,8 +10,8 @@ export default defineConfig({
         resolve: { alias: [
           { find: /^hono$/, replacement: require.resolve(pkg!) },
           ...['context-storage', 'csrf', 'html'].map(subpath => ({ find: `hono/${subpath}`, replacement: require.resolve(`${pkg}/${subpath}`) })),
-          { find: 'recooler/jsx/jsx-runtime', replacement: fileURLToPath(new URL('./src/jsx/jsx-runtime.ts', import.meta.url)) },
-          { find: 'recooler/jsx/jsx-dev-runtime', replacement: fileURLToPath(new URL('./src/jsx/jsx-dev-runtime.ts', import.meta.url)) },
+          { find: '@insights-gaming/recooler/jsx/jsx-runtime', replacement: fileURLToPath(new URL('./src/jsx/jsx-runtime.ts', import.meta.url)) },
+          { find: '@insights-gaming/recooler/jsx/jsx-dev-runtime', replacement: fileURLToPath(new URL('./src/jsx/jsx-dev-runtime.ts', import.meta.url)) },
         ] },
         test: {
           name, include: ['test/router/**/*.test.ts', 'test/jsx/**/*.test.ts', 'test/htmx-runtime/**/*.test.ts'],

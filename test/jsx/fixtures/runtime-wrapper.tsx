@@ -1,4 +1,4 @@
-/** @jsxImportSource recooler/jsx */
+/** @jsxImportSource @insights-gaming/recooler/jsx */
 import type { Context } from 'hono';
 export function SpreadWrapper(props: { ctx: Context; title: string }) {
   return <button {...props}>spread</button>;

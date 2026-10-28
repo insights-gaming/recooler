@@ -1,6 +1,6 @@
 import htmxURL from "htmx.org/dist/htmx.min.js?url";
 import type { Component } from "easy-jsx-html-engine";
-import { DefaultRootHOC } from "recooler/jsx";
+import { DefaultRootHOC } from "@insights-gaming/recooler/jsx";
 
 // declares its own charset, so DefaultRootHOC must not add a second one
 export const head: RouteHead = { title: "Recooler", scripts: [{ src: htmxURL }], metas: [{ charset: "utf-8" }] };

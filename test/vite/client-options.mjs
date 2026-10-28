@@ -18,7 +18,7 @@ const build = async (htmx = {}, extras = {}) => {
   return { html: await (await app.fetch(new Request('http://test/'))).text(), builder };
 };
 try {
-  await write('package.json', '{"name":"recooler-test-app","type":"module"}'); await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}'); await mkdir(path.join(root, 'node_modules')); await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/server-only.ts', `globalThis.__serverMarker = 1; export const db = () => 'database';`);
   await write('src/routes/index.tsx', `import { db } from '../server-only'; const update = () => db(); export default () => <button hx-on:click={() => update()}/>;`);

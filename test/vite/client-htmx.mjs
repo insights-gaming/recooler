@@ -33,7 +33,7 @@ const build = async legacy => {
 };
 try {
   await write('package.json', '{"name":"chromium-regressions","type":"module"}');
-  await mkdir(path.join(root, 'node_modules')); await symlink(pkg, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules')); await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(pkg, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/routes/index.tsx', `${inc}
     export const head = { scripts: [{ src: '/htmx.js' }] };
@@ -69,7 +69,7 @@ try {
     </>;`);
   await write('src/routes/edit/index.tsx', `${inc} export const onLoad = () => inc('editLoads');
     export default () => <button id="save" hx-on:click={() => inc('saves')}>save</button>;`);
-  await write('src/routes/stream/index.tsx', `import { Suspense } from 'recooler/jsx'; ${inc}
+  await write('src/routes/stream/index.tsx', `import { Suspense } from '@insights-gaming/recooler/jsx'; ${inc}
     export const head = { scripts: [{ src: '/htmx.js' }] };
     export const onLoad = () => { inc('streamLoads'); (globalThis.order ??= []).push('onLoad'); };
     const Child = async () => { await new Promise(r => setTimeout(r, 200)); return <button id="streamed" hx-on:click={() => inc('streamClicks')}>streamed</button>; };

@@ -24,7 +24,7 @@ describe("transform", () => {
     if (mode === "client-slice") {
       expect(result.code).not.toContain("./db");
       expect(result.code).not.toContain("_action$");
-      expect(result.code).not.toContain("recooler/htmx/runtime");
+      expect(result.code).not.toContain("@insights-gaming/recooler/htmx/runtime");
       expect(result.code).toContain('globalThis.$handlers');
     } else {
       expect(result.code).toContain("registerActions");

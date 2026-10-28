@@ -294,7 +294,7 @@ Additional private per-package options are:
 Probe instrumentation wraps manifest namespace export slots, returned HOC
 components, page handlers and registered actions. Action identities use package-relative source labels, mapping the target
 module prefix to its runtime action ID. Route templates map to manifest
-file IDs for dispatch-time `recooler/htmx/testing` signing. The uninstrumented
+file IDs for dispatch-time `@insights-gaming/recooler/htmx/testing` signing. The uninstrumented
 Worker uses the same signed dispatch hook and independent runtime. Fixture
 runtimes use separate Node worker threads so persistent action registries and
 stream globals cannot leak between baseline and probe.

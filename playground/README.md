@@ -1,6 +1,6 @@
 # TypeScript playground
 
-The public Farm playground ported to `recooler` 0.1.0 / Vite 8.
+The public Farm playground ported to `@insights-gaming/recooler` 0.1.0 / Vite 8.
 
 From the repository root:
 

@@ -40,7 +40,7 @@ it('emits no action bodies or server runtime helpers into valid slices', () => {
     return <i hx-post={() => db.save('secret body')} hx-on:click={() => console.log('client')} />;
   }`, { ...options, mode: 'client-slice' });
   expect(result.diagnostics).toEqual([]);
-  for (const token of ['secret body', 'db.server', 'actionUrl', 'wrapAction', 'registerActions', 'recooler/htmx/runtime']) expect(result.code).not.toContain(token);
+  for (const token of ['secret body', 'db.server', 'actionUrl', 'wrapAction', 'registerActions', '@insights-gaming/recooler/htmx/runtime']) expect(result.code).not.toContain(token);
   expect(parseSync(options.id, result.code).errors).toEqual([]);
 });
 

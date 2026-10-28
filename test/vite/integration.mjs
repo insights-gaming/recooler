@@ -23,7 +23,7 @@ const routeSource = `export default () => <h1>recooler integration</h1>;\nexport
 let server;
 try {
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await write('tsconfig.json', '{"compilerOptions":{"target":"ES2022","module":"ESNext"}}');
   await write('src/routes/index.tsx', routeSource);
@@ -45,7 +45,7 @@ try {
     assert.match(await readFile(path.join(root, builder.environments[selected].config.build.outDir, 'index.js'), 'utf8'), /recooler integration/);
   } else {
     // An actual vite build CLI invocation, using the installed public subpath.
-    await write('vite.config.mjs', `import { recooler } from 'recooler/vite';\nexport default { plugins: recooler(), build: ${JSON.stringify(base.build)} };\n`);
+    await write('vite.config.mjs', `import { recooler } from '@insights-gaming/recooler/vite';\nexport default { plugins: recooler(), build: ${JSON.stringify(base.build)} };\n`);
     await execute(process.execPath, [path.join(packageDir, 'node_modules/vite/bin/vite.js'), 'build', root, '--mode', 'production', '--config', path.join(root, 'vite.config.mjs')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' } });
     const bundle = path.join(root, 'dist/server/app.mjs');
     assert.doesNotMatch(await readFile(bundle, 'utf8'), /fileName:\s*["']\//);

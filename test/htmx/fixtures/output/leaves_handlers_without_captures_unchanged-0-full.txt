@@ -1,4 +1,4 @@
-import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
+import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "@insights-gaming/recooler/htmx/runtime";
 export default function C() {
 	return <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@0\"].call(this, event)"} hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", {})} />;
 }

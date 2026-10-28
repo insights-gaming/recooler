@@ -21,7 +21,7 @@ let mf, window;
 const originalRun = vm.runInContext;
 try {
   await write('package.json', JSON.stringify({ name: 'proxy-admin', type: 'module' }));
-  await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules')); await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   if (beta) await write('cloudflare.config.ts', `export default { worker: { name: 'admin_worker', entrypoint: './src/entry.ts', compatibilityDate: '2026-10-20', compatibilityFlags: ['nodejs_als'] } };`);
   else await write('wrangler.json', JSON.stringify({ name: 'admin_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: ['nodejs_als'] }));
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);

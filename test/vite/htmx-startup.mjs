@@ -32,15 +32,15 @@ let server;
 try {
   await write('package.json', '{"name":"startup-app-a","type":"module"}');
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/components/Form.tsx', source);
   await write('src/routes/index.tsx', `import { Form } from '../components/Form'; export default Form;`);
   await write('src/routes/table/index.ts', `import { table, namespace } from 'virtual:recooler/htmx'; export const onGet = c => c.json({ table, namespace });`);
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/custom.ts', `import { manifest } from './routes.gen';
-import { createApp } from 'recooler/router';
-import { jsxPages } from 'recooler/jsx';
-import { htmx } from 'recooler/htmx';
+import { createApp } from '@insights-gaming/recooler/router';
+import { jsxPages } from '@insights-gaming/recooler/jsx';
+import { htmx } from '@insights-gaming/recooler/htmx';
 import { table, namespace } from 'virtual:recooler/htmx';
 export default createApp(manifest, { pages: jsxPages(), extensions: [htmx({ table, namespace, secret: env => env.RECOOLER_SECRET })] });`);
   for (const mode of ['warmup', 'manifest-first']) {
@@ -80,7 +80,7 @@ export default createApp(manifest, { pages: jsxPages(), extensions: [htmx({ tabl
   await cp(path.join(root, 'src'), path.join(relocated, 'src'), { recursive: true });
   await cp(path.join(root, 'package.json'), path.join(relocated, 'package.json'));
   await mkdir(path.join(relocated, 'node_modules'));
-  await symlink(packageDir, path.join(relocated, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(relocated, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(relocated, 'node_modules/@insights-gaming/recooler'), 'dir');
   const moved = await compile(relocated);
   assert.equal((await graph(moved)).namespace, namespaceA, 'checkout path does not change app identity');
   assert.equal((await submit(moved, urlA)).status, 200);

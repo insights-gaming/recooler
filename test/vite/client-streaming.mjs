@@ -23,7 +23,7 @@ async function build(name, files, { entry, htmx = { legacyClientScript: legacy }
   const root = path.join(workspace, name);
   await rm(root, { recursive: true, force: true });
   await mkdir(path.join(root, 'node_modules'), { recursive: true });
-  await symlink(PKG, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(PKG, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   for (const d of ['hono', 'easy-jsx-html-engine']) await symlink(path.join(PKG, 'node_modules', d), path.join(root, 'node_modules', d), 'dir');
   if (legacy && !files['src/root.tsx'] && name !== 'consumer-modern') files['src/root.tsx'] = `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
 export default (Content, clientScript) => props => <html><head><script src="/htmx.js"/></head><body><Content {...props}/><script>{dangerouslyPreventEscaping(clientScript ?? '')}</script></body></html>;`;
@@ -94,22 +94,22 @@ try {
   if (want('consumer-suspense')) {
     const built = await build('consumer', {
       'src/root.tsx': `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
-import { renderHeadElements } from 'recooler/jsx';
+import { renderHeadElements } from '@insights-gaming/recooler/jsx';
 export default (Content, clientScript) => async props => {
   const content = await <Content {...props}/>;
   return <html><head><meta charset="utf-8"/><script src="/htmx.js"></script>{renderHeadElements(props.head)}</head>
     <body hx-boost="true">{content}{clientScript ? <script>{dangerouslyPreventEscaping('(()=>{' + clientScript + '})()')}</script> : null}</body></html>;
 };`,
-      'src/entry.ts': `import { createApp } from 'recooler/router';
-import { jsxPages } from 'recooler/jsx';
-import { htmx } from 'recooler/htmx';
+      'src/entry.ts': `import { createApp } from '@insights-gaming/recooler/router';
+import { jsxPages } from '@insights-gaming/recooler/jsx';
+import { htmx } from '@insights-gaming/recooler/htmx';
 import { CreateResolvedTemplate } from 'easy-jsx-html-engine';
 import { table, clients, clientEntry, clientPreloads, clientModules, namespace } from 'virtual:recooler/htmx';
 import { manifest } from './routes.gen';
 export default createApp(manifest, { pages: jsxPages({
   ResolvedTemplate: CreateResolvedTemplate({ resolvedScriptMiddleware: script => script + '.forEach(htmx.process)' }),
 }), extensions: [htmx({ table, clients, clientEntry, clientPreloads, clientModules, legacyClientScript: true, namespace, secret: () => 'k' })] });`,
-      'src/routes/index.tsx': `import { Suspense } from 'recooler/jsx'; ${inc}
+      'src/routes/index.tsx': `import { Suspense } from '@insights-gaming/recooler/jsx'; ${inc}
 const Slow = async ({ ms, children }) => { await new Promise(r => setTimeout(r, ms)); return children; };
 export const onLoad = () => { inc('loads'); globalThis.onLoadDOM = { late: !!document.querySelector('#late'), state: document.readyState }; };
 export default props => <>
@@ -234,7 +234,7 @@ export default () => <>
     p = await page(s, '/'); s.gate('recooler-');
     await p.click('#tog'); await p.waitForSelector('#gl'); await sleep(50);
     await p.click('#gl', { noWaitAfter: true }); await sleep(300);
-    results['swap-window'].guardedLinkDuringWindow = { url: new URL(p.url()).pathname, glRequests: s.count('/m/gl'), logs: p.logs.filter(l => l.includes('recooler')) };
+    results['swap-window'].guardedLinkDuringWindow = { url: new URL(p.url()).pathname, glRequests: s.count('/m/gl'), logs: p.logs.filter(l => l.includes('@insights-gaming/recooler')) };
     s.release(); await p.close();
     // (c) delayed slices: guarded native form.
     p = await page(s, '/'); s.gate('recooler-');
@@ -337,16 +337,16 @@ export default () => <><a id="toa" href="/">a</a><button id="bc" hx-on:click={()
   // 8. Consumer htmx.process renderer with a modern root (no legacy inline import).
   if (want('consumer-modern')) {
     const built = await build('consumer-modern', {
-      'src/entry.ts': `import { createApp } from 'recooler/router';
-import { jsxPages } from 'recooler/jsx';
-import { htmx } from 'recooler/htmx';
+      'src/entry.ts': `import { createApp } from '@insights-gaming/recooler/router';
+import { jsxPages } from '@insights-gaming/recooler/jsx';
+import { htmx } from '@insights-gaming/recooler/htmx';
 import { CreateResolvedTemplate } from 'easy-jsx-html-engine';
 import { table, clients, clientEntry, clientPreloads, clientModules, namespace } from 'virtual:recooler/htmx';
 import { manifest } from './routes.gen';
 export default createApp(manifest, { pages: jsxPages({
   ResolvedTemplate: CreateResolvedTemplate({ resolvedScriptMiddleware: script => script + '.forEach(htmx.process)' }),
 }), extensions: [htmx({ table, clients, clientEntry, clientPreloads, clientModules, namespace, secret: () => 'k' })] });`,
-      'src/routes/index.tsx': `import { Suspense } from 'recooler/jsx'; ${inc}
+      'src/routes/index.tsx': `import { Suspense } from '@insights-gaming/recooler/jsx'; ${inc}
 export const head = { scripts: [{ src: '/htmx.js' }] };
 const Slow = async ({ ms, children }) => { await new Promise(r => setTimeout(r, ms)); return children; };
 export const onLoad = () => { inc('loads'); globalThis.onLoadDOM = { late: !!document.querySelector('#late'), state: document.readyState }; };

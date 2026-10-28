@@ -1,5 +1,5 @@
 import { defineConfig, isRunnableDevEnvironment, type Plugin } from 'vite';
-import { recooler } from 'recooler/vite';
+import { recooler } from '@insights-gaming/recooler/vite';
 
 const nodeDev: Plugin = {
   name: 'playground:http',

@@ -12,7 +12,7 @@ const write = async (name, value) => { await mkdir(path.dirname(path.join(root, 
 let server, ws;
 try {
   await write('package.json', '{"name":"client-hmr","type":"module"}');
-  await mkdir(path.join(root, 'node_modules')); await symlink(pkg, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules')); await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(pkg, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/routes/index.tsx', `export default () => <button hx-on:click={() => 1}/>;`);
   await write('index.html', `<script type="module" src="/spa/main.ts"></script>`);

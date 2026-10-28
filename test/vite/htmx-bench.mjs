@@ -26,7 +26,7 @@ const limits = { buildRatio: 6, linearity100to400: 5.5, editRatio: 6, editFloorM
   editOverheadMs: 500, editOverheadRatio: 0.5, nodeEditMaxMs: 1000, workerdEditMaxMs: 3500 };
 try {
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await write('tsconfig.json', '{"compilerOptions":{"target":"ES2022","module":"ESNext"}}');
   await write('wrangler.json', JSON.stringify({ name: 'bench_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: ['nodejs_als'] }));
@@ -54,7 +54,7 @@ try {
       root, configFile: false, logLevel: 'silent', mode: 'production',
       plugins: [...(cf ? [cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false })] : []), ...recooler({ htmx: mode === 'baseline' ? false : {}, ...(cf ? { serverEnvironment: 'bench_worker' } : {}) }),
       ],
-      resolve: { alias: { 'farm-plugin-recooler/helpers': 'recooler/jsx' } },
+      resolve: { alias: { 'farm-plugin-recooler/helpers': '@insights-gaming/recooler/jsx' } },
       build: { ssr: 'src/entry.ts', write: false, sourcemap: true, minify: false },
       server: { host: '127.0.0.1', port: 0 },
     });

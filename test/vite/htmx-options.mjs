@@ -20,16 +20,16 @@ try {
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await write('src/routes/index.tsx', `export default () => <form hx-post={() => 'signed'}/>;`);
   await mkdir(path.join(root, 'node_modules'));
-  await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(packageDir, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   for (const mode of ['production', 'development']) {
-    await write('src/entry.ts', `import { htmx } from 'recooler/htmx'; export default htmx({ table: {}, secret: { unsafeUnsigned: true } });`);
+    await write('src/entry.ts', `import { htmx } from '@insights-gaming/recooler/htmx'; export default htmx({ table: {}, secret: { unsafeUnsigned: true } });`);
     const output = await compile({ mode });
     await assert.rejects(output.load, /unsafeUnsigned is forbidden in production/);
   }
-  await write('src/entry.ts', `import { htmx, unsafeUnsignedMarker } from 'recooler/htmx'; const extension = htmx({ table: {}, secret: { unsafeUnsigned: true }, allowUnsignedInProduction: true }); export default extension[unsafeUnsignedMarker];`);
+  await write('src/entry.ts', `import { htmx, unsafeUnsignedMarker } from '@insights-gaming/recooler/htmx'; const extension = htmx({ table: {}, secret: { unsafeUnsigned: true }, allowUnsignedInProduction: true }); export default extension[unsafeUnsignedMarker];`);
   assert.equal((await (await compile()).load()).default, true);
   // htmx:false also keeps the production guard for custom runtime entries.
-  await write('src/entry.ts', `import { htmx } from 'recooler/htmx'; export default htmx({ table: {}, secret: { unsafeUnsigned: true } });`);
+  await write('src/entry.ts', `import { htmx } from '@insights-gaming/recooler/htmx'; export default htmx({ table: {}, secret: { unsafeUnsigned: true } });`);
   await assert.rejects((await compile({}, { htmx: false })).load, /forbidden in production/);
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/routes/index.tsx', `export default () => { const local = () => 1; return <form hx-post={() => local()}/>; };`);

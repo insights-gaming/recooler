@@ -6,7 +6,7 @@
     "strict": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "recooler/jsx",
+    "jsxImportSource": "@insights-gaming/recooler/jsx",
     "types": []
   },
   "include": ["consumer.tsx"]

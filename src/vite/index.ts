@@ -120,7 +120,7 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
   let manifest: string;
   let generationError: Error | undefined;
   let devServer: ViteDevServer | undefined;
-  let noExternal = ['recooler', 'easy-jsx-html-engine'];
+  let noExternal = ['@insights-gaming/recooler', 'easy-jsx-html-engine'];
   const generated = (error?: Error, result?: GenerateResult) => {
     htmx.generationFailed(error !== undefined);
     if (result) htmx.generated(result);
@@ -147,13 +147,13 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
         root, workspaceRoot: searchForWorkspaceRoot(root), isBuild: env.command === 'build',
         isFrameworkPkgByJson(pkg) {
           return ['dependencies', 'peerDependencies'].some(field =>
-            ['recooler', 'easy-jsx-html-engine'].some(name => pkg[field]?.[name]));
+            ['@insights-gaming/recooler', 'easy-jsx-html-engine'].some(name => pkg[field]?.[name]));
         },
       });
       noExternal = [...new Set([...noExternal, ...crawled.ssr.noExternal, ...(options.htmx && options.htmx.actionDependencies || [])])];
       // The framework packages themselves never declare actions; registering
       // in them would import recooler from packages that cannot resolve it.
-      htmx.actionDependencies(noExternal.filter(name => name !== 'recooler' && name !== 'easy-jsx-html-engine'), root);
+      htmx.actionDependencies(noExternal.filter(name => name !== '@insights-gaming/recooler' && name !== 'easy-jsx-html-engine'), root);
     },
     configEnvironment(_name, config) {
       if ((config.consumer ?? (_name === 'client' ? 'client' : 'server')) !== 'server') return;
@@ -189,12 +189,12 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
       if (generationError) throw generationError;
       const settings = options.htmx || {};
       const binding = JSON.stringify(settings.secretBinding ?? 'RECOOLER_SECRET');
-      const imports = options.htmx === false ? '' : `import { htmx } from 'recooler/htmx';\nimport { table, clients, clientEntry, clientPreloads, clientModules, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
+      const imports = options.htmx === false ? '' : `import { htmx } from '@insights-gaming/recooler/htmx';\nimport { table, clients, clientEntry, clientPreloads, clientModules, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
       const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, clients, clientEntry, clientPreloads, clientModules, legacyClientScript: ${JSON.stringify(settings.legacyClientScript === true)}, namespace, secret: env => { const value = env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined); if (typeof value !== 'string' || !value) throw new Error(${JSON.stringify('recooler: htmx actions require a nonempty ' + (settings.secretBinding ?? 'RECOOLER_SECRET') + ' binding; set it in .dev.vars for local Workers, a deployed Worker secret, or process.env on Node')}); return value; }, base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
       // Loading the table first pretransforms route closures in parallel. The
       // module runner otherwise lowers/evaluates manifest imports serially.
       // All registrations still evaluate before createApp consumes the table.
-      return { code: `${imports}import { createApp } from 'recooler/router';\nimport { jsxPages } from 'recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\nexport default createApp(manifest, { pages: jsxPages()${extensions} });\n`, map: null };
+      return { code: `${imports}import { createApp } from '@insights-gaming/recooler/router';\nimport { jsxPages } from '@insights-gaming/recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\nexport default createApp(manifest, { pages: jsxPages()${extensions} });\n`, map: null };
     },
   };
   // Wire invalidation before configureServer's initial generation can fail.

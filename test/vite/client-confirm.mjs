@@ -24,7 +24,7 @@ async function build(name, files, { entry, htmx = {}, extra = {} } = {}) {
   const root = path.join(workspace, name);
   await rm(root, { recursive: true, force: true });
   await mkdir(path.join(root, 'node_modules'), { recursive: true });
-  await symlink(PKG, path.join(root, 'node_modules/recooler'), 'dir');
+  await mkdir(path.join(root, 'node_modules/@insights-gaming'), { recursive: true }); await symlink(PKG, path.join(root, 'node_modules/@insights-gaming/recooler'), 'dir');
   for (const d of ['hono', 'easy-jsx-html-engine']) await symlink(path.join(PKG, 'node_modules', d), path.join(root, 'node_modules', d), 'dir');
   files = { 'package.json': JSON.stringify({ name: 'rc4-' + name, type: 'module' }),
     'src/entry.ts': entry ?? `export { default } from 'virtual:recooler/app';`, ...files };
@@ -89,9 +89,9 @@ async function page(s, pathname, { wait = true, init } = {}) {
 }
 const results = {};
 const want = name => !only.length || only.includes(name);
-const legacyConsumerEntry = `import { createApp } from 'recooler/router';
-import { jsxPages } from 'recooler/jsx';
-import { htmx } from 'recooler/htmx';
+const legacyConsumerEntry = `import { createApp } from '@insights-gaming/recooler/router';
+import { jsxPages } from '@insights-gaming/recooler/jsx';
+import { htmx } from '@insights-gaming/recooler/htmx';
 import { CreateResolvedTemplate } from 'easy-jsx-html-engine';
 import { table, clients, clientEntry, clientPreloads, clientModules, namespace } from 'virtual:recooler/htmx';
 import { manifest } from './routes.gen';
@@ -181,7 +181,7 @@ export default () => <>
 document.addEventListener('htmx:confirm', e => { if(e.target.id === 'capture') e.preventDefault(); }, true);`;
     const built = await build('competing2', {
       'src/root.tsx': guardRoot(guard), 'src/entry.ts': legacyConsumerEntry, ...startRoutes,
-      'src/routes/index.tsx': `import { Suspense } from 'recooler/jsx'; ${inc} ${slow}
+      'src/routes/index.tsx': `import { Suspense } from '@insights-gaming/recooler/jsx'; ${inc} ${slow}
 export const onLoad = () => inc('c_loads');
 export default props => <>
   <Suspense rid={props.rid} fallback={<p>w</p>}><Slow ms={100}>
@@ -281,7 +281,7 @@ export default () => <><button id="h" hx-on:click={() => inc('c')}>h</button><di
   if (want('pending-replay')) {
     const built = await build('pending', {
       'src/root.tsx': legacyRoot, 'src/entry.ts': legacyConsumerEntry,
-      'src/routes/index.tsx': `import { Suspense } from 'recooler/jsx'; ${inc}
+      'src/routes/index.tsx': `import { Suspense } from '@insights-gaming/recooler/jsx'; ${inc}
 const Slow = async ({ ms, children }) => { await new Promise(r => setTimeout(r, ms)); return children; };
 export const onLoad = () => inc('loads');
 export default props => <>
@@ -342,7 +342,7 @@ export default props => <>
   if (want('native-fallback')) {
     const built = await build('native-fallback', {
       'src/root.tsx': legacyRoot, 'src/entry.ts': legacyConsumerEntry, ...startRoutes,
-      'src/routes/index.tsx': `import { Suspense } from 'recooler/jsx'; ${inc} ${slow}
+      'src/routes/index.tsx': `import { Suspense } from '@insights-gaming/recooler/jsx'; ${inc} ${slow}
 export const onLoad = () => inc('c_loads');
 export default props => <>
   <Suspense rid={props.rid} fallback={<p>wait</p>}><Slow ms={100}>
