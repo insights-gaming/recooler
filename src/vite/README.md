@@ -264,8 +264,8 @@ Handlers run immediately when their slice registers, independent of marker
 completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
 Route onLoad runs at DOMContentLoaded or immediately if parsing has finished,
 sees the complete DOM, and is never awaited. Rejections go to reportError (with a
-console.error fallback), except the aborted signal's reason or a fetch DOMException
-named AbortError after abort. It receives { signal }, an AbortSignal for that marker
+console.error fallback), except any DOMException named AbortError once the
+marker's signal has aborted. It receives { signal }, an AbortSignal for that marker
 instance. Register window/document listeners with { signal }; use an abort listener
 to release other resources. The return value is ignored. Root/layout onLoad stays ignored.
 
@@ -277,7 +277,7 @@ export const onLoad: RouteOnLoad = ({ signal }) => {
 };
 ```
 
-If `build.target` is lowered below Safari 15 / Chrome 90 / Firefox 86, the `{ signal }` listener option is ignored.
+Browsers older than Safari 15 / Chrome 90 / Firefox 86 ignore the `{ signal }` listener option, and `signal.throwIfAborted()` needs Safari 15.4 / Chrome 100 / Firefox 97; Vite 8's default build target is newer than both.
 
 The entry exports init() and observes afterSwap, afterSettle and historyRestore.
 Only client-bearing pages get a trailing template[data-recooler-marker] with route

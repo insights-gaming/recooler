@@ -90,8 +90,8 @@ function invoke(id, scope, element, event) {
   if (fn) return (scope === null ? fn : fn(scope)).call(element, event);
 }
 async function initializeNode(node) {
-  prune();
   const key = signature(node);
+  if (instances.has(node) && instances.get(node).key !== key) prune();
   if (completed.get(node) === key) return;
   const existing = jobs.get(node);
   if (existing?.key === key) return existing.promise;
@@ -115,7 +115,7 @@ async function initializeNode(node) {
     if (typeof module?.onLoad === 'function') {
       const signal = instance.controller.signal;
       const failed = error => {
-        if (signal.aborted && (error === signal.reason || error instanceof DOMException && error.name === 'AbortError')) return;
+        if (signal.aborted && error instanceof DOMException && error.name === 'AbortError') return;
         report(error);
       };
       try {

@@ -368,7 +368,7 @@ A route's `onLoad({ signal })` is called at DOMContentLoaded, or immediately whe
 is no longer loading. It sees the complete DOM and is never awaited: asynchronous
 or never-resolving onLoad work cannot disable handlers or hold readiness. A rejected
 onLoad promise is sent to `reportError` (console.error where unavailable), except
-its aborted signal's reason or a fetch `DOMException` named `AbortError` after abort.
+any `DOMException` named `AbortError` once its signal has aborted.
 The signal belongs to that marker instance and aborts once when the marker leaves
 the document or its route/version changes. Register listeners with `{ signal }`,
 or use an abort listener to release other resources. The return value is ignored.
@@ -669,7 +669,7 @@ export const onLoad: RouteOnLoad = ({ signal }) => {
 };
 ```
 
-If `build.target` is lowered below Safari 15 / Chrome 90 / Firefox 86, the `{ signal }` listener option is ignored.
+Browsers older than Safari 15 / Chrome 90 / Firefox 86 ignore the `{ signal }` listener option, and `signal.throwIfAborted()` needs Safari 15.4 / Chrome 100 / Firefox 97; Vite 8's default build target is newer than both.
 
 The return value is ignored, including functions or promises of functions.
 Readiness never waits for async onLoad work. After each await, check for abort
