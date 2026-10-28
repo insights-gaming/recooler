@@ -45,6 +45,10 @@
     "./jsx/jsx-dev-runtime": {
       "types": "./dist/jsx/jsx-dev-runtime.d.ts",
       "default": "./dist/jsx/jsx-dev-runtime.js"
+    },
+    "./htmx/testing": {
+      "types": "./dist/htmx/testing.d.ts",
+      "default": "./dist/htmx/testing.js"
     }
   },
   "bin": {

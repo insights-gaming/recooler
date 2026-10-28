@@ -103,11 +103,9 @@ also protect method-only routes, catch-alls and unmatched requests under its
 prefix. After-next middleware must still see `ctx.error` and `ctx.finalized` and
 may throw `HTTPException` with a response returned by `app.onError`.
 
-Send `HX-Request: true`, a same-origin `Origin`, and
-`Sec-Fetch-Site: same-origin` on manual action requests. Revisit CSRF and signed
-URL migration when the htmx implementation lands. The legacy two-argument root
-compatibility opt-in, exact script string and route marker through `props.head`
-remain design work for that phase; see the inventory's plan gaps.
+See the action URL and CSRF migration below for manual action requests. Client
+entry loading remains Phase 5 work; the JSX root compatibility contract is
+documented below.
 
 ## JSX pages
 
@@ -175,3 +173,69 @@ Suspense only when that output is desired.
 
 External module scripts execute after the entire Suspense stream finishes. Phase
 5 must account for this onLoad timing difference from the old inline script.
+
+
+## htmx action URLs and security (D3/D6/D7)
+
+Configure `htmx({ table, secret })` from `recooler/htmx` as a `createApp` extension
+alongside `jsxPages()`. The reachability table maps manifest `route.file` IDs to
+registered action-bearing module IDs, including roots, layouts and shared static
+imports. The table is static; D5 development uses `invalidateAll` and a full SSR
+reload to re-evaluate the virtual table and recreate `createApp`. Getter mode is
+unsupported. Register actions before `createApp`: `actionUrl` throws if an action uses a method
+that was not reserved on the rendering route at app creation. Recreate the app
+after registering a new method. The Vite integration will provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+
+**D6: all action URLs are now signed**, including actions without captures. The
+signature covers the receiving route file, exact pathname, HTTP method, action
+ID and serialized scope. Pages cached before this switch contain incompatible
+URLs: invalidate those pages and have users refresh them before submitting.
+Unknown, unsigned, tampered and replayed-to-another-path URLs fall through after
+route middleware and normally return 404 without running an action. A guard's
+401 still comes first. Supply a runtime secret string or `secret: env =>
+env.ACTION_SECRET`; env functions are cached per env object identity in a WeakMap
+(with one fallback slot for non-object envs), never inlined by the transform.
+Use a new env object or recreate the app to rotate a key within the same env. Missing/empty secrets fail startup or the first request
+with actions. `secret: false` now throws; use `secret: { unsafeUnsigned: true }` only for local
+development. This disables D6 replay protection (including unused barrel actions)
+while retaining CSRF and reachability checks. The Phase 4b Vite plugin must reject
+this mode in production using the exported `unsafeUnsignedMarker` on the extension.
+Each `htmx()` creation in this mode logs a runtime warning. The marker is a runtime
+property, so the plugin must evaluate the built server entry to check it.
+The plugin must also provide a stable per-project namespace to both
+`registerActions(moduleId, methods, namespace)` and `htmx({ namespace, ... })`; the
+default namespace remains shared for compatibility with current transform output.
+
+**D7: action requests require `HX-Request: true`**, including mutating GET actions.
+They also require acceptable Fetch Metadata or Origin. Manual requests should
+send `HX-Request: true`, `Origin` equal to the destination origin, and
+`Sec-Fetch-Site: same-origin`. The request URL's own Origin is accepted when
+`Sec-Fetch-Site` is absent. Configure `trustedOrigins` for additional exact origins
+or an origin predicate: these are accepted regardless of Fetch Metadata, including
+`same-site` and `cross-site`. Same-site alone is insufficient. An untrusted request
+with `cross-site` or an empty `Sec-Fetch-Site` is rejected even if its Origin equals
+the request URL's origin. Missing or
+invalid provenance and missing HX headers return 403 before action execution.
+These checks also apply to bodyless, JSON and other non-form requests. Rejections
+return 403 directly without entering the application's `onError`.
+
+**D3: actions post to the rendering route.** A component imported from an admin
+route and rendered on a public page now submits to the public page's middleware
+chain. In 0.0.27 it submitted to the defining route module. Keep authorization in
+the rendering route or action when sharing such components. Only page routes
+register actions; handler-only routes keep ordinary `action` query parameters.
+Forms returned by guard middleware must live on an unguarded route because the
+guard always runs before action dispatch. Actions run after directory/group
+middleware but before `onRequest`, as in 0.0.27: authorization in `onRequest`
+does not protect actions. Move such checks into directory or group middleware.
+
+Use `htmx({ base: '/app', ... })` when `app.mount()` or a prefix-stripping proxy
+hides that external prefix. Mount actions without the appropriate base are
+unsupported. Omit `base` for `route()` and `basePath()`, whose request pathname
+already includes the prefix. URLs preserve exact encoded segments and stay local
+even when a root catch-all matches a path starting with `//`.
+
+The lower-level `actionScope` helper now requires the ambient rendering binding;
+`configureActions` is replaced by per-extension secrets. `page.scripts` is empty
+until Phase 5 supplies the client entry. Client handler slices already register
+their own handlers; loading those slices and invoking onLoad remain Phase 5 work.

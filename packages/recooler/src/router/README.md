@@ -52,8 +52,9 @@ method, and GET includes HEAD. Handlers follow scoped middleware and precede onR
 and method dispatch. Extensions with array handlers must declare a nonempty `methods` list, otherwise
 startup throws `RouteValidationError`. HEAD declarations register as GET for Hono routing;
 their handlers run only for HEAD requests, alongside any GET handlers.
-Whether selected handlers should precede scoped middleware remains an open question tied
-to htmx D5 (guard-rendered forms).
+All extension middleware runs in extension order after scoped guards and before any
+extension handlers, regardless of each extension's position in the list. Actions
+therefore remain after guards; guard-rendered forms need an unguarded route.
 Action handlers should return their response for a matching action and call `next()` when
 the request should reach another handler. Supply all methods that should run the extension,
 including methods for which the route has no native handler.
@@ -82,3 +83,10 @@ Use `createApp<MyEnv>(manifest)` to type Hono context variables (for example
 `MyEnv = { Variables: { user: User } }`). `app.use()` called after `createApp()` does not
 run for matched terminal routes: Hono executes registrations in order. Install request
 middleware through the manifest or a parent app before routing the generated app.
+
+Extensions may supply `middleware: Handler[]` to run after scoped guards on every
+existing registration, independently of `methods`. This does not add registrations
+for unsupported methods. A `reserved(context)` predicate reserves a request from
+that route's `onRequest`, method handlers and page: when extension handlers call
+`next()`, dispatch continues through later matching registrations and their guards.
+This supports action dispatchers that must fall through on an invalid capability.
