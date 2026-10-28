@@ -27,6 +27,7 @@ const urls = ${JSON.stringify(Object.fromEntries(ids.map(id => [opaque(id), retr
 const routes = ${JSON.stringify(pages)};
 const version = ${JSON.stringify(version)};
 const handlers = globalThis.$handlers ??= Object.create(null);
+const owners = new WeakMap();
 const modules = new Map(), jobs = new WeakMap(), started = new WeakMap(), completed = new WeakMap();
 const report = error => console.error(error);
 const markers = () => [...document.querySelectorAll('[data-recooler-marker]')];
@@ -49,6 +50,21 @@ function checkVersion(node) {
   }
   return true;
 }
+function remember(id, module) {
+  modules.set(id, module);
+  for (const fn of Object.values(module)) if (typeof fn === 'function') {
+    const pages = owners.get(fn) ?? new Set();
+    for (const [route, page] of Object.entries(routes)) if (page.slices.includes(id)) pages.add(route);
+    owners.set(fn, pages);
+  }
+  return module;
+}
+function available(id) {
+  const fn = handlers[id];
+  if (!fn) return false;
+  const pages = owners.get(fn);
+  return markers().some(node => completed.get(node) === signature(node) && (!pages || pages.has(node.dataset.recoolerRoute)));
+}
 async function load(id) {
   if (!modules.has(id)) {
     const promise = (async () => {
@@ -58,7 +74,10 @@ async function load(id) {
         const url = urls[id];
         return import(/* @vite-ignore */ url + (url.includes('?') ? '&' : '?') + 'rc_retry=' + Date.now());
       }
-    })();
+    })().then(module => {
+      if (modules.get(id) === promise) remember(id, module);
+      return module;
+    });
     modules.set(id, promise);
     promise.catch(() => { if (modules.get(id) === promise) modules.delete(id); });
   }
@@ -109,7 +128,7 @@ function init() {
   return globalThis.__recooler_ready = ready;
 }
 function register(entries) {
-  for (const [id, module] of entries) modules.set(id, module);
+  for (const [id, module] of entries) remember(id, module);
   // A legacy import may have started a lazy job while the static graph loaded.
   // Static registration owns startup and must run onLoad before DCL, even then.
   for (const node of markers()) {
@@ -121,7 +140,7 @@ function register(entries) {
 const waiting = new WeakMap();
 globalThis.$rc = (id, scope, element, event) => {
   if (markers().some(node => !checkVersion(node))) return;
-  if (handlers[id] && markers().every(node => completed.get(node) === signature(node))) {
+  if (available(id) && !waiting.has(event)) {
     return invoke(id, scope, element, event);
   }
   // Only confirm has a safe public continuation. Config/beforeRequest run
@@ -155,7 +174,7 @@ globalThis.$rc = (id, scope, element, event) => {
         } });
         for (const [id, scope, target] of batch.records) {
           if (!target.isConnected) continue;
-          if (!handlers[id]) { cancelled = true; continue; }
+          if (!available(id)) { cancelled = true; continue; }
           try { await invoke(id, scope, target, late); } catch (error) { cancelled = true; report(error); }
         }
         if (confirm && !cancelled && !issued && event.detail.elt?.isConnected !== false) event.detail.issueRequest(true);
@@ -172,6 +191,7 @@ return { init, register };
 })();
 export const init = runtime.init;
 export const register = runtime.register;
-export const ready = globalThis.__recooler_ready ?? Promise.resolve();
+export const ready = Promise.resolve().then(init).then(() => globalThis.__recooler_ready);
+ready.catch(error => console.error(error));
 `;
 }

@@ -142,7 +142,12 @@ try {
     await page.locator('#key').press('x'); assert.equal(await page.inputValue('#key'), 'x');
     assert.deepEqual(await page.evaluate(() => ['paste', 'drop'].map(type => document.querySelector('#key').dispatchEvent(new Event(type, { bubbles: true, cancelable: true })))), [true, true]);
     // init.mjs: fragment adds a second marker and runs only its own onLoad once.
-    await page.click('#open'); await page.waitForFunction(() => globalThis.editLoads === 1); await page.click('#save');
+    block = new Promise(r => { release = () => { block = undefined; r(); }; });
+    await page.click('#open'); await page.waitForSelector('#save'); await sleep(80);
+    await page.click('#hxpost'); await sleep(80);
+    assert.equal(await page.evaluate(() => globalThis.postClicks), 2, 'ready page handlers do not wait for an unrelated fragment');
+    assert.equal(count('/m/post'), 2);
+    release(); await page.waitForFunction(() => globalThis.editLoads === 1); await page.click('#save');
     assert.equal(await page.evaluate(() => globalThis.saves), 1);
     await page.evaluate(() => globalThis.__recooler_client.init()); assert.equal(await page.evaluate(() => globalThis.editLoads), 1);
     assert.equal(await page.locator('[data-recooler-marker]').count(), 2);

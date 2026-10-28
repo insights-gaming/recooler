@@ -51,7 +51,7 @@ export function canonicalId(id: string): string {
   return normalizePath(id.slice(0, at)) + (parts.length ? '?' + parts.join('&') : '');
 }
 
-interface TableData { table: ActionTable; clients: ActionTable; enabled: boolean; preloads?: Record<string, string[]>; routeModules?: Record<string, string> }
+interface TableData { table: ActionTable; clients: ActionTable; enabled: boolean; onLoads?: string[]; preloads?: Record<string, string[]>; routeModules?: Record<string, string> }
 
 interface State {
   tableLoaded: boolean;
@@ -201,7 +201,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         }));
         if (epoch !== state.epoch) continue;
         const enabled = options.htmx !== false;
-        state.cached = { epoch, table, clients, enabled };
+        state.cached = { epoch, table, clients, enabled, onLoads: routes.filter(({ file }) => state.modules.get(canonicalId(file))?.onLoad).map(({ file }) => relative(file)).sort() };
         return state.cached;
       }
     })();
@@ -221,7 +221,7 @@ export function htmxPlugin(options: RecoolerOptions) {
     name: 'recooler:htmx',
     enforce: 'pre',
     config(_config, env) {
-      if (_config.base !== undefined && !_config.base.startsWith('/')) throw new Error('recooler: relative Vite base is unsupported; configure an absolute path prefix');
+      if (_config.base !== undefined && !_config.base.startsWith('/') && !/^https?:\/\//.test(_config.base)) throw new Error('recooler: relative Vite base is unsupported; configure an absolute path prefix');
       // Applies to custom createApp entries too; no runtime evaluation of a
       // Worker bundle in Node is needed to enforce the production guard.
       return {
@@ -338,8 +338,9 @@ export function htmxPlugin(options: RecoolerOptions) {
       // importers, retaining unchanged transforms while reloading the runner.
       const table = this.environment.moduleGraph.getModuleById(internalTable);
       if (table) this.environment.moduleGraph.invalidateModule(table);
-      const before = JSON.stringify(state.cached?.clients);
-      const after = JSON.stringify((await devTable(this.environment as DevEnvironment)).clients);
+      const signature = (data?: TableData) => JSON.stringify([data?.clients, data?.onLoads]);
+      const before = signature(state.cached);
+      const after = signature(await devTable(this.environment as DevEnvironment));
       if (before !== after) {
         const client = context.server.environments.client;
         client?.moduleGraph.invalidateAll();

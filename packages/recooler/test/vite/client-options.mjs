@@ -45,6 +45,7 @@ try {
   await write('src/routes/index.tsx', `export default () => <button hx-on:click={function () { this.textContent = 'changed'; }}/>;`);
   assert.notEqual(first, (await build()).html.match(/recooler-client.js\?v=([^"]+)/)[1]);
   for (const base of ['./', '', 'relative/']) await assert.rejects(build({}, { base }), /relative Vite base is unsupported/);
+  assert((await build({}, { base: 'https://cdn.example.test/static/' })).html.includes('https://cdn.example.test/static/assets/recooler-client.js'));
   // Bad custom orchestration is an actionable error, not an empty route table.
   await assert.rejects(build({}, { builder: { buildApp: builder => builder.build(builder.environments.client) } }), /build the selected server environment before the client/);
   console.log(JSON.stringify({ clientOptions: true, rawBanned: true, resolvedBanned: true, legacyOptIn: true, cacheBusting: true }));

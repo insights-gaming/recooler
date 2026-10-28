@@ -35,5 +35,16 @@ try {
     await new Promise(r => setTimeout(r, 100));
     assert(!messages.some(m => m.type === 'full-reload'), JSON.stringify(messages));
   }
+  // Changing the onLoad bit changes the client loading table even if its slice
+  // list stays the same, so the generated route entry must be invalidated.
+  await fetch(origin + '/@id/virtual:recooler/client');
+  const entry = server.environments.client.moduleGraph.getModuleById('\0virtual:recooler/client');
+  assert(entry?.transformResult);
+  messages.length = 0;
+  await write('src/routes/index.tsx', `export const onLoad = () => console.log('new onLoad'); export default () => <button hx-on:click={() => 1}/>;`);
+  const deadline = Date.now() + 5000;
+  while (!messages.some(m => m.type === 'full-reload')) { assert(Date.now() < deadline, JSON.stringify(messages)); await new Promise(r => setTimeout(r, 20)); }
+  assert.equal(entry.transformResult, null);
+  assert((await (await fetch(origin + '/@id/virtual:recooler/client')).text()).includes('"onLoad"'));
   console.log(JSON.stringify({ clientHmr: true, cssUpdateOnly: true, tsUpdateOnly: true }));
 } finally { ws?.terminate(); await server?.close(); await rm(root, { recursive: true, force: true }); }
