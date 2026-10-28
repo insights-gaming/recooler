@@ -6,6 +6,7 @@ import { attrKind, attrName, collect, isFunction } from "./collect.js";
 import { emitActionUrl, emitRegistration } from "./codegen.js";
 import { sliceModule, warnOnLoad } from "./slice.js";
 import { handlerOnlyDeclarations } from "./server.js";
+import { onLoadExports } from "./onload.js";
 import type { Action, Candidate, Diagnostic, FunctionNode, TransformOptions, TransformResult } from "./types.js";
 
 export type { Action, Handler, Diagnostic, TransformOptions, TransformResult, TransformMode,
@@ -100,7 +101,25 @@ export function transform(code: string, options: TransformOptions): TransformRes
     }
   }
   if (mode === "server") {
-    const clientOnly = handlerOnlyDeclarations(analysis, candidates);
+    const onLoad = options.moduleKind === "route" ? onLoadExports(analysis) : new Set<Node>();
+    const clientOnly = handlerOnlyDeclarations(analysis, candidates, onLoad);
+    // Drop the client entry export, including aliases/re-exports. Keep shared
+    // locals and effectful initializers under the same rules as handler code.
+    for (const item of analysis.program.body) {
+      if (onLoad.has(item)) drop(item.start, item.end);
+      if (item.type !== "ExportNamedDeclaration") continue;
+      if (!item.declaration && item.specifiers.some(s => onLoad.has(s))) {
+        if (item.specifiers.every(s => onLoad.has(s))) drop(item.start, item.end);
+        else trimList(item.specifiers, s => !onLoad.has(s), drop);
+      }
+      const decl = item.declaration;
+      const parts = decl?.type === "VariableDeclaration" ? decl.declarations : decl ? [decl] : [];
+      if (decl && parts.some(p => onLoad.has(p) && !clientOnly.has(p))) {
+        drop(item.start, decl.start);
+        const keptExports = parts.filter(p => !onLoad.has(p)).flatMap(p => analysis.moduleVariables(p).map(v => v.name));
+        if (keptExports.length) ms.appendLeft(item.end, `\nexport { ${keptExports.join(", ")} };`);
+      }
+    }
     for (const item of analysis.program.body) {
       const decl = item.type === "ExportNamedDeclaration" || item.type === "ExportDefaultDeclaration" ? item.declaration : item;
       if (!decl) continue;
@@ -110,7 +129,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
         else trimList(decl.declarations, d => !clientOnly.has(d), drop);
       }
     }
-    const clientOwners = new SpanIndex([...clientOnly]);
+    const clientOwners = new SpanIndex([...clientOnly, ...[...onLoad].filter(n => n.type === "ExportSpecifier")]);
     for (const item of analysis.program.body) if (item.type === "ImportDeclaration" && item.specifiers.length) {
       const kept = item.specifiers.filter(spec => {
         const variable = analysis.moduleVariables(spec)[0];

@@ -32,7 +32,8 @@ export default function Page({ count }) {
     expect(traced).toMatchObject({ source: 'page.tsx', ...position(input, input.indexOf(original) + originalOffset) });
   };
   check('untouched = 42', 'untouched = 42');
-  check('console.log(untouched)', 'console.log(untouched)');
+  if (mode !== 'server') check('console.log(untouched)', 'console.log(untouched)');
+  else expect(result.code).not.toContain('onLoad');
   if (mode !== 'client-slice') {
     check('console.log("outer action")', 'console.log("outer action")');
     // The identifier itself is rewritten; the generated alias still maps to

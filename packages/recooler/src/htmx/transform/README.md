@@ -46,13 +46,16 @@ reserved at module scope; injected helpers, captures and props are collision-fre
 - `full` (default): retain source code, export actions and handlers, and register
   the module's actions. Useful for tests and inspection.
 - `server`: retain action exports and rendered handler strings, remove handler
-  bodies, and prune their imports. Drop a specifier only when it has value
+  bodies, and prune their imports. In route modules also remove the client-only
+  `onLoad` export and prune its private dependency closure. Drop a specifier only when it has value
   references and all of them are in removed client code. Imports with no value
   references (including JSX pragmas and metadata types) and explicit side-effect
   imports stay. Private handler-only declarations are removed only when evaluation
-  is side-effect free: literals, functions, arrows, and classes without static
+  is side-effect free: identifiers, literals, functions, arrows, static-key objects
+  and arrays without spreads and with safe values, templates with safe expressions,
+  import namespace properties, and classes without static
   blocks, decorators, effectful static fields, computed keys or extends. Possibly
-  effectful initializers, destructuring, exports and shared server uses stay and
+  effectful initializers, destructuring, other exports and shared server uses stay and
   keep their dependencies. Hoisted action bodies are always server roots.
 - `client-slice`: keep handler exports and their breadth-first dependency closure;
   trim partial imports/declarators and type-only imports; remove server code,
@@ -64,7 +67,7 @@ reserved at module scope; injected helpers, captures and props are collision-fre
   server runtime helpers. Error results retain the original source for reporting
   and must never be emitted by the caller.
 
-Set `moduleKind: "route"` to keep `onLoad` and its dependency closure, including
+Set `moduleKind: "route"` to keep `onLoad` in client slices and its dependency closure, including
 declarations, local aliases, re-exports and namespace re-exports. `layout` and
 `root` report a warning for runtime `onLoad` exports; `component` (the default)
 silently drops them from slices. The bundler adapter identifies module kinds.

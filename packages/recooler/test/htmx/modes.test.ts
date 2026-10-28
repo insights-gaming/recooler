@@ -96,3 +96,54 @@ it('uses a shortest reference chain for each handler, with stable regex matching
     'event handler test.tsx@1 imports banned module "banned" via _handler$1 → short → db',
   ]);
 });
+
+
+it('removes route onLoad and its client-only closure in all three declaration/export forms', () => {
+  for (const entry of [
+    'export function onLoad() { return render(); }',
+    'export const onLoad = () => render(), keep = 2;',
+    'const load = () => render(); export { load as onLoad };',
+  ]) {
+    const source = `import { Chart } from 'chart.js'; import { db } from './db';
+      const config = { Chart }; function render() { return config.Chart; }
+      ${entry}
+      export default () => db();`;
+    const server = check(source, { mode: 'server' });
+    for (const token of ['onLoad', 'chart.js', 'function render', 'const config', 'const load']) expect(server.code).not.toContain(token);
+    expect(server.code).toContain("import { db } from './db'");
+    if (entry.includes('keep')) expect(server.code).toContain('export const keep = 2;');
+    expect(check(source, { mode: 'full' }).code).toContain('onLoad');
+    const slice = check(source);
+    expect(slice.code).toContain('onLoad');
+    expect(slice.code).toContain('chart.js');
+    expect(slice.code).not.toContain('./db');
+  }
+});
+
+it('drops onLoad aliases and re-exports while preserving other exports and shared server uses', () => {
+  for (const entry of [
+    `import { load } from 'chart.js'; export { load as onLoad };`,
+    `export { load as onLoad } from 'chart.js';`,
+    `export * as onLoad from 'chart.js';`,
+  ]) expect(check(entry, { mode: 'server' }).code.trim()).toBe('');
+  const shared = check(`import { Chart } from 'chart.js';
+    function load() { return Chart; }
+    export { load as onLoad, load as shared };
+    export const onLoad = () => load(), keep = 2;
+    export default () => onLoad();`, { mode: 'server' });
+  expect(shared.code).toContain('chart.js');
+  expect(shared.code).toContain('load as shared');
+  expect(shared.code).toContain('const onLoad = () => load(), keep = 2;');
+  expect(shared.code).toContain('export { keep };');
+  expect(shared.code).not.toContain('as onLoad');
+});
+
+it('preserves onLoad initializer effects and their dependencies while removing the export', () => {
+  const server = check(`import { setup } from 'chart.js';
+    export const onLoad = setup(), other = 3;
+    export default () => other;`, { mode: 'server' });
+  expect(server.code).toContain("import { setup } from 'chart.js'");
+  expect(server.code).toContain('const onLoad = setup(), other = 3;');
+  expect(server.code).toContain('export { other };');
+  expect(server.code).not.toContain('export const onLoad');
+});

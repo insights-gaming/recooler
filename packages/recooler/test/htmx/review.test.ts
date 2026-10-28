@@ -64,6 +64,11 @@ it('leaves unrelated computed function keys alone and accepts static template ke
   expect(result.actions).toHaveLength(1);
   expect(result.code).toContain('[Symbol.iterator]: function* () {}');
   for (const source of [
+    `<Table fmt={{ [Col.A]: v => v }} />`,
+    `<Table {...({ [Col.A]: v => v } as any)} />`,
+    `<Table fmt={c ? { [Col.A]: v => v } : {}} />`,
+  ]) expect(transform(source, options).diagnostics).toEqual([]);
+  for (const source of [
     `<i {...{ [k]: () => 1 }} />`, `<i attrs={{ [k]: () => 1 }} />`,
     `const props = { 'hx-post': () => 1, [k]: () => 2 };`,
   ]) expect(transform(source, options).diagnostics.map(d => d.code)).toEqual(['computed-handler-key']);
@@ -131,4 +136,58 @@ it('uses ESTree order for class extends/body and do-while body/test IDs', () => 
     expect(source!.slice(result.actions[0]!.start, result.actions[0]!.end)).toContain(first);
     expect(source!.slice(result.actions[1]!.start, result.actions[1]!.end)).toContain(second);
   }
+});
+
+
+it('rejects dynamic function keys through wrappers and branches in intrinsic htmx positions', () => {
+  const object = '{ [`hx-${k}`]: () => secretServerCode() }';
+  for (const expression of [object, `(${object})`, `(${object} as any)`, `(${object} satisfies Props)`,
+    `(${object})!`, `c ? ${object} : {}`, `c ? {} : ${object}`, `c && ${object}`, `${object} || fallback`,
+    `c ?? (${object} as any)`, `((c ? ${object} : {}) satisfies Props)!`]) {
+    for (const source of [`<i {...(${expression})} />`, `<i attrs={${expression}} />`]) for (const mode of modes) {
+      const result = transform(source, { ...options, mode });
+      expect(result.diagnostics.map(d => d.code), source).toEqual(['computed-handler-key']);
+      expect(result.code).toBe(source);
+    }
+  }
+  // Explicit htmx keys establish intent even on a component or outside JSX.
+  expect(transform(`<Table fmt={{ 'hx-post': () => 1, [k]: () => 2 }} />`, options).diagnostics.map(d => d.code))
+    .toEqual(['computed-handler-key']);
+});
+
+it('prunes client aliases, containers, templates and import namespace properties on the server', () => {
+  const source = "import { confetti } from 'canvas-confetti'; import { fmt } from './client-fmt'; import * as ns from './client-ns';"
+    + "const opts = { fx: confetti, colors: ['red'], ['format']: fmt, [`fn`]: () => fmt(1) };"
+    + "const fmtNum = fmt, list = [fmt, , { fx: confetti }], tpl = `x${fmt}`, prop = ns.fmt, bracket = ns['fmt'];"
+    + "export default () => <i hx-on:click={() => [opts, fmtNum, list, tpl, prop, bracket]} />;";
+  const result = transform(source, { ...options, mode: 'server' });
+  expect(result.diagnostics).toEqual([]);
+  for (const token of ['canvas-confetti', './client-fmt', './client-ns', 'const opts', 'fmtNum =', 'list =', 'tpl =', 'prop =', 'bracket =']) expect(result.code).not.toContain(token);
+  expect(parseSync(options.id, result.code).errors).toEqual([]);
+});
+
+it('keeps spreads, dynamic keys, getters and effectful container values on the server', () => {
+  for (const init of ['{ ...client }', '[...client]', '{ [key()]: client }', '{ get x() { return client; } }',
+    '{ x: client() }', '[client()]', '`x${client()}`', 'client.value', 'ns[key()]']) {
+    const result = transform(`import client from './client'; import * as ns from './ns';
+      const data = ${init}; export default () => <i hx-on:click={() => data} />;`, { ...options, mode: 'server' });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.code).toContain(`const data = ${init}`);
+    expect(parseSync(options.id, result.code).errors).toEqual([]);
+  }
+});
+
+it('counts qualified import-equals namespace chains as values without reviving type queries', () => {
+  const source = `import * as ns from './ns'; import X = ns.deep.Thing;
+    export default () => <i hx-on:click={() => X.go()} />;`;
+  const result = transform(source, { ...options, mode: 'client-slice' });
+  expect(result.diagnostics).toEqual([]);
+  expect(result.code).toContain("import * as ns from './ns'");
+  expect(result.code).toContain('import X = ns.deep.Thing');
+  expect(transform(source, { ...options, mode: 'client-slice', clientBannedImports: ['^\\./ns$'] }).diagnostics[0]?.message)
+    .toContain('_handler$0 → X → ns');
+  const typeOnly = transform(`import * as ns from './ns'; type X = typeof ns.deep.Thing;
+    export default () => <i hx-on:click={(e: X) => e} />;`, { ...options, mode: 'client-slice', clientBannedImports: ['ns'] });
+  expect(typeOnly.diagnostics).toEqual([]);
+  expect(typeOnly.code).not.toContain('./ns');
 });

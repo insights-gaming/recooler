@@ -93,15 +93,18 @@ export class Analysis {
     this.variables = scopes.scopes.flatMap(scope => scope.variables);
     for (const ref of this.references) this.referenceAt.set(ref.identifier.range[0], ref);
     const typeNodes = new Set<Node>();
+    const importNames = new Set<Node>();
     walk(program, node => {
       for (const child of children(node)) {
         this.parents.set(child, node);
+        if (importNames.has(node) || (node.type === "TSImportEqualsDeclaration" && node.importKind !== "type"
+          && child === node.moduleReference)) importNames.add(child);
         // TS expression wrappers have runtime expressions; their annotations do not.
-        if (typeNodes.has(node) || (node.type.startsWith("TS")
+        if (!importNames.has(node) && (typeNodes.has(node) || (node.type.startsWith("TS")
           && !["TSAsExpression", "TSSatisfiesExpression", "TSNonNullExpression", "TSTypeAssertion",
             "TSInstantiationExpression", "TSEnumDeclaration", "TSEnumBody", "TSEnumMember",
             "TSModuleDeclaration", "TSModuleBlock", "TSImportEqualsDeclaration", "TSExportAssignment",
-            "TSParameterProperty"].includes(node.type))) typeNodes.add(child);
+            "TSParameterProperty"].includes(node.type)))) typeNodes.add(child);
       }
     });
     this.valueReferences = this.references.filter(ref => ref.isValueReference && !typeNodes.has(ref.identifier as unknown as Node));

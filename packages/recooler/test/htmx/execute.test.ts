@@ -172,3 +172,24 @@ it('executes a hoisted action from a pruned handler-only component with its impo
   await module['_action$post$0']({ scope: { props: { id: 42 } } });
   expect(module.saved).toEqual([42]);
 });
+
+
+it('loads qualified import-equals aliases in client slices', async () => {
+  const namespace = url('export const deep = { Thing: { go: () => 42 } };');
+  const { module } = await execute(`import * as ns from ${JSON.stringify(namespace)};
+    import X = ns.deep.Thing;
+    export const onLoad = () => X.go();`, { mode: 'client-slice' });
+  expect(module.onLoad()).toBe(42);
+});
+
+it('loads server routes without evaluating browser-only onLoad imports', async () => {
+  const browser = url(`throw new Error('browser-only import evaluated'); export const Chart = class {};`);
+  for (const entry of ['export function onLoad() { return new Chart(); }',
+    'export const onLoad = () => new Chart();',
+    'const load = () => new Chart(); export { load as onLoad };']) {
+    const { module } = await execute(`import { Chart } from ${JSON.stringify(browser)};
+      ${entry} export default () => 42;`, { mode: 'server' });
+    expect(module.default()).toBe(42);
+    expect(module.onLoad).toBeUndefined();
+  }
+});

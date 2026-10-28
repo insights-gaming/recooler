@@ -1,7 +1,7 @@
 import { isRuntimeVariable, walk } from "./analysis.js";
 import type { Analysis, Node, Span, Variable } from "./analysis.js";
 import { SpanIndex } from "./spans.js";
-import { attrName } from "./collect.js";
+import { onLoadExports } from "./onload.js";
 import type { Candidate, Diagnostic, TransformOptions } from "./types.js";
 
 export interface SliceNode {
@@ -51,6 +51,7 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
   const bindings = new Map<Variable, number[]>();
   const roots: Root[] = [];
   const kept = new Set<Node>();
+  const exports = onLoadExports(analysis);
   const onLoadItems = new Set<Node>();
   const onLoadSpecifiers = new Set<Node>();
   const refs = (node: Node): Variable[] => {
@@ -87,7 +88,7 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
     name: c.exportName, description: `event handler ${c.id}`, nodes: [], refs: refs(c.expression), dynamic: dynamic(c.expression), span: c,
   });
   for (const item of analysis.program.body) {
-    if (item.type === "ExportAllDeclaration" && item.exportKind !== "type" && item.exported && attrName(item.exported) === "onLoad") {
+    if (item.type === "ExportAllDeclaration" && exports.has(item)) {
       onLoad(item, { nodes: [add(item, item, item.source.value)] });
       if (options.moduleKind === "route") onLoadItems.add(item);
       continue;
@@ -101,7 +102,7 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
     if (item.type === "ExportNamedDeclaration" && item.exportKind !== "type") {
       for (const spec of item.specifiers) {
         if (spec.type !== "ExportSpecifier" || spec.exportKind !== "type") {
-          if (attrName(spec.exported) === "onLoad") {
+          if (exports.has(spec)) {
             if (item.source) onLoad(spec, { nodes: [add(item, spec, item.source.value)] });
             else if (spec.type === "ExportSpecifier") {
               const variables = analysis.refs(spec).flatMap(r => r.resolved && isRuntimeVariable(r.resolved) ? [r.resolved] : []);
@@ -119,7 +120,7 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
       if (decl.kind === "using" || decl.kind === "await using") continue;
       for (const part of decl.declarations) {
         const index = add(item, part);
-        if (item.type === "ExportNamedDeclaration" && part.id.type === "Identifier" && part.id.name === "onLoad") {
+        if (exports.has(part)) {
           onLoad(part, { nodes: [index] });
           if (options.moduleKind === "route") onLoadItems.add(item);
         }
@@ -128,43 +129,50 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
       if (decl.type === "TSImportEqualsDeclaration" && decl.importKind === "type") continue;
       const index = add(item, decl, decl.type === "TSImportEqualsDeclaration" && decl.moduleReference.type === "TSExternalModuleReference"
         ? decl.moduleReference.expression.value as string : undefined);
-      if (item.type === "ExportNamedDeclaration" && decl.type === "FunctionDeclaration" && decl.id?.name === "onLoad") {
+      if (exports.has(decl)) {
         onLoad(decl, { nodes: [index] });
         if (options.moduleKind === "route") onLoadItems.add(item);
       }
     }
   }
   for (const root of roots) {
-    const paths = new Map<number, string[]>();
+    interface Path { name: string; parent?: Path }
+    const rootPath: Path = { name: root.name };
+    const formatPath = (path: Path): string => {
+      const names: string[] = [];
+      for (let p: Path | undefined = path; p; p = p.parent) names.push(p.name);
+      return names.reverse().join(" → ");
+    };
+    const paths = new Map<number, Path>();
     const queue: number[] = [];
-    const reach = (index: number, path: string[]) => {
+    const reach = (index: number, path: Path) => {
       if (paths.has(index)) return;
       paths.set(index, path); queue.push(index); kept.add(nodes[index]!.node);
     };
-    const reachRefs = (variables: Variable[], path: string[]) => {
-      for (const variable of variables) for (const index of bindings.get(variable) ?? []) reach(index, [...path, variable.name]);
+    const reachRefs = (variables: Variable[], path: Path) => {
+      for (const variable of variables) for (const index of bindings.get(variable) ?? []) reach(index, { name: variable.name, parent: path });
     };
-    root.nodes.forEach(index => reach(index, [root.name]));
-    reachRefs(root.refs, [root.name]);
+    root.nodes.forEach(index => reach(index, rootPath));
+    reachRefs(root.refs, rootPath);
     for (let i = 0; i < queue.length; i++) {
       const index = queue[i]!;
       reachRefs(nodes[index]!.refs, paths.get(index)!);
     }
     const reported = new Set<string>();
-    const report = (source: string, path: string[]) => {
+    const report = (source: string, path: Path) => {
       if (!patternsMatch(options.clientBannedImports ?? [], source) || reported.has(source)) return;
       reported.add(source);
       diagnostics.push({ severity: "error", code: "banned-client-import", start: root.span.start, end: root.span.end,
-        message: `${root.description} imports banned module ${JSON.stringify(source)} via ${path.join(" → ")}` });
+        message: `${root.description} imports banned module ${JSON.stringify(source)} via ${formatPath(path)}` });
     };
-    root.dynamic.forEach(source => report(source, [root.name]));
+    root.dynamic.forEach(source => report(source, rootPath));
     // Source order decides ties, as in the reference; BFS determines shortest paths.
     for (const index of [...paths.keys()].sort((a, b) => a - b)) {
       const node = nodes[index]!;
       const path = paths.get(index)!;
       for (const action of actionsAt.get(node.node) ?? []) diagnostics.push({
         severity: "error", code: "action-in-client-slice", start: action.start, end: action.end,
-        message: `${root.description} reaches form action ${action.id} (${action.exportName}) via ${path.join(" → ")}; action URLs require server request context and signing`,
+        message: `${root.description} reaches form action ${action.id} (${action.exportName}) via ${formatPath(path)}; action URLs require server request context and signing`,
       });
       node.dynamic.forEach(source => report(source, path));
       if (node.source) report(node.source, path);
@@ -175,19 +183,13 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
 
 export function warnOnLoad(analysis: Analysis, options: TransformOptions, diagnostics: Diagnostic[]): void {
   if (options.moduleKind !== "root" && options.moduleKind !== "layout") return;
+  const exports = onLoadExports(analysis);
   for (const item of analysis.program.body) {
-    if (item.type === "ExportAllDeclaration" && item.exportKind !== "type" && item.exported && attrName(item.exported) === "onLoad") {
+    const decl = item.type === "ExportNamedDeclaration" ? item.declaration : undefined;
+    if (exports.has(item) || (item.type === "ExportNamedDeclaration" && item.specifiers.some(s => exports.has(s)))
+      || (decl && (exports.has(decl) || (decl.type === "VariableDeclaration" && decl.declarations.some(d => exports.has(d)))))) {
       diagnostics.push({ severity: "warning", code: "ignored-onload", start: item.start, end: item.end,
         message: `${options.relativePath}: onLoad exported by a ${options.moduleKind} never runs; export it from a route module instead` });
-      continue;
     }
-    if (item.type !== "ExportNamedDeclaration" || item.exportKind === "type") continue;
-    const d = item.declaration;
-    const exported = (d?.type === "FunctionDeclaration" && !d.declare && d.id?.name === "onLoad")
-      || (d?.type === "VariableDeclaration" && !d.declare && d.declarations.some(p => p.id.type === "Identifier" && p.id.name === "onLoad"))
-      || item.specifiers.some(s => attrName(s.exported) === "onLoad" && !(s.type === "ExportSpecifier" && s.exportKind === "type")
-        && (item.source || analysis.refs(s).some(r => r.resolved && isRuntimeVariable(r.resolved))));
-    if (exported) diagnostics.push({ severity: "warning", code: "ignored-onload", start: item.start, end: item.end,
-      message: `${options.relativePath}: onLoad exported by a ${options.moduleKind} never runs; export it from a route module instead` });
   }
 }

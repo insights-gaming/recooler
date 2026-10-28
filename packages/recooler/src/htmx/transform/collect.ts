@@ -62,6 +62,21 @@ export function collect(analysis: Analysis, options: TransformOptions, diagnosti
     }
     item.captures = item.variables.map(v => v.name);
   }
+  function intrinsicPosition(node: Node): boolean {
+    let parent = analysis.parents.get(node);
+    while (parent) {
+      if ((unwrap(parent) !== parent && "expression" in parent && parent.expression === node)
+        || (parent.type === "ConditionalExpression" && (parent.consequent === node || parent.alternate === node))
+        || (parent.type === "LogicalExpression" && (parent.left === node || parent.right === node))) {
+        node = parent; parent = analysis.parents.get(node); continue;
+      }
+      if (parent.type === "JSXExpressionContainer") { node = parent; parent = analysis.parents.get(node); }
+      if (parent?.type !== "JSXSpreadAttribute" && parent?.type !== "JSXAttribute") return false;
+      const opening = analysis.parents.get(parent);
+      return opening?.type === "JSXOpeningElement" && opening.name.type === "JSXIdentifier" && /^[a-z]/.test(opening.name.name);
+    }
+    return false;
+  }
   function visit(node: Node, state: State): void {
     if (node.type === "JSXOpeningElement") {
       const ctx = node.attributes.find(a => a.type === "JSXAttribute" && attrName(a.name) === "ctx");
@@ -80,8 +95,7 @@ export function collect(analysis: Analysis, options: TransformOptions, diagnosti
     if (node.type === "ObjectExpression") {
       const ctx = node.properties.find(p => p.type === "Property" && attrName(p.key, p.computed) === "ctx");
       const context = ctx?.type === "Property" ? ctx.value : undefined;
-      const parent = analysis.parents.get(node);
-      const htmxPosition = parent?.type === "JSXSpreadAttribute" || (parent?.type === "JSXExpressionContainer" && analysis.parents.get(parent)?.type === "JSXAttribute")
+      const htmxPosition = intrinsicPosition(node)
         || node.properties.some(p => p.type === "Property" && attrName(p.key, p.computed)?.replace(/^data-/, "").startsWith("hx-"));
       for (const prop of node.properties) {
         if (prop.type === "Property" && prop.kind === "init" && !prop.method) {
