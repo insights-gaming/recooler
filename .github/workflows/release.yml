@@ -1,19 +1,19 @@
-name: Publish packages and crates
+name: Publish package
 on:
   push:
     branches:
       - main
 
 # the id-token permission that npm's OIDC publish needs is granted to the release job only, so that
-# the called CI jobs (dependency installs, cargo build scripts) don't get it
+# the called CI jobs (dependency installs, lifecycle scripts) don't get it
 permissions:
   contents: read
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  # builds every platform binary (via build.yaml), runs the cargo and node tests and checks the
-  # playground against the linux binary; nothing is published unless all of it passes
+  # builds the package and runs the tests, the conformance suite and the playground checks;
+  # nothing is published unless all of it passes
   call-ci:
     uses: ./.github/workflows/ci.yaml
 
@@ -31,7 +31,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.4.0
+          version: 12.11.2
           run_install: false
 
       - name: Setup Node.js 24.x
@@ -39,19 +39,6 @@ jobs:
         with:
           node-version: 24.x
           cache: "pnpm"
-
-      # batch download the artifacts built by build.yaml inside call-ci
-      - uses: actions/download-artifact@v4
-        with:
-          path: /tmp/artifacts
-      - name: Move Artifacts
-        run: |
-          for abi in linux-x64-gnu linux-x64-musl darwin-x64 win32-x64-msvc linux-arm64-musl linux-arm64-gnu darwin-arm64 win32-ia32-msvc win32-arm64-msvc
-          do
-            mv /tmp/artifacts/${{ github.sha }}-${abi}-plugin/* ./npm/${abi}
-
-            test -f ./npm/${abi}/index.farm
-          done
 
       - name: Install Dependencies
         uses: nick-fields/retry@v3
@@ -61,5 +48,6 @@ jobs:
           retry_wait_seconds: 10
           command: pnpm i --frozen-lockfile
 
+      # prepack builds dist
       - name: Publish to npm
         run: npm publish

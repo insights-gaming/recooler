@@ -181,11 +181,6 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/windows
 
-#Added by cargo
-
-/target
-# Cargo.lock
-
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -194,8 +189,4 @@ $RECYCLE.BIN/
 !.yarn/sdks
 !.yarn/versions
 
-*.farm
-*.node
-
-/src/helpers.d.ts
-/src/helpers.js
+/dist

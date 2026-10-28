@@ -1,19 +1,22 @@
 {
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
-    "sourceMap": false,
-    "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "sourceMap": true,
     "jsx": "react-jsx",
     "jsxImportSource": "easy-jsx-html-engine",
-    "declaration": true,
-    "skipLibCheck": true,
-    "types": [
-      "node",
-      "easy-jsx-html-engine/jsx-runtime"
-    ]
+    "types": ["node"],
+    "paths": {
+      "recooler/jsx": ["./src/jsx/index.ts"],
+      "recooler/jsx/jsx-runtime": ["./src/jsx/jsx-runtime.ts"],
+      "recooler/jsx/jsx-dev-runtime": ["./src/jsx/jsx-dev-runtime.ts"]
+    }
   },
-  "exclude": ["node_modules", "playground", "conformance", "tests/types"],
-  "include": ["src/helpers.ts", "global.d.ts", "options.d.ts"]
+  "include": ["src", "test"]
 }

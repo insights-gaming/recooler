@@ -3,17 +3,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "farm build",
-    "check": "node --test test/app.test.mjs"
+    "dev": "vite",
+    "build": "vite build",
+    "check": "node --experimental-vm-modules --test test/app.test.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "easy-jsx-html-engine": "^0.1.10",
-    "farm-plugin-recooler": "workspace:*",
-    "hono": "^4.12.34"
+    "easy-jsx-html-engine": "^0.1.13",
+    "hono": "^4.13.14",
+    "htmx.org": "^2.0.11",
+    "recooler": "workspace:*"
   },
   "devDependencies": {
-    "@farmfe/cli": "^1.0.5",
-    "@farmfe/core": "^1.7.11",
-    "@farmfe/plugin-react": "^1.2.6"
+    "@types/node": "^22.1.0",
+    "typescript": "^7.0.2",
+    "vite": "~8.3.5"
   }
 }

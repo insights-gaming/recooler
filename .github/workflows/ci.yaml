@@ -1,10 +1,10 @@
-name: Test Plugin
+name: Test
 on:
   pull_request:
     branches:
       - main
   # release.yml runs this workflow on every push to main and only publishes if every job passes,
-  # so there is no separate push trigger here (it would build every platform twice)
+  # so there is no separate push trigger here
   workflow_call:
 
 jobs:
@@ -14,27 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Installs the toolchain and components pinned in rust-toolchain.toml and caches cargo
-      # artifacts. The empty rustflags stop the action from defaulting to `-D warnings`, so tests
-      # build the same way as they do locally.
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          rustflags: ""
-
-      - name: Cargo test
-        run: cargo test
-
-      # TODO: make this blocking once the existing clippy::all violations in the crate are fixed.
-      # The crate has `#![deny(clippy::all)]`, so today this step fails on lints that predate it.
-      - name: Cargo clippy
-        run: cargo clippy --all-targets
-        continue-on-error: true
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.4.0
+          version: 12.11.2
           run_install: false
 
       - name: Setup Node.js
@@ -46,57 +29,25 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Node tests
+      # the client regression tests drive a headless Chromium
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # the conformance suite, the playground and the Vite integration tests load the built dist
+      - name: Build
+        run: pnpm run build
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Unit and integration tests
         run: pnpm run test
 
-      # type checks the playground against global.d.ts and the helpers' declarations emitted by
-      # the tsc in `pnpm run test`; the root tsconfig excludes the playground
-      - name: Type check playground
-        run: pnpm exec tsc -p playground
+      - name: Conformance
+        run: pnpm run test:conformance
 
-  call-rust-build:
-    uses: ./.github/workflows/build.yaml
-
-  test-artifacts:
-    name: Test Artifacts and Playground
-    needs: [call-rust-build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # batch download artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          path: /tmp/artifacts
-      - name: Check Artifacts
-        run: |
-          for abi in linux-x64-gnu linux-x64-musl darwin-x64 win32-x64-msvc linux-arm64-musl linux-arm64-gnu darwin-arm64 win32-ia32-msvc win32-arm64-msvc
-          do
-            mv /tmp/artifacts/${{ github.sha }}-${abi}-plugin/* ./npm/${abi}
-
-            test -f ./npm/${abi}/index.farm
-          done
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.4.0
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.x
-          cache: "pnpm"
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      # the playground loads the plugin through the workspace package, which uses
-      # npm/linux-x64-gnu/index.farm from the artifacts above and needs src/helpers.js
-      - name: Build Helpers
-        run: pnpm exec tsc
-
-      - name: Test Example
+      - name: Playground
         run: |
           pnpm --filter playground build
           pnpm --filter playground check
+          pnpm --filter playground typecheck

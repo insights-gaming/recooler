@@ -1,39 +1,28 @@
-# Recooler playground
+# TypeScript playground
 
-A minimal app built with the plugin from this repository, used by CI as an end-to-end check. It
-loads the plugin through the `farm-plugin-recooler` workspace package, so it needs a plugin binary
-for your platform in `npm/<platform>/index.farm` and the compiled helpers (`src/helpers.js`).
-
-## Running it locally
+The public Farm playground ported to `recooler` 0.1.0 / Vite 8.
 
 From the repository root:
 
 ```sh
-# build the plugin binary and copy it where scripts/index.js looks first
-# (use your platform's directory and library name, e.g. npm/linux-x64-gnu and libfarm_plugin_recooler.so)
-cargo build --release
-cp target/release/libfarm_plugin_recooler.dylib npm/darwin-arm64/index.farm
-
 pnpm install --frozen-lockfile
-pnpm exec tsc # emits src/helpers.js
-
-pnpm --filter playground build # farm build -> playground/build/main.js
-pnpm --filter playground check # node --test against the built hono app
+pnpm --filter recooler build
+pnpm --filter playground dev
+# Or build both server/client and execute the built-app checks:
+pnpm --filter playground build
+pnpm --filter playground check
+pnpm --filter playground typecheck
 ```
 
-## What it covers
+Open the printed dev URL. The head loads the local htmx asset before Recooler's
+module entry. The home page has a signed greeting action, a `this`-based counter
+handler, and `onLoad`; its database import is excluded from browser chunks. Dev
+uses a fixture-only signing key supplied at request time. Set your own runtime
+`RECOOLER_SECRET` when serving the built server. Serve `dist/client` as static
+assets alongside `dist/server/app.mjs`; server-emitted assets are in
+`dist/server/assets`. The Node HTTP adapter in `vite.config.ts` is for this demo.
 
-| Feature | Where |
-| --- | --- |
-| static, `[param]` and `[[catchall]]` routes | `src/routes/posts/{new,[id],[[rest]]}` |
-| group middleware | `src/routes/(admin)/middleware.ts` (sets `x-group: admin` on `/admin` only) |
-| a blocking group guard, incl. fall-through from a public page's form actions, the same path in two groups, mounting under a prefix and re-dispatching a request | `src/routes/(staff)/middleware.ts` with `(staff)/posts/[postId]` and `(staff)/admin` (`onPost` only) |
-| a page next to a same-shaped `onPost`-only route of another group | `src/routes/posts/[id]` (page with an action) and `(staff)/posts/[postId]` |
-| layout with a `head` function | `src/routes/layout.tsx` |
-| root component and `head` object (with its own charset, which must not be duplicated) | `src/root.tsx` |
-| route `head` function using params | `src/routes/posts/[id]/index.tsx` |
-| form actions (`hx-post`) returning JSX (200) and nothing (204) | `src/routes/index.tsx` |
-| `hx-on:click` event handler inlined as a client script | `src/routes/index.tsx` |
-| `client_banned_imports` | `farm.config.ts` bans `src/lib/db.ts`, which pages import but handlers must not |
-
-The tests in `test/app.test.mjs` import `build/main.js` and assert on `app.request()` responses.
+The checks execute emitted ESM in a native module VM with a Happy DOM document,
+exercise the rendered event attribute, call the built signed action, and inspect
+all emitted client chunks for database/server runtime markers. Client initialization
+uses full-page navigation; keep route-changing links outside inherited hx-boost.

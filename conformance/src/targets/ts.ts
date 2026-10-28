@@ -47,7 +47,7 @@ export async function tsUnavailable(load = importModule): Promise<string | undef
 }
 
 const packageDir = fileURLToPath(new URL("../../", import.meta.url));
-const implementation = path.join(packageDir, "../packages/recooler/dist");
+const implementation = path.join(packageDir, "../dist");
 const builder = fileURLToPath(new URL("./ts-build.mjs", import.meta.url));
 const execute = promisify(execFile);
 let importGeneration = 0;

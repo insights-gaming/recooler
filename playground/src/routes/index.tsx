@@ -1,5 +1,7 @@
 import { SERVER_ONLY_MARKER } from "../lib/db";
 
+export const onLoad = () => { document.body.dataset.loaded = 'yes'; };
+
 export default function Home(_props: RouteProps) {
   return (
     <>

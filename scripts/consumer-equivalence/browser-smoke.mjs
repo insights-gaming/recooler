@@ -49,7 +49,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const [origin, profileFile, output] = process.argv.slice(2);
   if (!origin || !profileFile || !output || !resolve(output).startsWith('/private/tmp/')) throw new Error('Usage: browser-smoke.mjs ORIGIN PRIVATE_PROFILE.json /private/tmp/RESULT.json');
   const profile = JSON.parse(await readFile(profileFile,'utf8'));
-  const { chromium } = createRequire(new URL('../../packages/recooler/package.json', import.meta.url))('playwright');
+  const { chromium } = createRequire(new URL('../../package.json', import.meta.url))('playwright');
   const browser = await chromium.launch({headless:true});
   try {
     const page = await browser.newPage();

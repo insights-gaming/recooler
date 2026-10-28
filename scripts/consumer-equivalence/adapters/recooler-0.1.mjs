@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { signActionUrl } from '../../../packages/recooler/dist/htmx/testing.js';
+import { signActionUrl } from '../../../dist/htmx/testing.js';
 import { loadRuntime } from '../runtime.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtureSecret = 'synthetic-equivalence-secret';

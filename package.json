@@ -1,80 +1,109 @@
 {
-  "name": "farm-plugin-recooler",
-  "version": "0.0.27",
-  "main": "scripts/index.js",
-  "types": "scripts/func.d.ts",
+  "name": "recooler",
+  "version": "0.1.0",
+  "description": "File-based routing, JSX pages and htmx actions for Hono on Vite",
   "type": "module",
   "license": "MIT",
   "repository": {
     "url": "https://github.com/ssttevee/recooler"
   },
-  "devDependencies": {
-    "@farmfe/plugin-tools": "^0.1.1",
-    "@types/node": "^22.1.0",
-    "easy-jsx-html-engine": "^0.1.10",
-    "hono": "^4.12.34",
-    "typescript": "^5.5.4"
-  },
-  "peerDependencies": {
-    "easy-jsx-html-engine": "^0.1.3",
-    "hono": "^4.12.0"
-  },
-  "napi": {
-    "name": "farm_plugin_recooler",
-    "triples": {
-      "additional": [
-        "aarch64-apple-darwin",
-        "aarch64-unknown-linux-gnu",
-        "aarch64-unknown-linux-musl",
-        "x86_64-unknown-linux-musl",
-        "i686-pc-windows-msvc",
-        "aarch64-pc-windows-msvc"
-      ]
+  "exports": {
+    "./router": {
+      "types": "./dist/router/index.d.ts",
+      "default": "./dist/router/index.js"
+    },
+    "./gen": {
+      "types": "./dist/gen/index.d.ts",
+      "default": "./dist/gen/index.js"
+    },
+    "./jsx": {
+      "types": "./dist/jsx/index.d.ts",
+      "default": "./dist/jsx/index.js"
+    },
+    "./htmx": {
+      "types": "./dist/htmx/index.d.ts",
+      "default": "./dist/htmx/index.js"
+    },
+    "./htmx/transform": {
+      "types": "./dist/htmx/transform/index.d.ts",
+      "default": "./dist/htmx/transform/index.js"
+    },
+    "./htmx/runtime": {
+      "types": "./dist/htmx/runtime.d.ts",
+      "default": "./dist/htmx/runtime.js"
+    },
+    "./vite": {
+      "types": "./dist/vite/index.d.ts",
+      "default": "./dist/vite/index.js"
+    },
+    "./package.json": "./package.json",
+    "./jsx/jsx-runtime": {
+      "types": "./dist/jsx/jsx-runtime.d.ts",
+      "default": "./dist/jsx/jsx-runtime.js"
+    },
+    "./jsx/jsx-dev-runtime": {
+      "types": "./dist/jsx/jsx-dev-runtime.d.ts",
+      "default": "./dist/jsx/jsx-dev-runtime.js"
+    },
+    "./htmx/testing": {
+      "types": "./dist/htmx/testing.d.ts",
+      "default": "./dist/htmx/testing.js"
+    },
+    "./vite/client": {
+      "types": "./src/vite/client.d.ts"
     }
   },
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./scripts/func.d.ts",
-        "default": "./scripts/func.js"
-      },
-      "default": {
-        "types": "./scripts/index.d.ts",
-        "default": "./scripts/index.js"
-      }
-    },
-    "./helpers": {
-      "types": "./src/helpers.d.ts",
-      "import": "./src/helpers.js",
-      "default": "./src/helpers.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "scripts": {
-    "dev": "cargo watch -w src -s 'scripts/watch.sh'",
-    "bump": "npx changeset version",
-    "prepack": "tsc",
-    "build": "farm-plugin-tools build --platform --cargo-name farm_plugin_recooler -p farm_plugin_recooler --release",
-    "prepublishOnly": "farm-plugin-tools prepublish",
-    "test": "tsc && node --test tests/*.test.mjs",
-    "test:conformance": "pnpm --filter recooler-conformance test"
+  "bin": {
+    "recooler-routes": "./dist/gen/cli.js"
   },
   "files": [
-    "scripts",
-    "src/helpers.js",
-    "src/helpers.d.ts",
-    "global.d.ts",
-    "options.d.ts"
+    "dist",
+    "src"
   ],
-  "optionalDependencies": {
-    "farm-plugin-recooler-darwin-arm64": "0.0.0",
-    "farm-plugin-recooler-darwin-x64": "0.0.0",
-    "farm-plugin-recooler-linux-arm64-gnu": "0.0.0",
-    "farm-plugin-recooler-linux-arm64-musl": "0.0.0",
-    "farm-plugin-recooler-linux-x64-gnu": "0.0.0",
-    "farm-plugin-recooler-linux-x64-musl": "0.0.0",
-    "farm-plugin-recooler-win32-arm64-msvc": "0.0.0",
-    "farm-plugin-recooler-win32-ia32-msvc": "0.0.0",
-    "farm-plugin-recooler-win32-x64-msvc": "0.0.0"
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.build.json && tsc -p test/jsx/consumer/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:conformance": "pnpm --filter recooler-conformance test",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "easy-jsx-html-engine": "^0.1.13",
+    "hono": "^4.12.0 || ^5.0.0-0",
+    "vite": "^8.3.0"
+  },
+  "peerDependenciesMeta": {
+    "easy-jsx-html-engine": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@typescript-eslint/scope-manager": "^8.72.1",
+    "get-tsconfig": "^4.13.6",
+    "magic-string": "^1.4.5",
+    "oxc-parser": "^0.156.0",
+    "vitefu": "^1.1.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.65.0",
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "@types/node": "^22.1.0",
+    "@types/ws": "^8.18.2",
+    "easy-jsx-html-engine": "^0.1.13",
+    "happy-dom": "^21.0.4",
+    "hono": "^4.13.14",
+    "hono-412": "npm:hono@4.12.34",
+    "hono-5": "npm:hono@5.0.0-rc.1",
+    "htmx-1": "npm:htmx.org@1.9.12",
+    "htmx.org": "^2.0.11",
+    "jsdom": "^27.4.0",
+    "playwright": "^1.64.1",
+    "typescript": "^7.0.2",
+    "vite": "~8.3.5",
+    "vitest": "^5.0.5",
+    "ws": "^8.22.0"
   }
 }

@@ -7,129 +7,6 @@ settings:
 importers:
 
   .:
-    devDependencies:
-      '@farmfe/plugin-tools':
-        specifier: ^0.1.1
-        version: 0.1.1
-      '@types/node':
-        specifier: ^22.1.0
-        version: 22.1.0
-      easy-jsx-html-engine:
-        specifier: ^0.1.10
-        version: 0.1.10
-      hono:
-        specifier: ^4.12.34
-        version: 4.12.34
-      typescript:
-        specifier: ^5.5.4
-        version: 5.5.4
-    optionalDependencies:
-      farm-plugin-recooler-darwin-arm64:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-darwin-x64:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-linux-arm64-gnu:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-linux-arm64-musl:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-linux-x64-gnu:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-linux-x64-musl:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-win32-arm64-msvc:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-win32-ia32-msvc:
-        specifier: 0.0.0
-        version: 0.0.0
-      farm-plugin-recooler-win32-x64-msvc:
-        specifier: 0.0.0
-        version: 0.0.0
-
-  conformance:
-    devDependencies:
-      '@farmfe/core':
-        specifier: 1.7.11
-        version: 1.7.11(@types/node@22.1.0)(supports-color@10.2.2)
-      '@farmfe/plugin-react':
-        specifier: 1.2.6
-        version: 1.2.6
-      '@types/node':
-        specifier: ^22.1.0
-        version: 22.1.0
-      easy-jsx-html-engine:
-        specifier: 0.1.13
-        version: 0.1.13
-      farm-recooler-oracle:
-        specifier: npm:farm-plugin-recooler@0.0.27
-        version: farm-plugin-recooler@0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.13.14)
-      hono:
-        specifier: ^4.13.14
-        version: 4.13.14
-      recooler:
-        specifier: workspace:*
-        version: link:../packages/recooler
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: ~8.3.5
-        version: 8.3.5(@types/node@22.1.0)(esbuild@0.28.2)
-      vitest:
-        specifier: ^5.0.5
-        version: 5.0.5(@types/node@22.1.0)(happy-dom@21.0.4)(jsdom@27.4.0(supports-color@10.2.2))(vite@8.3.5(@types/node@22.1.0)(esbuild@0.28.2))
-
-  fixtures/consumer-shape/admin:
-    dependencies:
-      easy-jsx-html-engine:
-        specifier: 0.1.13
-        version: 0.1.13
-      farm-plugin-recooler:
-        specifier: 0.0.27
-        version: 0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.12.29)
-      hono:
-        specifier: 4.12.29
-        version: 4.12.29
-    devDependencies:
-      '@farmfe/cli':
-        specifier: 1.0.5
-        version: 1.0.5
-      '@farmfe/core':
-        specifier: 1.7.11
-        version: 1.7.11(@types/node@22.1.0)(supports-color@7.2.0)
-      '@farmfe/plugin-react':
-        specifier: 1.2.6
-        version: 1.2.6
-
-  fixtures/consumer-shape/router:
-    dependencies:
-      easy-jsx-html-engine:
-        specifier: 0.1.13
-        version: 0.1.13
-      farm-plugin-recooler:
-        specifier: 0.0.27
-        version: 0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.12.29)
-      hono:
-        specifier: 4.12.29
-        version: 4.12.29
-    devDependencies:
-      '@farmfe/cli':
-        specifier: 1.0.5
-        version: 1.0.5
-      '@farmfe/core':
-        specifier: 1.7.11
-        version: 1.7.11(@types/node@22.1.0)(supports-color@7.2.0)
-      '@farmfe/plugin-react':
-        specifier: 1.2.6
-        version: 1.2.6
-
-  packages/recooler:
     dependencies:
       '@typescript-eslint/scope-manager':
         specifier: ^8.72.1
@@ -199,29 +76,84 @@ importers:
         specifier: ^8.22.0
         version: 8.22.0
 
-  playground:
-    dependencies:
+  conformance:
+    devDependencies:
+      '@farmfe/core':
+        specifier: 1.7.11
+        version: 1.7.11(@types/node@22.1.0)(supports-color@10.2.2)
+      '@farmfe/plugin-react':
+        specifier: 1.2.6
+        version: 1.2.6
+      '@types/node':
+        specifier: ^22.1.0
+        version: 22.1.0
       easy-jsx-html-engine:
-        specifier: ^0.1.10
-        version: 0.1.10
-      farm-plugin-recooler:
+        specifier: 0.1.13
+        version: 0.1.13
+      farm-recooler-oracle:
+        specifier: npm:farm-plugin-recooler@0.0.27
+        version: farm-plugin-recooler@0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.13.14)
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      recooler:
         specifier: workspace:*
         version: link:..
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ~8.3.5
+        version: 8.3.5(@types/node@22.1.0)(esbuild@0.28.2)
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@22.1.0)(happy-dom@21.0.4)(jsdom@27.4.0(supports-color@10.2.2))(vite@8.3.5(@types/node@22.1.0)(esbuild@0.28.2))
+
+  fixtures/consumer-shape/admin:
+    dependencies:
+      easy-jsx-html-engine:
+        specifier: 0.1.13
+        version: 0.1.13
+      farm-plugin-recooler:
+        specifier: 0.0.27
+        version: 0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.12.29)
       hono:
-        specifier: ^4.12.34
-        version: 4.12.34
+        specifier: 4.12.29
+        version: 4.12.29
     devDependencies:
       '@farmfe/cli':
-        specifier: ^1.0.5
+        specifier: 1.0.5
         version: 1.0.5
       '@farmfe/core':
-        specifier: ^1.7.11
+        specifier: 1.7.11
         version: 1.7.11(@types/node@22.1.0)(supports-color@7.2.0)
       '@farmfe/plugin-react':
-        specifier: ^1.2.6
+        specifier: 1.2.6
         version: 1.2.6
 
-  playground-vite:
+  fixtures/consumer-shape/router:
+    dependencies:
+      easy-jsx-html-engine:
+        specifier: 0.1.13
+        version: 0.1.13
+      farm-plugin-recooler:
+        specifier: 0.0.27
+        version: 0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.12.29)
+      hono:
+        specifier: 4.12.29
+        version: 4.12.29
+    devDependencies:
+      '@farmfe/cli':
+        specifier: 1.0.5
+        version: 1.0.5
+      '@farmfe/core':
+        specifier: 1.7.11
+        version: 1.7.11(@types/node@22.1.0)(supports-color@7.2.0)
+      '@farmfe/plugin-react':
+        specifier: 1.2.6
+        version: 1.2.6
+
+  playground:
     dependencies:
       easy-jsx-html-engine:
         specifier: ^0.1.13
@@ -234,7 +166,7 @@ importers:
         version: 2.0.11
       recooler:
         specifier: workspace:*
-        version: link:../packages/recooler
+        version: link:..
     devDependencies:
       '@types/node':
         specifier: ^22.1.0
@@ -782,10 +714,6 @@ packages:
   '@farmfe/plugin-react@1.2.6':
     resolution: {integrity: sha512-AVXMnqwekp+Cke6a16/xWnviUnQiFeY1FhxkTGJVamHQFgGmm+uAhPXJ85sQDQLAwtkAMd8rimEhNFVeHIKkaw==}
 
-  '@farmfe/plugin-tools@0.1.1':
-    resolution: {integrity: sha512-7ox1VgCI5AWFrIUQVLEYGdqCSGNBJYRC0Yhu5sK0a/sR/OSaZa97MdiKA80LkM6UgK+dDFy49rPre10U/M7yww==}
-    hasBin: true
-
   '@farmfe/runtime-plugin-hmr@3.5.10':
     resolution: {integrity: sha512-ZFwAGDJ1sNuwX77ADdPSO+PoMImrGl0k+nvW/TnzOy72k8JxC8OwaeOiuPgNkYxDGldp55l9mPE9NvcoxR8uzQ==}
 
@@ -1001,11 +929,6 @@ packages:
 
   '@mdn/browser-compat-data@5.7.6':
     resolution: {integrity: sha512-7xdrMX0Wk7grrTZQwAoy1GkvPMFoizStUoL+VmtUkAxegbCCec+3FKwOM6yc/uGU5+BEczQHXAlWiqvM8JeENg==}
-
-  '@napi-rs/cli@2.18.4':
-    resolution: {integrity: sha512-SgJeA4df9DE2iAEpr3M2H0OKl/yjtg1BnRI5/JyowS71tUWhrfSu2LT0V3vlHET+g1hBVlrO60PmEXwUEKp8Mg==}
-    engines: {node: '>= 10'}
-    hasBin: true
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -1747,9 +1670,6 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
-  easy-jsx-html-engine@0.1.10:
-    resolution: {integrity: sha512-RU/IzcZNiplVK/YWx/LiN5cis45HCQiStAk0ilppOcdlvNEnQaCJpwWBJeTh+tdn3GQdgSw4MwpNoFZCq9lhUw==}
-
   easy-jsx-html-engine@0.1.13:
     resolution: {integrity: sha512-P2fdf6F/iLmUkOLUjO75vEGJW0doJdx6aP9osShFLJxJd81pBrdbj6TfI3Yx9E03vgo0R6zHmzsQu+/VQups1A==}
 
@@ -1850,22 +1770,10 @@ packages:
     resolution: {integrity: sha512-igffWSQATGV2ZJEvDBIB9Q2QfVOr+vv/JTZaaNoYfW/nrCGZ58zyJ0kSkFQEvptGUWf6idECqj82ykli4Ueplw==}
     engines: {node: '>=16.15.1', npm: '>=7.0.0', pnpm: '>=3.2.0', yarn: '>=1.13'}
 
-  farm-plugin-recooler-darwin-arm64@0.0.0:
-    resolution: {integrity: sha512-FHPcjdZWfLBIHIl2aU2ses1zUU/3u6r++j90nAYLRoy8JVhxULUH2QXkB5LJeetHsbfxmQ3x7x78xUeWpPPbyA==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [darwin]
-
   farm-plugin-recooler-darwin-arm64@0.0.27:
     resolution: {integrity: sha512-9JW9PrNMxy5QqE+39mBuCx4CysGX42BzeIH3hWt8FftWnHuCk5xomTTtY8xG1Co+qGbId51wOmD1WItZ8rig1A==}
     engines: {node: '>= 10'}
     cpu: [arm64]
-    os: [darwin]
-
-  farm-plugin-recooler-darwin-x64@0.0.0:
-    resolution: {integrity: sha512-MCQJWixm2OO5gzGLr2MHYpyaGidFbrVJjpuX6dnQGGH8NK2TkK3hhxjv8FSYn9EWvT9kyfFkeDfbTII+8bSGbg==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
     os: [darwin]
 
   farm-plugin-recooler-darwin-x64@0.0.27:
@@ -1874,24 +1782,12 @@ packages:
     cpu: [x64]
     os: [darwin]
 
-  farm-plugin-recooler-linux-arm64-gnu@0.0.0:
-    resolution: {integrity: sha512-nnZFfeulzcyLEQnKD9AFUXxK3zfoJP0Y8J0FrZFNkzpMs6H6kd0thoDu2t/ajdOXsXUxcVzccs5yqUTmp8QxhA==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [linux]
-
   farm-plugin-recooler-linux-arm64-gnu@0.0.27:
     resolution: {integrity: sha512-f6ll7DDw40M42cWBckcZ0A8fLWo5KafbgwkzTwHqW7vmB+eKh5oPk3qA20oh4MILXHnur2GWSTsgAaDyf2lf+Q==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
-
-  farm-plugin-recooler-linux-arm64-musl@0.0.0:
-    resolution: {integrity: sha512-JVl135erC+0V5xFwnkSg4A0kYqvf65um3tfmQF903R7zSHyT6nd6qvZfvyxD8ehSVT0/3DaGJgKiB0d14ONZ0A==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [linux]
 
   farm-plugin-recooler-linux-arm64-musl@0.0.27:
     resolution: {integrity: sha512-2utHyLR25dco/fvtUvXbDAizqMFzQUEFWix4ZyK1kcnB/lwrFlIa5BPLcKnMGrLqvMjEpwWYmsZE/Od8c9iOag==}
@@ -1900,24 +1796,12 @@ packages:
     os: [linux]
     libc: [musl]
 
-  farm-plugin-recooler-linux-x64-gnu@0.0.0:
-    resolution: {integrity: sha512-KReobYvBdFvjP+fT/2w2rFFZDB+eAdDwq4fZV80LtrCaTcmN90PJuJg7CQyMRLv/CAix8j/2ygNZVMpu85mHkg==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [linux]
-
   farm-plugin-recooler-linux-x64-gnu@0.0.27:
     resolution: {integrity: sha512-TyWAQ8V1wWzAaqgtD5gYs963/RyHjElOffXMYpuYb05oud9vnfXp+o/u0Y6aiQlSuCZjwz644kJJsQWwly4yzA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
-
-  farm-plugin-recooler-linux-x64-musl@0.0.0:
-    resolution: {integrity: sha512-HAyBJJ6btGfL0P51SlkNNyzR329Vz5LwRUFSg1Nl5Kl/fDQfUC0Mno/W29YIK2i/VK6yuULgzWDxfLzsui3whQ==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [linux]
 
   farm-plugin-recooler-linux-x64-musl@0.0.27:
     resolution: {integrity: sha512-P1Yx7gyGdUDQBTRghttCmbgDJUnsJCBAtudh41xdcAFEjIo0/sqKDq6nzltbuw4tBAtR4CnTWNT7/aXCvj03KQ==}
@@ -1926,34 +1810,16 @@ packages:
     os: [linux]
     libc: [musl]
 
-  farm-plugin-recooler-win32-arm64-msvc@0.0.0:
-    resolution: {integrity: sha512-Ubs1odOWlBe/GyqdPRHGi/tGAeoXNXRQnyO0fbE4sKtxBdYMbC0PevVoSPa9d1XsP2yQMGCo6ZPLw5p+/cSFYw==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [win32]
-
   farm-plugin-recooler-win32-arm64-msvc@0.0.27:
     resolution: {integrity: sha512-Fu+VtJZKRhVVBloBT/9W2bW56b1V5Fpyg2yD9W7XqaeWqLaga8IM+GxYuz9dS1Nyziw7fq73tzSDFCeQXa8Neg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  farm-plugin-recooler-win32-ia32-msvc@0.0.0:
-    resolution: {integrity: sha512-V4b15KN3Icggt/8v4z7c40rlOKfWAU047tbqRN7i+AKvDZZz1oy9CeBUBbonDatdwyv8Q4QXVL6iYuznASpzrA==}
-    engines: {node: '>= 10'}
-    cpu: [ia32]
-    os: [win32]
-
   farm-plugin-recooler-win32-ia32-msvc@0.0.27:
     resolution: {integrity: sha512-yjJg1R3lTuAOZ65eJNNLxO2k3Ng6zNJYaCGfzOWlRrxCG8HmovnYgDy53Zh4glPkukAMXJt8HVN5DDXdsTTuSA==}
     engines: {node: '>= 10'}
     cpu: [ia32]
-    os: [win32]
-
-  farm-plugin-recooler-win32-x64-msvc@0.0.0:
-    resolution: {integrity: sha512-nAnxElHC+xZ+Bac2YQrlwtqPwu5KMCDSDOgSAKzC5WCBtg0vrKD4win0mGF3ciySYoruLacw+Fuf8IOPvINPNg==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
     os: [win32]
 
   farm-plugin-recooler-win32-x64-msvc@0.0.27:
@@ -2492,9 +2358,6 @@ packages:
     resolution: {integrity: sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg==}
     engines: {node: 20 || >=22}
 
-  magic-string@1.4.4:
-    resolution: {integrity: sha512-jQz9sVhrZuphH4NrAIHSgkDJCluQO7Ioi4KGRLa7aTUjAODQ13hENX0YIytqYE/rIkO485gQG2LeBxJaW53kkQ==}
-
   magic-string@1.4.5:
     resolution: {integrity: sha512-oLLC2+YvQUfAa+vxoufE/yc1icb87M9iXIRqAoR/2EhE/8cb3SF/+Gi0c2By1B+5Vz2e2vQtUvHiu1+63Znh+w==}
 
@@ -2964,11 +2827,6 @@ packages:
   type-is@1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}
     engines: {node: '>= 0.6'}
-
-  typescript@5.5.4:
-    resolution: {integrity: sha512-Mtq29sKDAEYP7aljRgtPOpTvOfbwRWlS6dPRzwjdE+C0R4brX/GUyhHSecbHMFLNBLcJIPt9nl9yG5TZ1weH+Q==}
-    engines: {node: '>=14.17'}
-    hasBin: true
 
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
@@ -3768,12 +3626,6 @@ snapshots:
       '@farmfe/plugin-react-win32-ia32-msvc': 1.2.6
       '@farmfe/plugin-react-win32-x64-msvc': 1.2.6
 
-  '@farmfe/plugin-tools@0.1.1':
-    dependencies:
-      '@farmfe/utils': 0.1.0
-      '@napi-rs/cli': 2.18.4
-      cac: 6.7.14
-
   '@farmfe/runtime-plugin-hmr@3.5.10':
     dependencies:
       core-js: 3.50.0
@@ -3942,8 +3794,6 @@ snapshots:
       read-yaml-file: 1.1.0
 
   '@mdn/browser-compat-data@5.7.6': {}
-
-  '@napi-rs/cli@2.18.4': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -4193,7 +4043,7 @@ snapshots:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.5
       estree-walker: 3.0.3
-      magic-string: 1.4.4
+      magic-string: 1.4.5
     optionalDependencies:
       vite: 8.3.5(@types/node@22.1.0)(esbuild@0.28.2)
 
@@ -4485,11 +4335,6 @@ snapshots:
       es-errors: 1.3.0
       gopd: 1.2.0
 
-  easy-jsx-html-engine@0.1.10:
-    dependencies:
-      clsx: 2.1.1
-      html-escaper: 3.0.3
-
   easy-jsx-html-engine@0.1.13:
     dependencies:
       clsx: 2.1.1
@@ -4616,55 +4461,28 @@ snapshots:
       semver: 7.8.5
       ua-parser-js: 1.0.41
 
-  farm-plugin-recooler-darwin-arm64@0.0.0:
-    optional: true
-
   farm-plugin-recooler-darwin-arm64@0.0.27:
-    optional: true
-
-  farm-plugin-recooler-darwin-x64@0.0.0:
     optional: true
 
   farm-plugin-recooler-darwin-x64@0.0.27:
     optional: true
 
-  farm-plugin-recooler-linux-arm64-gnu@0.0.0:
-    optional: true
-
   farm-plugin-recooler-linux-arm64-gnu@0.0.27:
-    optional: true
-
-  farm-plugin-recooler-linux-arm64-musl@0.0.0:
     optional: true
 
   farm-plugin-recooler-linux-arm64-musl@0.0.27:
     optional: true
 
-  farm-plugin-recooler-linux-x64-gnu@0.0.0:
-    optional: true
-
   farm-plugin-recooler-linux-x64-gnu@0.0.27:
-    optional: true
-
-  farm-plugin-recooler-linux-x64-musl@0.0.0:
     optional: true
 
   farm-plugin-recooler-linux-x64-musl@0.0.27:
     optional: true
 
-  farm-plugin-recooler-win32-arm64-msvc@0.0.0:
-    optional: true
-
   farm-plugin-recooler-win32-arm64-msvc@0.0.27:
     optional: true
 
-  farm-plugin-recooler-win32-ia32-msvc@0.0.0:
-    optional: true
-
   farm-plugin-recooler-win32-ia32-msvc@0.0.27:
-    optional: true
-
-  farm-plugin-recooler-win32-x64-msvc@0.0.0:
     optional: true
 
   farm-plugin-recooler-win32-x64-msvc@0.0.27:
@@ -5311,10 +5129,6 @@ snapshots:
 
   lru-cache@11.5.3: {}
 
-  magic-string@1.4.4:
-    dependencies:
-      '@jridgewell/sourcemap-codec': 1.6.0
-
   magic-string@1.4.5:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
@@ -5781,8 +5595,6 @@ snapshots:
       media-typer: 0.3.0
       mime-types: 2.1.35
 
-  typescript@5.5.4: {}
-
   typescript@7.0.2:
     optionalDependencies:
       '@typescript/typescript-aix-ppc64': 7.0.2
@@ -5857,7 +5669,7 @@ snapshots:
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
-      magic-string: 1.4.4
+      magic-string: 1.4.5
       obug: 3.0.0
       picomatch: 4.0.7
       std-env: 4.3.0

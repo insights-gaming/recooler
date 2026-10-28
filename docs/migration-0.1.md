@@ -136,11 +136,11 @@ The plugin defaults JSX to `recooler/jsx` per file, respects nested/referenced
 tsconfigs, file pragmas and explicit OXC or legacy esbuild configuration, and
 warns for other effective runtimes. The htmx transform relies on this runtime to
 remove Context values from intrinsic attributes, including props spreads.
-See the [Vite integration](../packages/recooler/src/vite/README.md) for environment
+See the [Vite integration](../src/vite/README.md) for environment
 selection, dependency bundling and augmenting the virtual app's Bindings.
 Precompiled dependencies need recompilation or aliases for their bundled engine
 runtime imports; aliases do not rewrite externalized dependencies. See the
-[JSX README](../packages/recooler/src/jsx/README.md) for the alias recipe and Node
+[JSX README](../src/jsx/README.md) for the alias recipe and Node
 ESM bundling requirements.
 
 Import `RouteProps`, `RouteHead`, and `RouteHeadFn` explicitly from `recooler/jsx`;
@@ -191,7 +191,7 @@ imports. The table is static; development invalidates the virtual table and relo
 server runner to recreate `createApp`, retaining unchanged transforms. Getter mode is
 unsupported. Register actions before `createApp`: `actionUrl` throws if an action uses a method
 that was not reserved on the rendering route at app creation. Recreate the app
-after registering a new method. The Vite integration generates this table; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+after registering a new method. The Vite integration generates this table; see the [runtime interface](../src/htmx/README.md).
 
 **D6: all action URLs are now signed**, including actions without captures. The
 signature covers the app/environment namespace, external action base, defining
@@ -458,7 +458,7 @@ Server graph edits invalidate the server runner. Recooler invalidates the client
 entry and sends a client reload only when its route-to-slice/onLoad table changes.
 Files outside the server graph retain Vite's normal HMR, including SPA CSS and
 TypeScript entries.
-`playground-vite/` demonstrates this stack alongside the frozen Farm playground.
+`playground/` demonstrates this stack.
 
 ## Practical Worker port checklist
 

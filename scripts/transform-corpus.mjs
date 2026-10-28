@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Build packages/recooler first. Reads sources only; redirect JSON outside the repo.
+// Build the package first. Reads sources only; redirect JSON outside the repo.
 import { readdir, readFile } from "node:fs/promises";
 import { resolve, relative, basename } from "node:path";
 import { createRequire } from "node:module";
-import { transform } from "../packages/recooler/dist/htmx/transform/index.js";
-const require = createRequire(new URL("../packages/recooler/package.json", import.meta.url));
+import { transform } from "../dist/htmx/transform/index.js";
+const require = createRequire(new URL("../package.json", import.meta.url));
 const { parseSync } = require("oxc-parser");
 const dirs = process.argv.slice(2);
 if (!dirs.length) throw new Error("Usage: node scripts/transform-corpus.mjs <dir> [<dir> ...]");
