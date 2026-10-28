@@ -305,3 +305,124 @@ Logs: `/private/tmp/rc-package-r2-final.log`,
 `/private/tmp/rc-chromium2-final.log`, `/private/tmp/rc-attacks-{1,2}.log`,
 `/private/tmp/rc-hmr-review.log`, `/private/tmp/rc-skew-{1,2}.log` and
 `/private/tmp/rc-failure-recovered-{1,2}.log`.
+
+## Round 3 implementation (2026-10-28)
+
+Worktree `/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-dd227eee`, branch
+`ssttevee/ts-client`, continued from `a31bf6b`. Implementation checkpoint:
+`10c64d5`; asserting Chromium tests, migration notes and proxy coverage:
+`122ee54`. The documentation-only commit following those checkpoints is the
+handoff HEAD. Nothing pushed.
+
+### Early registration design
+
+Content emits a classic, parser-blocking **external** `assets/recooler-gate.js`
+first, followed by both `<script type="module" async src=X>` and
+`<script type="module" src=X>` for the entry and current route. The identical URLs
+share browser module identity; async evaluation registers slices while Suspense
+is streaming, while deferred modules still hold DOMContentLoaded. Modulepreloads
+remain. This applies to legacy roots as well as default/modern roots, without
+requiring them to render props.scripts themselves.
+
+A separately emitted external gate is deliberate: an async entry alone cannot
+protect a chunk that htmx.process sees before the entry fetch finishes. The gate
+requires no new inline script. Its capture listener also defers confirm dispatch
+by one microtask, because htmx 1.9.12 can emit a synchronous load confirm before
+installing the element's hx-on listener. After dispatch it uses only htmx's public
+issueRequest continuation; no native event or request is reconstructed. Pending
+confirm/config/before-request dispatch is handed to the entry when it arrives.
+The gate is served by Vite in development and emitted with client assets for
+production, including the /_admin proxy and absolute-base paths.
+
+Handler availability is now simply registration in $handlers, independent of
+route marker completion. Route onLoad runs at DOMContentLoaded or immediately
+when readyState is not loading, and its promise is never awaited. Synchronous
+throws and rejected promises go to reportError (console fallback where absent).
+Readiness includes invocation, not async completion. Root/layout onLoad stays
+ignored. Only client-bearing routes get a trailing template marker.
+
+### Findings and Chromium evidence
+
+1. **Body/layout callbacks:** registered root/layout slices remain runnable
+   throughout body boosts. On both htmx versions, the original body attack now
+   records exactly five before-swap, after-swap, after-settle and config callbacks
+   over five boosts, with and without destination onLoad; all five token headers
+   are present. With 300 ms destination asset latency, the first boost records
+   afterSwap=1 and afterSettle=1 and increases bodyLoads. The existing package
+   Chromium test now asserts bodySwaps=3, bodySettles=3, and exactly eight root
+   confirm callbacks for the boost and seven destination requests.
+2. **Async onLoad:** a click during the 1.5 s callback runs and a non-boosted
+   guarded link makes zero requests. Package Chromium coverage also asserts that
+   never-resolving onLoad neither blocks readiness nor disables handlers, and a
+   rejected callback reaches reportError while clicks remain usable.
+3. **Consumer Suspense:** with `.forEach(htmx.process)`, both root styles and
+   htmx 1.9.12/2.0.11 pass. The package tests add 450 ms asset latency, leave the
+   external gate available, assert zero gated load requests before the async
+   modules arrive, then click successfully while the stream is still open.
+   onLoad is still zero at that point, runs exactly once after parsing, and sees
+   the final streamed element. Original unmodified round 3 attacks also report
+   susClicks=1 before DCL, susConfirms=1, susPostConfirms=1, zero gated requests,
+   then two clicks and one onLoad after stream completion. Modern-root confirms
+   no longer bypass the gate.
+4. **Native guard window:** retained the decision to drop unavailable ordinary
+   events without changing defaults. Migration guidance explicitly covers
+   non-boosted links/forms, href="#", key/paste/drop guards and htmx:confirm.
+   Every dropped event warns in development, including load. All three dev
+   integration targets assert that the served external gate warns for a missing
+   click handler while leaving preventDefault untouched. Chromium asserts the
+   documented native-link/form exposure during a deliberately blocked swap.
+5. **Config/before-request spelling:** both camel and kebab spellings are
+   recognized. Original attacks report one of each late callback after release,
+   then two of each after another ready interaction, with one request per action.
+   Both package Chromium scripts now assert callback counters, not just requests.
+6. **Marker/table/history:** handler-free routes emit no marker. The template
+   marker trails client-bearing Content. Both versions insert both handler-free
+   tr rows intact. Package Chromium covers A→B→C→Back, same-route reswaps and
+   cross-route fragments for both roots. Original init reports loadsEdit=1,
+   clickSave=1, and same-route onLoad delta=1; original hist/hist-modern keep B's
+   DOM and onLoad on back navigation on both versions.
+7. **Guessable route names:** documented the hash of route.file and that public
+   client chunks are not a confidentiality boundary. No naming change.
+
+Every scenario in `/private/tmp/rc-review3/chromium-attack.mjs` is represented
+with assertions in `packages/recooler/test/vite/client-streaming.mjs`, run for
+both htmx versions and both root styles. The older `client-htmx.mjs` retains
+request-owner, native-default, startup, history, fragment, retry, version mismatch,
+HX-Location and push-url checks. No test relies only on printing counters.
+
+### Verification
+
+- Full package suite: **48 files, 1,440 passed**. The subsequently added
+  Cloudflare v2 /_admin test also passes through Vitest (1 pass, other tests
+  intentionally filtered). The matrix includes plain Vite, Cloudflare 1.65.0 and
+  2.0.0-beta.v.5, and both-root /_admin two-Worker service-binding tests with
+  explicit gate asset content-type/path assertions. All four Chromium combinations
+  pass their complete scenario assertions.
+- Package typecheck (including consumer declarations), build, conformance
+  typecheck, and playground typecheck/build/check pass (2 playground tests).
+- Both conformance targets: **1,054 passed, 7 expected skips**.
+- All original round 3 Chromium attacks complete on both htmx versions.
+- Original round 2 init, hist, hist-modern, failure and all four settle-loop
+  variants complete on both versions. Each loop makes exactly one GET /b at
+  both 2 and 3 seconds. Failure deliberately logs failed imports and jsdom's
+  unimplemented document navigation; browser recovery/reload assertions pass.
+- Original replay times out because it gates every asset, including the new
+  blocking gate, then waits for parsing before releasing assets. Original skew
+  selects the removed meta marker. Compatibility copies in
+  `/private/tmp/rc-review3-round2-compat` change only those harness assumptions:
+  exclude recooler-gate.js from the intentional module block and select the
+  template marker. Replay then completes all loaded/early cases without duplicate
+  requests; skew refuses mixed-version handlers on both versions. Original
+  reviewer files are unchanged.
+
+Logs: `/private/tmp/rc-r3-package-verified.log`,
+`/private/tmp/rc-r3-admin-beta-vitest.log`, `/private/tmp/rc-r3-admin-beta.log`,
+`/private/tmp/rc-r3-conformance.log`, `/private/tmp/rc-r3-typecheck.log`,
+`/private/tmp/rc-r3-build-final.log`,
+`/private/tmp/rc-r3-conformance-typecheck.log`,
+`/private/tmp/rc-r3-playground-{typecheck,build,check}.log`,
+`/private/tmp/rc-r3-attacks-{1,2}.log`,
+`/private/tmp/rc-r3-chromium1-final.log`,
+`/private/tmp/rc-r3-r2-{init,hist,hist-modern,replay,failure,skew}-{1,2}.log`,
+`/private/tmp/rc-r3-r2-settle-{after-settle,after-request,after-swap,load}-{1,2}.log`
+and `/private/tmp/rc-r3-r2-compat-{replay,skew}-{1,2}.log`.
