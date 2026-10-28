@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build, createBuilder, createLogger, createServer } from 'vite';
 import { recooler } from '../../dist/vite/index.js';
 
 const packageDir = fileURLToPath(new URL('../../', import.meta.url));
+// Resolved either by package name or through the symlink to the checkout, whatever its directory name.
+const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const jsxRuntimePattern = `(?:@insights-gaming/recooler/|${escapeRegExp(await realpath(packageDir))}/(?:dist/)?)jsx/jsx-`;
 const execute = promisify(execFile);
 await mkdir(path.join(packageDir, '.cache'), { recursive: true });
 const root = await mkdtemp(path.join(packageDir, '.cache/regressions-'));
@@ -111,7 +114,7 @@ try {
   server = await createServer({ ...base, plugins: recooler(), customLogger: logger, server: { middlewareMode: true, ws: false } });
   for (const [file, runtime] of jsxCases) {
     const transformed = await server.environments.ssr.transformRequest('/src/' + file + '.tsx');
-    assert.match(transformed.code, new RegExp(runtime.replace('@insights-gaming/recooler/jsx', '(?:@insights-gaming/)?recooler/(?:dist/)?jsx') + '/jsx-'));
+    assert.match(transformed.code, new RegExp(runtime === '@insights-gaming/recooler/jsx' ? jsxRuntimePattern : runtime + '/jsx-'));
   }
   assert.match((await server.environments.ssr.transformRequest('/src/classic/index.tsx')).code, /h\(/);
   assert.match((await server.environments.ssr.transformRequest('/src/classic-pragma.tsx')).code, /h\(/);
@@ -119,13 +122,13 @@ try {
   assert(warnings.some(w => w.includes('hono/jsx')));
   assert(warnings.some(w => w.includes('classic JSX runtime')));
   await write('src/nested/tsconfig.json', '{"compilerOptions":{"jsxImportSource":"@insights-gaming/recooler/jsx"}}');
-  await waitFor(async () => /recooler\/(?:dist\/)?jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/nested/index.tsx')).code));
+  await waitFor(async () => new RegExp(jsxRuntimePattern).test((await server.environments.ssr.transformRequest('/src/nested/index.tsx')).code));
   await write('src/nested/tsconfig.json', '{"compilerOptions":{"jsxImportSource":"hono/jsx"}}');
   await waitFor(async () => /hono\/jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/nested/index.tsx')).code));
   await write('src/included/tsconfig.json', '{"include":["test"],"compilerOptions":{"jsxImportSource":"hono/jsx"}}');
   await waitFor(async () => /hono\/jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/included/test/outside.tsx')).code));
   await write('src/included/tsconfig.json', '{"include":["app"],"compilerOptions":{"jsxImportSource":"@insights-gaming/recooler/jsx"}}');
-  await waitFor(async () => /recooler\/(?:dist\/)?jsx\/jsx-/.test((await server.environments.ssr.transformRequest('/src/included/test/outside.tsx')).code));
+  await waitFor(async () => new RegExp(jsxRuntimePattern).test((await server.environments.ssr.transformRequest('/src/included/test/outside.tsx')).code));
   await server.close(); server = undefined;
   for (const [file, runtime] of jsxCases) {
     const result = await build({ ...base, plugins: recooler(), build: { ssr: 'src/' + file + '.tsx', write: false, minify: false, rolldownOptions: { external: id => /jsx-(dev-)?runtime/.test(id) } } });
