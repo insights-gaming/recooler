@@ -3,7 +3,7 @@ import { contextStorage } from 'hono/context-storage';
 import { Fragment, type Children } from 'easy-jsx-html-engine';
 import { createElement } from '../jsx/jsx-runtime.js';
 import type { RouterExtension } from '../router/index.js';
-import { getActionRegistry, bindingKey, findAction, getActionBinding } from './runtime.js';
+import { getActionRegistry, bindingKey, findRegisteredAction, getActionBinding } from './runtime.js';
 import { createActionSigner, type ActionSigner } from './signing.js';
 import { timingSafeEqual } from './crypto.js';
 
@@ -14,14 +14,17 @@ export interface HtmxOptions<E extends Env = Env> {
   table: ActionTable;
   /** Env functions are resolved synchronously and cached by env object identity. */
   secret?: string | { unsafeUnsigned: true } | ((env: E['Bindings']) => string);
-  /** Per-project registry namespace; Phase 4b must supply the same value to registerActions. */
+  /** Per-project registry namespace; must match registerActions (supplied by Vite). */
   namespace?: string;
   /** Additional origins (or a predicate) accepted regardless of Sec-Fetch-Site. */
   trustedOrigins?: readonly string[] | ((origin: string, context: Context<E>) => boolean | Promise<boolean>);
   /** External prefix hidden by mount() or a prefix-stripping proxy, e.g. /app. */
   base?: string;
+  /** Explicit escape hatch for production unsigned mode; signing is strongly preferred. */
+  allowUnsignedInProduction?: boolean;
 }
-/** Phase 4b production-build hook: reject an extension whose marker is true. */
+declare const __RECOOLER_PRODUCTION__: boolean;
+/** Runtime tooling marker; the Vite production flag enforces the startup guard. */
 export const unsafeUnsignedMarker = Symbol.for('recooler.htmx.unsafeUnsigned.v1');
 export interface HtmxExtension extends RouterExtension {
   readonly [unsafeUnsignedMarker]: boolean;
@@ -42,6 +45,9 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
     throw new TypeError('htmx base must be a local path prefix without query, hash or dot segments');
   }
   const unsafeUnsigned = typeof options.secret === 'object' && options.secret?.unsafeUnsigned === true;
+  if (unsafeUnsigned && typeof __RECOOLER_PRODUCTION__ !== 'undefined' && __RECOOLER_PRODUCTION__ && !options.allowUnsignedInProduction) {
+    throw new Error('htmx: unsafeUnsigned is forbidden in production; configure a secret or explicitly set allowUnsignedInProduction: true');
+  }
   if (unsafeUnsigned) console.warn('htmx: unsafeUnsigned disables action signing and replay protection; use only for local development');
   const envSigners = new WeakMap<object, ActionSigner>();
   let fallbackSigner: ActionSigner | undefined;
@@ -92,12 +98,13 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
         if (!allowed) return c.text('Forbidden', 403);
         const bound = getActionBinding(c);
         const actionId = c.req.query('action')!;
+        const registered = findRegisteredAction(bound.modules, c.req.method, actionId, bound.namespace);
+        if (!registered) return next();
         const json = c.req.query('scope');
         const signature = bound.sign({ routeId: bound.routeId, pathname: bound.pathname,
-          method: c.req.method, actionId }, json ?? '');
+          method: c.req.method, actionId, namespace: bound.namespace, base: bound.base, moduleHash: registered.moduleHash }, json ?? '');
         if (signature !== undefined && (json === undefined || !timingSafeEqual(c.req.query('sig') ?? '', signature))) return next();
-        const action = findAction(bound.modules, c.req.method, actionId, bound.namespace);
-        if (!action) return next();
+        const { action } = registered;
         try {
           const result = await action(c);
           if (result instanceof Response) return result;

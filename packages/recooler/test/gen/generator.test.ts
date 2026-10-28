@@ -192,7 +192,7 @@ it('provides a thin Vite plugin that regenerates before build and on add/unlink'
   const off = vi.fn();
   const server = { ws: { clients: new Set(), on: vi.fn(), off: vi.fn(), send: vi.fn() }, watcher: { add: vi.fn(), on(event: string, callback: (file: string) => void) { events.set(event, callback); return this; }, off }, config: { logger: { error: vi.fn() } }, httpServer: { once: vi.fn() } };
   const buildStart = plugin.buildStart as () => Promise<void>;
-  const configureServer = plugin.configureServer as (server: unknown) => Promise<void>;
+  const configureServer = (typeof plugin.configureServer === 'function' ? plugin.configureServer : plugin.configureServer!.handler) as (server: unknown) => Promise<void>;
   await buildStart();
   await configureServer(server);
   await put(cwd, 'src/routes/added/index.ts', handler);
@@ -373,4 +373,33 @@ it.each(['100%', 'a#b', 'a?b'])('suggests renaming a non-portable literal direct
   const cwd = await fixture({ [`src/routes/${segment}/index.ts`]: handler });
   await expect(generateRoutes({ cwd })).rejects.toThrow('rename the directory');
   await expect(generateRoutes({ cwd })).rejects.not.toThrow('digit patterns');
+});
+
+it.skipIf(process.platform === 'win32')('warns that colon route directories are not portable to Windows', async () => {
+  const cwd = await fixture({ 'src/routes/:id/index.ts': handler });
+  expect((await renderRoutes({ cwd })).warnings).toEqual([
+    'WARNING: route directory routes/:id contains : and is not portable to Windows; use bracket parameters such as [id] instead',
+  ]);
+});
+
+it.skipIf(process.platform === 'win32')('loads only exact colon-containing manifest inputs and removes stale permissions', async () => {
+  const cwd = await fixture({
+    'src/routes/:id/index.ts': handler,
+    'src/routes/:id/private.txt': 'not a route input',
+    'src/routes/index.ts': handler,
+  });
+  const plugin = routes({ cwd });
+  const buildStart = plugin.buildStart as () => Promise<void>;
+  const load = plugin.load as (this: unknown, id: string) => Promise<{ code: string; map: null } | undefined>;
+  const context = { addWatchFile: vi.fn() };
+  const file = path.join(cwd, 'src/routes/:id/index.ts');
+  await buildStart();
+  expect(await load.call(context, file)).toEqual({ code: handler, map: null });
+  expect(context.addWatchFile).toHaveBeenCalledWith(file);
+  for (const other of [file + '?raw', file + '?v=1', path.join(cwd, 'src/routes/:id/private.txt'), path.join(cwd, 'src/routes/index.ts')]) {
+    expect(await load.call(context, other)).toBeUndefined();
+  }
+  await rm(file);
+  await buildStart();
+  expect(await load.call(context, file)).toBeUndefined();
 });

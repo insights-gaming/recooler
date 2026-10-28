@@ -23,9 +23,10 @@ it('compares equal, unequal and differently sized signatures', () => {
   expect(timingSafeEqual('abc', 'ab')).toBe(false);
 });
 it('signs a versioned unambiguous tuple with UTF-8 and exact pathname identity', () => {
-  const address = { routeId: 'routes/口.tsx', pathname: '/a%2Fb', method: 'post', actionId: '口@0', scope: { a: 'é' } };
+  const address = { namespace: 'my-app:ssr', base: '/app', moduleHash: 'source-sha256', routeId: 'routes/口.tsx', pathname: '/a%2Fb', method: 'post', actionId: '口@0', scope: { a: 'é' } };
   const url = new URL(signActionUrl(address, '秘密'), 'http://localhost');
-  const message = JSON.stringify(['recooler.action.v1', address.routeId, address.pathname, 'POST', address.actionId, JSON.stringify(address.scope)]);
+  expect(url.pathname).toBe('/app/a%2Fb');
+  const message = JSON.stringify(['recooler.action.v2', address.namespace, address.base, address.moduleHash, address.routeId, address.pathname, 'POST', address.actionId, JSON.stringify(address.scope)]);
   expect(url.searchParams.get('sig')).toBe(createHmac('sha256', '秘密').update(message).digest('base64url'));
   expect(() => signActionUrl(address, '')).toThrow('nonempty');
 });

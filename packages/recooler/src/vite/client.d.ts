@@ -4,3 +4,8 @@ declare module 'virtual:recooler/app' {
   const app: import('hono').Hono<import('recooler/jsx').RouteEnv>;
   export default app;
 }
+declare module 'virtual:recooler/htmx' {
+  export const table: import('recooler/htmx').ActionTable;
+  export const namespace: string;
+  export const enabled: boolean;
+}

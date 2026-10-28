@@ -5,8 +5,14 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { createLogger, resolveConfig } from 'vite';
 import { recooler } from '../../src/vite/index.js';
 import { serverEnvironment } from '../../src/vite/environment.js';
+import { canonicalId } from '../../src/vite/htmx.js';
 
 const execute = promisify(execFile);
+test('canonical IDs remove transport queries and retain meaningful variants', () => {
+  expect(canonicalId('/app/src/a.tsx?v=abc&t=123')).toBe('/app/src/a.tsx');
+  expect(canonicalId('/app/src/a.tsx?recooler-handlers&t=123&raw&v=abc')).toBe('/app/src/a.tsx?recooler-handlers&raw');
+  expect(canonicalId('/app/src/a.tsx?variant=one')).not.toBe(canonicalId('/app/src/a.tsx?variant=two'));
+});
 beforeAll(async () => {
   await execute(process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.build.json'], { cwd: fileURLToPath(new URL('../../', import.meta.url)) });
 });
@@ -59,4 +65,46 @@ test('Vitest, custom server dependencies, per-file JSX and dev generation regres
     timeout: 120000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
   });
   expect(result.stdout).toContain('"regressions":true');
+}, 130000);
+
+for (const runtime of ['plain', 'cloudflare', 'beta']) {
+  test(`htmx static graph, signing, edits/removal and built actions on ${runtime}`, async () => {
+    const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-integration.mjs', import.meta.url)), runtime], {
+      timeout: 120000, maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, NODE_ENV: 'production', WRANGLER_SEND_METRICS: 'false' },
+    });
+    expect(result.stdout).toContain('"actionRemoval":true');
+  }, 130000);
+}
+
+test('production unsigned guard covers custom entries and diagnostics retain locations', async () => {
+  const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-options.mjs', import.meta.url))], {
+    timeout: 120000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+  });
+  expect(result.stdout).toContain('"productionGuard":true');
+}, 130000);
+
+test('watch builds retain unchanged actions and discard removed actions', async () => {
+  const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-watch.mjs', import.meta.url))], {
+    timeout: 60000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+  });
+  expect(result.stdout).toContain('"cachedActions":true');
+}, 65000);
+
+for (const runtime of ['node', 'workerd']) {
+  test(`htmx canonical layouts, table parity, source maps and full edit matrix on ${runtime}`, async () => {
+    const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-regressions.mjs', import.meta.url)), ...(runtime === 'workerd' ? ['--cloudflare'] : [])], {
+      timeout: 120000, maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, NODE_ENV: 'production', WRANGLER_SEND_METRICS: 'false' },
+    });
+    expect(result.stdout).toContain('"editMatrix":true');
+    expect(result.stdout).toContain('"tableParity":true');
+  }, 130000);
+}
+
+test('warmup and manifest-first entries retain actions; build identity survives relocation and isolates named apps', async () => {
+  const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-startup.mjs', import.meta.url))], {
+    timeout: 120000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+  });
+  expect(result.stdout).toContain('"samePathReplay":true');
 }, 130000);

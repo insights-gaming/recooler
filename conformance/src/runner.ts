@@ -112,7 +112,7 @@ export function observe(app: BuiltApp): (request: Request, mount?: ScenarioReque
         if (mount.also) outer.route(mount.also, routed!);
         mounts.set(key, outer);
       }
-      response = await outer.fetch(request);
+      response = await outer.fetch(request, app.env);
     } else response = await dispatch(request);
     const body = await response.text();
     const headers = new Headers(response.headers);

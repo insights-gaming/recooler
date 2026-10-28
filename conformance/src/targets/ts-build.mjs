@@ -2,14 +2,14 @@
 // evaluated in the runner's realm (where middleware traces are observed).
 import { build } from 'vite';
 import { recooler } from 'recooler/vite';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = process.argv[2];
 try {
   await build({
     root, mode: 'production', configFile: false, logLevel: 'warn',
-    plugins: recooler(),
+    plugins: recooler({ htmx: JSON.parse(await readFile(path.join(root, 'htmx-options.json'), 'utf8')) }),
     resolve: { alias: { 'farm-plugin-recooler/helpers': 'recooler/jsx' } },
     ssr: { noExternal: true },
     build: {

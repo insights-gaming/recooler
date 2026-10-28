@@ -196,3 +196,9 @@ re-parse failures and timings as JSON; keep external corpus reports outside the
 repository. Build the package before running it.
 The benchmark separately measures parsing, scope analysis, their combined cost,
 the indexed frontend, and the full transform with a source map.
+
+`actionTransformVersion` is exported for bundler adapters that hash action-bearing
+modules. Include it alongside the input source in the module hash, and bump it
+whenever collection or numbering semantics change. This invalidates old positional
+IDs after a transform upgrade even if the source itself is unchanged. The Vite
+adapter hashes the JSON tuple `[actionTransformVersion, source]` with SHA-256.

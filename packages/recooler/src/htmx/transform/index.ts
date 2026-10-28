@@ -14,6 +14,9 @@ export type { Action, Handler, Diagnostic, TransformOptions, TransformResult, Tr
 export { emitActionUrl, emitRegistration } from "./codegen.js";
 export { bannedClientModules, isBannedModule, moduleIdForms } from "./banned-imports.js";
 
+/** Bump whenever action collection/numbering semantics change, even for unchanged source. */
+export const actionTransformVersion = 1;
+
 /** Pure TSX → TSX transform. Diagnostics with severity `error` are build errors;
  * callers MUST reject them. On errors code/map are the unchanged source/map.
  * Parsing errors are also returned as diagnostics. No filesystem or bundler APIs.

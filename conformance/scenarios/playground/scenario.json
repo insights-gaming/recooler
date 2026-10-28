@@ -428,7 +428,7 @@
         }
       ],
       "requires": [
-        "htmx"
+        "client"
       ]
     },
     {
@@ -458,7 +458,7 @@
         }
       ],
       "requires": [
-        "htmx"
+        "client"
       ]
     },
     {

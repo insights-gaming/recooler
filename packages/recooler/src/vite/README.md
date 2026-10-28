@@ -21,11 +21,13 @@ For TypeScript entries, add `/// <reference types="recooler/vite/client" />` to
 your `env.d.ts`.
 
 The virtual module exports **only default**, equivalent to
-`createApp(manifest, { pages: jsxPages() })`. For custom adapters or extensions,
+`createApp(manifest, { pages: jsxPages(), extensions })`. The server htmx extension
+is installed as described below. For custom adapters or extensions,
 use your own `createApp` entry and the generated manifest. The plugin array
-keeps route generation separate from app wiring; future htmx integration can
-add plugins and extensions without replacing the platform's app builder.
-The plugin does not yet wire the htmx transform into action dispatch or a client entry.
+keeps route generation separate from app wiring, so extension plugins can evolve
+without replacing the platform's app builder.
+The plugin wires server htmx transforms and action dispatch; client entry delivery
+remains Phase 5.
 
 For a virtual-only SSR build, use `build: { ssr: true, rolldownOptions: {
 input: 'virtual:recooler/app' } }`. Vite treats a string `build.ssr` as a real
@@ -36,6 +38,11 @@ The Cloudflare plugin serves the Worker entry automatically.
 `recooler()` includes `routes()` for build-time generation and dev watching.
 `routes: { check: true }` compares committed output instead of writing it.
 The standalone `routes(options)` export remains usable for API-only apps.
+Colon parameter directories such as `routes/:id/` work in Cloudflare dev with
+Vite's default strict filesystem policy. The route plugin reads only exact known
+manifest inputs containing `:`; it does not disable the filesystem allow-list.
+These directory names cannot be checked out on Windows; prefer `routes/[id]/`.
+The generator returns a portability warning for names containing `:`.
 
 JSX defaults to the automatic `recooler/jsx` runtime per file. The plugin adds
 pragmas only when the file's own tsconfig and pragmas do not select a source or
@@ -79,3 +86,116 @@ declare module 'recooler/jsx' {
   interface RouteEnv { Bindings: { API_KEY: string } }
 }
 ```
+
+## Server htmx actions (Phase 4b)
+
+`recooler()` transforms `hx-*` source attributes in server mode before the JSX
+pragmas are added. Dev always installs the htmx extension so adding the first
+action through an import works immediately. Builds install it when a loaded
+source module contains `hx-`. Set `htmx: {}` to enable it explicitly or
+`htmx: false` to disable the transform and automatic extension. Handler strings
+are emitted, but client chunks, `onLoad` delivery and `page.scripts` are Phase 5.
+
+```ts
+recooler({
+  serverEnvironment: 'my_worker', // Cloudflare v1 Worker environment, if restricted
+  htmx: {
+    secretBinding: 'RECOOLER_SECRET', // default
+    namespace: 'my-app',            // optional stable app identity override
+    base: '/app',                   // only for prefix-stripping mounts/proxies
+    trustedOrigins: ['https://app.example'],
+  },
+})
+```
+
+The generated entry resolves the secret from the **request env binding**, falling
+back to `process.env[binding]` on Node. Configure a Worker secret (a `.dev.vars`
+value locally); Cloudflare v2 also requires declaring the binding as a secret in
+`worker.env`. Supply a nonempty value before the first request to an action-bearing
+route. The key is never read during compilation or inlined into the JS bundle.
+Cloudflare copies `.dev.vars` into `dist/<worker>/` for local build preview; that
+file contains secrets, so keep build output private and out of source control.
+Rotation follows the runtime's env-identity cache; use a fresh env object or app.
+The plugin intentionally accepts a binding name rather than a literal secret.
+
+Custom entries configure `htmx({ secret })` themselves and can import the graph:
+
+```ts
+import { table, namespace } from 'virtual:recooler/htmx';
+import { htmx } from 'recooler/htmx';
+// createApp(manifest, { pages: jsxPages(), extensions: [htmx({
+//   table, namespace, secret: env => env.RECOOLER_SECRET,
+// })] });
+```
+
+Always pass that namespace: its app identity hashes the nearest `package.json`
+name and the POSIX `srcDir` path relative to that package root. The environment
+name is appended, along with a per-server nonce in dev. Moving a checkout leaves
+build identity unchanged; named apps built at the same Docker path remain
+separate. `htmx.namespace` overrides the app identity while retaining environment
+and dev isolation. Give every app a distinct package name or explicit namespace;
+apps without a package name must set the override for reliable isolation.
+Distinct apps, and separate deployments of one app such as staging and production,
+**must not share a signing secret**, even when their namespaces differ.
+It matches all registrations and isolates concurrent dev servers with identical
+relative module IDs. Module/action IDs are **srcDir-relative**, with POSIX separators (including
+`../` for outside-source modules), exactly matching 0.0.27. Only Vite transport
+`?v=`/`?t=` queries are removed; meaningful variants remain distinct.
+
+Production builds define `__RECOOLER_PRODUCTION__` as true. `htmx()` throws at
+startup for `secret: { unsafeUnsigned: true }`, including in custom entries.
+The runtime's explicit `allowUnsignedInProduction: true` escape hatch permits an
+intentional unsigned deployment and retains the warning/marker. This avoids
+executing a Worker bundle in Node to inspect a runtime-only marker. The production
+guard also applies to `vite build --mode development`; dev servers permit the
+explicit unsafe mode. Bundler-independent consumers without this plugin must
+provide their own production policy.
+
+The D5 table follows surviving static imports/re-exports/side effects from each
+page route, its router-resolved layouts (including canonical alias directories)
+and the root. It emits only action-bearing module IDs.
+Dynamic imports are not action roots. Barrels intentionally over-approximate at
+module precision; D6 signatures prevent foreign-route/path authorization. Routes
+without a page never receive table entries. Both build and dev propagate action
+identities through reverse static edges, discovering shared closures once. Table
+replacement returns `map: null` when later mapped code does not move; combined
+lines use a boundary source map. Dev uses the selected
+server environment's lowered `transformResult.deps`, parallel discovery with cached
+adjacency, reverse-edge action propagation, stable graph epochs and deduped
+concurrent computations. Unchanged pure htmx transforms are cached across full
+reloads; source changes still re-evaluate every registration. Action transforms also run during warmup and before the table is imported, so
+manifest-first custom entries work. Empty dev registration
+starts only after that environment loads `virtual:recooler/htmx`. Reset hooks cover
+`srcDir`, declared action packages, and previously transformed action modules,
+including `{}` when actions are absent. Idle and auxiliary environments receive no
+empty-registration imports before they load the table. Changes invalidate only the virtual table and use a full SSR runner reload. Route generation runs before platform
+startup hooks, so eager workerd imports see the initial graph.
+
+Action packages must remain source inputs. Packages declaring `recooler` or
+`easy-jsx-html-engine` in dependencies/peerDependencies are discovered by the
+framework dependency crawl, excluded from the selected server's `optimizeDeps`,
+and bundled rather than SSR-externalized. For packages without such a declaration,
+list them in `htmx.actionDependencies`. This also overrides explicit external or
+optimizer-include entries for those packages; package subpaths are covered.
+The declarations/list are needed before Vite chooses externals or prebundles;
+source transforms cannot discover a package they never receive. Custom Rolldown
+`external` functions that override Vite's resolver remain the application's
+responsibility. `htmx.clientBannedImports` forwards raw-specifier checks to the
+transform; the client bundle graph check remains Phase 5.
+
+Each registration includes a SHA-256 hash of the JSON tuple
+`[actionTransformVersion, definingModuleSource]` through the codegen contract.
+The transform exports `actionTransformVersion`; maintainers must bump it whenever
+action collection or numbering semantics change, even for unchanged source. V2 signed URLs bind that hash, namespace and mount base;
+editing a module invalidates old positional action IDs from that module.
+Function-valued action and `hx-on*` attributes reaching the JSX runtime throw a
+“module was not transformed” diagnostic instead of rendering server source.
+
+Verification fixtures: `test/vite/htmx-integration.mjs` (plain, Cloudflare v1,
+v2 beta), `htmx-options.mjs` (production guard and located diagnostics),
+`htmx-startup.mjs` (warmup, manifest-first entries, stable app identity,
+namespace overrides and same-path replay), `htmx-regressions.mjs` (alias layouts, table parity, map paths, edit matrix, shifted
+IDs and server/environment isolation; add `--cloudflare` for workerd), and
+`htmx-bench.mjs` (interleaved full-plugin/no-htmx build and edit-response gates).
+Run them with `pnpm --filter recooler exec node test/vite/<script>.mjs`; add
+`--cloudflare` to the benchmark for the 400/1,000-route workerd dev gate.

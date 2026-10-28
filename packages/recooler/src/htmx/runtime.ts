@@ -7,7 +7,7 @@ export type Action = (context: Context) => unknown;
 export type ActionMethods = Record<string, Record<string, Action>>;
 
 // Symbol.for survives server-runtime reloads while cached modules retain registrations.
-// Phase 4b must emit a stable per-project namespace in both registration and htmx().
+// Vite emits a namespace per project/environment (and per dev server).
 const registryKey = Symbol.for('recooler.htmx.actions.v2');
 const persistent = globalThis as typeof globalThis & { [registryKey]?: Map<string, Map<string, ActionMethods>> };
 const registries = persistent[registryKey] ??= new Map<string, Map<string, ActionMethods>>();
@@ -20,7 +20,11 @@ export function getActionRegistry(namespace = ''): Map<string, ActionMethods> {
 export const actionRegistry = getActionRegistry();
 
 /** Replace one module atomically. An empty registration clears removed actions in dev. */
-export function registerActions(moduleId: string, actions: ActionMethods, namespace = ''): void {
+const hashesKey = Symbol.for('recooler.htmx.moduleHashes.v1');
+const hashStorage = globalThis as typeof globalThis & { [hashesKey]?: WeakMap<ActionMethods, string> };
+const moduleHashes = hashStorage[hashesKey] ??= new WeakMap<ActionMethods, string>();
+
+export function registerActions(moduleId: string, actions: ActionMethods, namespace = '', moduleHash = ''): void {
   const methods: ActionMethods = Object.create(null);
   for (const [method, entries] of Object.entries(actions)) {
     const normalized = method.toUpperCase();
@@ -33,6 +37,7 @@ export function registerActions(moduleId: string, actions: ActionMethods, namesp
       table[id] = action;
     }
   }
+  moduleHashes.set(methods, moduleHash);
   getActionRegistry(namespace).set(moduleId, methods);
 }
 
@@ -54,25 +59,31 @@ export function getActionBinding(context: Context): ActionBinding {
   return binding;
 }
 
-export function findAction(modules: readonly string[], method: string, id: string, namespace?: string): Action | undefined {
+export function findRegisteredAction(modules: readonly string[], method: string, id: string, namespace?: string): { action: Action; moduleHash: string } | undefined {
   for (const module of modules) {
-    const actions = getActionRegistry(namespace).get(module)?.[method];
-    if (actions && Object.hasOwn(actions, id)) return actions[id];
+    const registered = getActionRegistry(namespace).get(module);
+    const actions = registered?.[method];
+    if (actions && Object.hasOwn(actions, id)) return { action: actions[id]!, moduleHash: moduleHashes.get(registered!) ?? '' };
   }
+}
+
+export function findAction(modules: readonly string[], method: string, id: string, namespace?: string): Action | undefined {
+  return findRegisteredAction(modules, method, id, namespace)?.action;
 }
 
 export function actionUrl(id: string, scope: Record<string, unknown>, context?: Context): string {
   const binding = getActionBinding(context ?? getContext());
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
-    if (findAction(binding.modules, method, id, binding.namespace)) {
+    const registered = findRegisteredAction(binding.modules, method, id, binding.namespace);
+    if (registered) {
       if (!binding.methods.includes(method)) {
         throw new Error(`Action ${id} uses ${method}, which was not reserved on ${binding.routeId} at app creation; register actions before createApp and recreate the app after an SSR reload`);
       }
-      return signedUrl({ routeId: binding.routeId, pathname: binding.pathname, method, actionId: id, scope },
-        binding.sign, binding.base);
+      return signedUrl({ routeId: binding.routeId, pathname: binding.pathname, method, actionId: id, scope,
+        namespace: binding.namespace, base: binding.base, moduleHash: registered.moduleHash }, binding.sign);
     }
   }
-  throw new Error(`Action ${id} is not reachable from ${binding.routeId}`);
+  throw new Error(`Action ${id} is not reachable from ${binding.routeId}; dynamic import() is not followed by the action table`);
 }
 
 /** Legacy query-fragment helper, now signed against the ambient rendering route (D6). */
