@@ -1,0 +1,1 @@
+{"name":"recooler-jsx-farm-oracle","private":true,"type":"module","dependencies":{"@farmfe/core":"1.7.11","@farmfe/plugin-react":"1.2.6","farm-plugin-recooler":"0.0.27","easy-jsx-html-engine":"0.1.13","hono":"4.13.14"}}

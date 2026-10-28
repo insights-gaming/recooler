@@ -11,7 +11,12 @@
     "sourceMap": true,
     "jsx": "react-jsx",
     "jsxImportSource": "easy-jsx-html-engine",
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "recooler/jsx": ["./src/jsx/index.ts"],
+      "recooler/jsx/jsx-runtime": ["./src/jsx/jsx-runtime.ts"],
+      "recooler/jsx/jsx-dev-runtime": ["./src/jsx/jsx-dev-runtime.ts"]
+    }
   },
   "include": ["src", "test"]
 }
