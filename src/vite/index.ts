@@ -151,7 +151,9 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
         },
       });
       noExternal = [...new Set([...noExternal, ...crawled.ssr.noExternal, ...(options.htmx && options.htmx.actionDependencies || [])])];
-      htmx.actionDependencies(noExternal, root);
+      // The framework packages themselves never declare actions; registering
+      // in them would import recooler from packages that cannot resolve it.
+      htmx.actionDependencies(noExternal.filter(name => name !== 'recooler' && name !== 'easy-jsx-html-engine'), root);
     },
     configEnvironment(_name, config) {
       if ((config.consumer ?? (_name === 'client' ? 'client' : 'server')) !== 'server') return;
