@@ -41,7 +41,7 @@ export default { async fetch(request) { return Response.json({ answer, table: aw
 }
 export function config(root, plugins, extra = {}) {
   return { root, configFile: false, logLevel: 'error', plugins,
-    ssr: { noExternal: true }, optimizeDeps: { noDiscovery: true, include: [] },
+    ssr: { noExternal: true }, optimizeDeps: { noDiscovery: true, include: [], exclude: ['spike-actions'] },
     server: { host: '127.0.0.1', port: 0, fs: { allow: [base] } },
     build: { ssr: join(root, 'src/entry.ts'), sourcemap: true, minify: false, outDir: 'dist/server',
       rolldownOptions: { output: { entryFileNames: 'entry.mjs' } } }, ...extra };

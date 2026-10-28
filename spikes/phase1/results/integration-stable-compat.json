@@ -1,0 +1,1462 @@
+{
+  "kind": "stable-compat",
+  "benchCount": 0,
+  "flag": "nodejs_compat",
+  "serverName": "spike_worker",
+  "buildOrder": [
+    "spike_worker",
+    "client",
+    "spike_worker:manifest",
+    "spike_worker"
+  ],
+  "builtChecks": {
+    "value": {
+      "answer": 46,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/unused.ts"
+        ],
+        "/admin": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/unused.ts@0"
+      ],
+      "manifest": {
+        "entry": "/assets/entry-B99dQvG4.mjs"
+      }
+    },
+    "crash": {
+      "stack": "Error: MOVED_FRAME\n    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/dist/spike_worker/index.js:46:8)\n    at moved (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/dist/spike_worker/index.js:40:9)\n    at Object.fetch (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/dist/spike_worker/index.js:3608:3)"
+    },
+    "frame": {
+      "frame": "    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/dist/spike_worker/index.js:46:8)",
+      "generated": {
+        "line": 46,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+        "line": 3,
+        "column": 10,
+        "name": null
+      }
+    },
+    "context": {
+      "hono": [
+        {
+          "path": "/mount/item/00-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "00-a b",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "00-a b",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+        },
+        {
+          "path": "/mount/item/01-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "01-c/d",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "01-c/d",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/10-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "10-a b",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "10-a b",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "11-c/d",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "11-c/d",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+        }
+      ],
+      "hono5": [
+        {
+          "path": "/mount/item/00-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "00-a b",
+            "propertyRoutePath": null,
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "00-a b",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+        },
+        {
+          "path": "/mount/item/01-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "01-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "01-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/10-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "10-a b",
+            "propertyRoutePath": null,
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "10-a b",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "11-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "11-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+        }
+      ]
+    }
+  },
+  "chunks": {
+    "sharedChunk": "assets/shared-eWn4n8j0.mjs",
+    "publicChunk": "assets/public-B9Xk8AWw.mjs",
+    "adminChunk": "assets/admin-BSoLrbLx.mjs",
+    "publicStaticClosure": [
+      "assets/public-B9Xk8AWw.mjs",
+      "assets/shared-eWn4n8j0.mjs",
+      "assets/entry-B99dQvG4.mjs"
+    ],
+    "runtimeEvaluation": {
+      "publicDidNotEvaluateAdmin": true,
+      "sharedEvaluations": 1
+    }
+  },
+  "maps": {
+    "server": [
+      {
+        "file": "dist/spike_worker/index.js",
+        "positions": [
+          {
+            "marker": "MOVED_FRAME",
+            "generated": {
+              "line": 46,
+              "column": 18
+            },
+            "original": {
+              "source": "../../src/map-source.ts",
+              "line": 3,
+              "column": 20,
+              "name": null
+            },
+            "expected": {
+              "line": 3,
+              "column": 21
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "MOVED_FRAME",
+            "generated": {
+              "line": 46,
+              "column": 21
+            },
+            "original": {
+              "source": "../../src/map-source.ts",
+              "line": 3,
+              "column": 20,
+              "name": null
+            },
+            "expected": {
+              "line": 3,
+              "column": 24
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "MOVED_FRAME",
+            "generated": {
+              "line": 46,
+              "column": 28
+            },
+            "original": {
+              "source": "../../src/map-source.ts",
+              "line": 3,
+              "column": 20,
+              "name": null
+            },
+            "expected": {
+              "line": 3,
+              "column": 31
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "UNTOUCHED_FRAME",
+            "generated": {
+              "line": 43,
+              "column": 18
+            },
+            "original": {
+              "source": "../../src/map-source.ts",
+              "line": 8,
+              "column": 18,
+              "name": null
+            },
+            "expected": {
+              "line": 8,
+              "column": 19
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "UNTOUCHED_FRAME",
+            "generated": {
+              "line": 43,
+              "column": 21
+            },
+            "original": {
+              "source": "../../src/map-source.ts",
+              "line": 8,
+              "column": 18,
+              "name": null
+            },
+            "expected": {
+              "line": 8,
+              "column": 22
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "UNTOUCHED_FRAME",
+            "generated": {
+              "line": 43,
+              "column": 32
+            },
+            "original": {
+              "source": "../../src/map-source.ts",
+              "line": 8,
+              "column": 18,
+              "name": null
+            },
+            "expected": {
+              "line": 8,
+              "column": 33
+            },
+            "granularity": "string-token"
+          }
+        ],
+        "hasSourcesContent": true,
+        "sources": [
+          "../../src/unused.ts",
+          "../../src/side.ts",
+          "../../src/component.ts",
+          "../../src/cycle-b.ts",
+          "../../src/cycle-a.ts",
+          "../../src/admin.ts",
+          "../../outside/component.ts",
+          "../../node_modules/spike-actions/index.js",
+          "../../src/route.ts",
+          "../../src/root.ts",
+          "../../src/layout.ts",
+          "../../src/map-source.ts",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/request/constants.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/utils/buffer.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/utils/body.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/utils/url.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/request.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/utils/html.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/context.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/compose.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/utils/constants.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/hono-base.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/utils.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/reg-exp-router/matcher.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/reg-exp-router/node.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/reg-exp-router/trie.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/reg-exp-router/router.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/smart-router/router.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/trie-router/node.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/router/trie-router/router.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/hono.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/context/constants.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/request/constants.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/utils/buffer.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/utils/body.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/utils/url.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/request.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/utils/html.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/context.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/compose.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/hono-base.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/utils.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/reg-exp-router/matcher.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/reg-exp-router/node.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/reg-exp-router/trie.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/reg-exp-router/router.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/smart-router/router.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/trie-router/node.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/router/trie-router/router.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/hono.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/middleware/context-storage/index.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/middleware/context-storage/index.js",
+          "../../../../../../node_modules/.pnpm/hono@4.13.14/node_modules/hono/dist/helper/route/index.js",
+          "../../../../../../node_modules/.pnpm/hono@5.0.0-rc.1/node_modules/hono/dist/helper/route/index.js",
+          "../../../../../../node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs",
+          "../../../../../../node_modules/.pnpm/html-escaper@3.0.3/node_modules/html-escaper/esm/index.js",
+          "../../../../../../node_modules/.pnpm/easy-jsx-html-engine@0.1.13/node_modules/easy-jsx-html-engine/util.js",
+          "../../../../../../node_modules/.pnpm/easy-jsx-html-engine@0.1.13/node_modules/easy-jsx-html-engine/intrinsics.js",
+          "../../../../../../node_modules/.pnpm/easy-jsx-html-engine@0.1.13/node_modules/easy-jsx-html-engine/create-element.js",
+          "../../../../../../node_modules/.pnpm/easy-jsx-html-engine@0.1.13/node_modules/easy-jsx-html-engine/error-boundary.js",
+          "../../../../../../node_modules/.pnpm/easy-jsx-html-engine@0.1.13/node_modules/easy-jsx-html-engine/suspense.js",
+          "../../../../../../node_modules/.pnpm/easy-jsx-html-engine@0.1.13/node_modules/easy-jsx-html-engine/stream-webapi.js",
+          "../../../../context-app.mjs",
+          "../../src/entry.ts"
+        ]
+      }
+    ],
+    "client": [
+      {
+        "file": "dist/client/assets/entry-B99dQvG4.mjs",
+        "positions": [
+          {
+            "marker": "MOVED_FRAME",
+            "generated": {
+              "line": 9,
+              "column": 18
+            },
+            "original": {
+              "source": "../../../src/map-source.ts",
+              "line": 3,
+              "column": 20,
+              "name": null
+            },
+            "expected": {
+              "line": 3,
+              "column": 21
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "MOVED_FRAME",
+            "generated": {
+              "line": 9,
+              "column": 21
+            },
+            "original": {
+              "source": "../../../src/map-source.ts",
+              "line": 3,
+              "column": 20,
+              "name": null
+            },
+            "expected": {
+              "line": 3,
+              "column": 24
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "MOVED_FRAME",
+            "generated": {
+              "line": 9,
+              "column": 28
+            },
+            "original": {
+              "source": "../../../src/map-source.ts",
+              "line": 3,
+              "column": 20,
+              "name": null
+            },
+            "expected": {
+              "line": 3,
+              "column": 31
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "UNTOUCHED_FRAME",
+            "generated": {
+              "line": 6,
+              "column": 18
+            },
+            "original": {
+              "source": "../../../src/map-source.ts",
+              "line": 8,
+              "column": 18,
+              "name": null
+            },
+            "expected": {
+              "line": 8,
+              "column": 19
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "UNTOUCHED_FRAME",
+            "generated": {
+              "line": 6,
+              "column": 21
+            },
+            "original": {
+              "source": "../../../src/map-source.ts",
+              "line": 8,
+              "column": 18,
+              "name": null
+            },
+            "expected": {
+              "line": 8,
+              "column": 22
+            },
+            "granularity": "string-token"
+          },
+          {
+            "marker": "UNTOUCHED_FRAME",
+            "generated": {
+              "line": 6,
+              "column": 32
+            },
+            "original": {
+              "source": "../../../src/map-source.ts",
+              "line": 8,
+              "column": 18,
+              "name": null
+            },
+            "expected": {
+              "line": 8,
+              "column": 33
+            },
+            "granularity": "string-token"
+          }
+        ],
+        "hasSourcesContent": true,
+        "sources": [
+          "../../../src/map-source.ts"
+        ]
+      }
+    ]
+  },
+  "clientManifest": {
+    "../../../../virtual:client-entry": {
+      "file": "assets/entry-B99dQvG4.mjs",
+      "name": "_virtual_client-entry",
+      "src": "../../../../virtual:client-entry",
+      "isEntry": true,
+      "dynamicImports": [
+        "src/client/public.ts",
+        "src/client/admin.ts"
+      ]
+    },
+    "_shared-eWn4n8j0.mjs": {
+      "file": "assets/shared-eWn4n8j0.mjs",
+      "name": "shared"
+    },
+    "src/client/admin.ts": {
+      "file": "assets/admin-BSoLrbLx.mjs",
+      "name": "admin",
+      "src": "src/client/admin.ts",
+      "isDynamicEntry": true,
+      "imports": [
+        "_shared-eWn4n8j0.mjs"
+      ]
+    },
+    "src/client/public.ts": {
+      "file": "assets/public-B9Xk8AWw.mjs",
+      "name": "public",
+      "src": "src/client/public.ts",
+      "isDynamicEntry": true,
+      "imports": [
+        "_shared-eWn4n8j0.mjs"
+      ]
+    }
+  },
+  "banned": true,
+  "stats": {
+    "resolveCalls": 0,
+    "graphMs": 0,
+    "chunks": {},
+    "buildOrder": [
+      "client"
+    ],
+    "table": {
+      "/public": [
+        "node_modules/spike-actions/index.js",
+        "outside/component.ts",
+        "src/admin.ts",
+        "src/barrel.ts",
+        "src/component.ts",
+        "src/cycle-a.ts",
+        "src/cycle-b.ts",
+        "src/layout.ts",
+        "src/root.ts",
+        "src/route.ts",
+        "src/side.ts",
+        "src/unused.ts"
+      ],
+      "/admin": [
+        "node_modules/spike-actions/index.js",
+        "outside/component.ts",
+        "src/admin.ts",
+        "src/barrel.ts",
+        "src/component.ts",
+        "src/cycle-a.ts",
+        "src/cycle-b.ts",
+        "src/layout.ts",
+        "src/root.ts",
+        "src/route.ts",
+        "src/side.ts",
+        "src/unused.ts"
+      ]
+    },
+    "manifest": {
+      "entry": "/assets/entry-B99dQvG4.mjs"
+    },
+    "devComputations": 3,
+    "clientReloads": 1
+  },
+  "observed": {
+    "first": {
+      "answer": 46,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/unused.ts"
+        ],
+        "/admin": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/unused.ts@0"
+      ],
+      "manifest": {}
+    },
+    "changed": {
+      "answer": 46,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/added.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/unused.ts"
+        ],
+        "/admin": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/added.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/added.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/unused.ts@0"
+      ],
+      "manifest": {}
+    },
+    "context": {
+      "hono": [
+        {
+          "path": "/mount/item/00-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "00-a b",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "00-a b",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+        },
+        {
+          "path": "/mount/item/01-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "01-c/d",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "01-c/d",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/10-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "10-a b",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "10-a b",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "11-c/d",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "11-c/d",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+        }
+      ],
+      "hono5": [
+        {
+          "path": "/mount/item/00-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "00-a b",
+            "propertyRoutePath": null,
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "00-a b",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+        },
+        {
+          "path": "/mount/item/01-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "01-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "01-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/10-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "10-a b",
+            "propertyRoutePath": null,
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "10-a b",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "11-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "11-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+        }
+      ]
+    },
+    "crash": {
+      "stack": "Error: MOVED_FRAME\n    at hoisted (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts:3:11)\n    at moved (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts:5:10)\n    at Object.fetch (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/entry.ts:14:42)\n    at workers/runner-worker/index.js:365:20\n    at maybeCaptureError (workers/runner-worker/index.js:51:10)"
+    },
+    "devMap": {
+      "positions": [
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 12,
+            "column": 18
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 21
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 12,
+            "column": 21
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 24
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 12,
+            "column": 28
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 31
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 18
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 19
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 21
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 22
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 32
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 33
+          },
+          "granularity": "string-token"
+        }
+      ],
+      "hasSourcesContent": true,
+      "sources": [
+        "map-source.ts"
+      ]
+    },
+    "devClientMap": {
+      "positions": [
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 18
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 21
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 21
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 24
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 28
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 31
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 18
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 19
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 21
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 22
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 32
+          },
+          "original": {
+            "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-stable-compat/src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 33
+          },
+          "granularity": "string-token"
+        }
+      ],
+      "hasSourcesContent": true,
+      "sources": [
+        "map-source.ts"
+      ]
+    },
+    "wsEvents": [
+      {
+        "type": "connected"
+      },
+      {
+        "type": "full-reload",
+        "path": "*"
+      },
+      {
+        "type": "update",
+        "updates": [
+          {
+            "type": "js-update",
+            "timestamp": 1793155376809,
+            "path": "\u0000virtual:client-entry",
+            "acceptedPath": "\u0000virtual:client-entry",
+            "explicitImportRequired": false,
+            "isWithinCircularImport": false
+          }
+        ]
+      }
+    ],
+    "clientReloads": 1,
+    "devComputations": 3
+  }
+}

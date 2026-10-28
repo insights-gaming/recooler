@@ -2,14 +2,15 @@ import { createElement as h, Suspense } from 'easy-jsx-html-engine';
 import { renderToStream } from 'easy-jsx-html-engine/stream-webapi';
 
 // The gate is released by the caller only AFTER it receives the streaming Response.
-export function createContextApp(Hono, contextStorage, getContext, routePath) {
+export function createContextApp(Hono, contextStorage, getContext, routePath, timed = false) {
   const gates = new Map();
   const child = new Hono();
   child.get('/item/:id/:rest{.+}', (c) => {
     const id = c.req.param('id');
     c.set('requestId', id);
     let release;
-    const gate = new Promise(r => { release = r; });
+    const gate = timed ? new Promise(r => { setTimeout(r, 100); release = () => {}; })
+      : new Promise(r => { release = r; });
     gates.set(id, release);
     const matched = { routePath: routePath(c), params: { ...c.req.param() } };
     const snapshot = (where) => {
@@ -30,7 +31,7 @@ export function createContextApp(Hono, contextStorage, getContext, routePath) {
       })()),
       // .toHTML runs in the renderer after the initial writable stream is consumed.
       { toHTML() { return '<b>' + JSON.stringify(snapshot('toHTML')) + '</b>'; } }
-    ), { waitUntil: p => pending.push(p) });
+    ), { waitUntil: p => { pending.push(p); try { c.executionCtx.waitUntil(p); } catch {} } });
     return new Response(stream, { headers: { 'content-type': 'text/html' } });
   });
   const app = new Hono();
