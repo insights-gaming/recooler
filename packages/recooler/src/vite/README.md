@@ -93,7 +93,7 @@ pragmas are added. Dev always installs the htmx extension so adding the first
 action through an import works immediately. Builds install it when a loaded
 source module contains `hx-`. Set `htmx: {}` to enable it explicitly or
 `htmx: false` to disable the transform and automatic extension. Handler strings
-are emitted with a pre-load queue; client chunks, route `onLoad` and `page.scripts` are wired automatically.
+call the shared dispatcher; static route modules, route `onLoad` and `page.scripts` are wired automatically.
 
 ```ts
 recooler({
@@ -263,7 +263,7 @@ now provide the first-load ordering guarantee. Load classic htmx before these mo
 
 Bans, exact server input slicing, dev fs authorization, redacted maps, and opaque
 lookup keys remain enforced. Dropped slice comments are removed even with minify:false.
-Server graph edits retain SSR runner invalidation; client table changes trigger a
+Server graph edits retain SSR runner invalidation; client table changes (including onLoad metadata) trigger a
 client reload, while unrelated SPA CSS/TypeScript edits keep normal Vite updates.
 Build watch orders client rebuilding after server output.
 

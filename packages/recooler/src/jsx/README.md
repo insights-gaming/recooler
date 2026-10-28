@@ -163,10 +163,13 @@ entry scripts. The resolved template and cleanup script are configurable through
 the options below; the engine loader script is fixed.
 
 External module scripts run after the entire Suspense stream has parsed.
-The Phase 5 entry also waits for DOMContentLoaded for legacy inline imports,
-then loads route slices, replays queued events and calls onLoad. This changes
-0.0.27's earlier inline timing. Use `htmx.legacyClientScript: true` explicitly
-for roots that still inline the second argument; see the migration guide.
+Static route modules register handlers and call synchronous onLoad before
+DOMContentLoaded and htmx startup, recovering 0.0.27's first-load ordering.
+Legacy dynamic imports wait for parsing while the static scripts provide startup
+registration. After swaps, init loads every new marker and runs its owning onLoad.
+Only confirm can defer its request; other event policies are in the migration guide.
+Use `htmx.legacyClientScript: true` explicitly for roots that inline the second
+argument.
 
 ## Rendering options
 

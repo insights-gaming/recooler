@@ -418,18 +418,18 @@ Either way:
   - It is then sliced down to the `_handler$N` exports, the route module's `onLoad`, and the module-level declarations and imports they reference.
   - Port the slice rules from `slice_handler_module` in `src/htmx/transform.rs`: breadth-first reference walk, type-only imports trimmed, partially used imports trimmed, `onLoad` recognised in its three forms in route modules only, and a warning when a layout or the root exports `onLoad`.
   - Each slice registers its own handlers (`$handlers["…@2"] = _handler$2`), so no entry needs to know the IDs.
-- **★ Per-route lazy chunks.**
-  - The client entry maps a route path to `() => import(slice)` for the slices that route reaches. Rolldown dedupes shared slices.
+- **★ Per-route modules and lazy swaps.**
+  - Each route has a static module entry importing its reachable slices. The general entry also maps routes to dynamic imports for swaps. Rolldown dedupes shared slices.
   - This keeps per-page module side effects per page, as in 0.0.27, and stops admin-only handler code reaching public pages.
   - The entry's module list comes from the server build's graph (`buildApp`, server first), so no glob pre-scan is needed.
   - The alternative is one global bundle.
 - **Loading.**
-  - Pages link the entry with `<script type="module" src>` through the extension's `page.scripts`.
-  - The entry reads `data-recooler-route`, loads that route's chunk, installs `window.$handlers`, and calls `onLoad` itself. There is no inline script, so no CSP nonce is needed.
+  - Pages include static `<script type="module" src>` entries and modulepreloads through the extension and JSX Content, including legacy roots. They register handlers and run synchronous onLoad before DOMContentLoaded/htmx startup, after the complete stream parses.
+  - Every route uses a hidden body-safe span marker. After swaps, init scans all markers, loads missing slices and runs onLoad once per new marker, including fragments. It never falls back to a stale body attribute.
   - `hx-on` attributes themselves still need `unsafe-eval`, as with htmx in general; document this.
-  - Handlers triggered before the chunk loads: queue them in a tiny stub, or document it.
+  - Initial load has no queue. During swaps only confirm is deferred via issueRequest(true); configRequest/beforeRequest run late. Other early events are dropped with a dev warning (except htmx:load), without canceling defaults or recreating requests.
 - **Build.** Declare `environments.client` with `build.rolldownOptions.input` set to the virtual entry, so one `vite build` builds both environments, as `@cloudflare/vite-plugin` already does.
-  - The client entry has a **stable file name** with a `?v=<buildId>` query, so the server never needs the client manifest, and the Cloudflare plugin's own Worker → client order is a correct two-pass build.
+  - The general entry has a **stable file name**. Each route entry uses an opaque sha256(route.file) prefix. Both use `?v=<contentHash>`, computed in the server build, so the server needs no client manifest and Cloudflare retains its Worker → client order.
   - Don't override `builder.buildApp` in `config`. The spike did, and it dropped the Cloudflare plugin's asset step and forced `sharedPlugins`.
   - Assert that the route → slice table the client build uses matches the server build's.
   - The Environment API is RC, and `createBuilder`/`buildApp` are still `@experimental`, so pin the Vite minor.
@@ -541,11 +541,12 @@ Slicing, the client environment, per-route chunks, `onLoad`, and dev invalidatio
 Exit criteria: event handlers work in the template, a test asserts that no server-only code reaches the client bundle, and dev HMR works.
 
 Implemented on `ssttevee/ts-client`: `playground-vite/` runs beside the Farm
-playground; all client conformance checks are enabled. The legacy-root opt-in is
-`htmx.legacyClientScript: true` (inline import of the stable entry). Early function
-events queue their this/event/scope, even before entry execution. The client waits
-for document parsing, registers slices, replays events, then runs the owning page's
-onLoad. Route-changing htmx navigation requires a full page load in 0.1.0.
+playground; all client conformance checks are enabled. After round 2 review,
+initial pages use deterministic static route module entries, including legacy
+roots, with registration/onLoad before htmx's DOMContentLoaded startup. No initial
+queue. Swap initialization loads every route marker and runs onLoad per inserted
+marker. Only confirm uses a deferred continuation; config/beforeRequest run late,
+and other early events are dropped without canceling defaults or replaying requests.
 See [verification](../reviews/ts-client-implementation.md) and the migration guide.
 
 ### Phase 6: migration and cutover

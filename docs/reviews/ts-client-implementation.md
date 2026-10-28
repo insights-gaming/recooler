@@ -1,5 +1,8 @@
 # Phase 5 client scripts: implementation and review fixes
 
+**Current design: see the round 2 redesign below.** Earlier queue/replay descriptions
+and limits are historical and are superseded by that section.
+
 Implemented on `ssttevee/ts-client` in the existing `t3-dd227eee` worktree,
 starting at `a8366ee` (Phase 5 based on `ssttevee/ts-htmx-vite` `98acae9`).
 No push. The final HEAD is recorded in the implementation handoff.
@@ -177,3 +180,128 @@ Raw local logs: `/private/tmp/ts-client-package.log`,
 `/private/tmp/ts-client-conformance.log`, `/private/tmp/ts-client-typecheck.log`,
 `/private/tmp/ts-client-htmx1.log`, `/private/tmp/ts-client-htmx2.log`,
 `/private/tmp/ts-client-proxy.log`, and `/private/tmp/ts-client-r4b-*.log`.
+
+
+## Round 2 redesign (2026-10-28)
+
+Continued at `14d9c99` in `/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-dd227eee`,
+on `ssttevee/ts-client`. Checkpoints: `8711907` (loading redesign) and `9dce8d1`
+(Chromium regression coverage, runtime refinements and conformance fixtures).
+`ad1b32e` preserves ready parent handlers during fragment loading, exported readiness,
+absolute CDN bases and client onLoad HMR metadata. The final documentation
+commit/HEAD is recorded in the handoff. Nothing pushed.
+
+### Route modules and startup
+
+- The selected **server** graph determines the route-to-slice table, as before.
+  Each handler-bearing route gets an explicit Rolldown entry named
+  `assets/recooler-route-${sha256(route.file).slice(0,20)}.js?v=<contentHash>`.
+  The opaque hash is stable across builds; the version changes with source and
+  client settings. The server serializes these deterministic URLs alongside its
+  existing table, with no client manifest read or server bundle evaluation.
+- The general entry remains `assets/recooler-client.js?v=<contentHash>`. Versioned
+  opaque slice files are explicit entries too, providing actual preload/retry
+  targets even when Rolldown moves implementations into shared chunks. Shared
+  imports are deduplicated. The static closure for one route does not fetch or
+  evaluate other routes' private slices (D4 remains tested).
+- JSX Content starts with a hidden `span[data-recooler-marker]` carrying the
+  route pattern and version, followed by static module scripts. DefaultRootHOC
+  puts dependency preloads in head; custom/legacy roots get preloads in Content.
+  This works even if a legacy root renders only its inline second argument.
+  Other extension scripts retain their existing rendering. Custom roots that
+  also render props.scripts can emit the same module URL twice; browser module
+  identity and runtime job deduplication prevent duplicate registration/onLoad.
+- Static route modules import namespaces and register them synchronously, then
+  initialize the route. They execute after the full stream parses and before
+  DOMContentLoaded/htmx startup. Initial load has no queue. A legacy dynamic
+  import during parsing waits for parsing; an already-started lazy job cannot
+  delay static registration or cause onLoad to run twice.
+- A shared runtime tolerates the queried entry plus its unqueried static import.
+  Initialization scans **all** Content markers, never a body attribute or meta.
+  Work is keyed by marker identity and route/version signature. New fragment
+  markers run their own route onLoad once, matching the former inline script.
+  Existing markers do not rerun. New same-route body content and history cache
+  restoration do rerun. Stale async jobs cannot initialize another route's DOM.
+  Function ownership tracks the opaque slice-to-route relation, so ready parent
+  handlers continue to work while another fragment loads or fails.
+  Sync onLoad effects precede first htmx processing; async onLoad completion is
+  awaited before deferred confirm handlers. Root/layout onLoad stays ignored.
+
+### Swap-window policy
+
+`init()` runs afterSwap, afterSettle and historyRestore, and remains callable
+explicitly (including by the legacy cached import shim).
+
+Only `htmx:confirm` is canceled/deferred. Handlers for one original event share
+its public `detail.issueRequest(true)` continuation after onLoad. A handler's
+preventDefault suppresses automatic continuation; an explicit issueRequest call
+also suppresses automatic continuation. Detached elements are skipped. Handler
+and onLoad failures are isolated and reported.
+
+`htmx:configRequest` and `htmx:beforeRequest` run late, without canceling the
+original event or issuing another request. Their configuration changes may arrive
+after the request has already used the data; preventDefault cannot cancel it.
+Neither has a public continuation that safely resumes the original request.
+
+**All other early events are dropped.** Their native/htmx defaults are untouched.
+This includes click, submit, checkbox, keydown, paste, drop, response, swap and
+settle callbacks. Development warns about dropped handlers, except htmx:load.
+Dropping avoids stale lifecycle callbacks and cancellation-dependent side effects;
+there is no claim that arbitrary callbacks are harmless to invoke late. Once the
+marker initializes, handlers receive the original event normally. There is no
+click/requestSubmit redispatch, htmx.ajax reconstruction, or generic event replay.
+htmx itself can ignore native defaultPrevented; Recooler adds no second request.
+
+### Per-finding resolution
+
+| Round 2 finding | Resolution / evidence |
+| --- | --- |
+| Critical replay duplicates and body loop | Removed all generic cancellation/reissue. Static first-load modules restore ordering. Chromium covers hx-post, boosted form/link, preventDefault submit, response callbacks and body lifecycle handlers with delayed destination assets. Each action has one request. Both supplied settle-loop versions report exactly one GET /b at 2 and 3 seconds for after-settle, after-request, after-swap and load. |
+| htmx 1 history loses leading meta / stale body fallback | Replaced meta with a hidden span; removed body fallback. Chromium A→B→C→Back for legacy and default roots on both htmx versions yields b:b, c:c, b:b and no B refetch. Supplied modern history output is `a b c | back b` on both. |
+| Failed import wedges dispatch / unhandled rejections | Failed promises are evicted. One retry uses a fresh module URL because native import caches rejected URLs. A second failure attempts one sessionStorage-guarded reload per client version, then reports a console error. Later init can retry. Readiness settles after reporting; all public/internal jobs observe failures. Chromium covers transient recovery, persistent failure guard, zero unhandled rejections, and usable handlers after recovery. The supplied failure script leaves link and submit defaults uncanceled. An extended copy waits for recovery and asserts nextClickAfterReady=1 with unhandled=0 on both versions. The click that triggers recovery is deliberately dropped, never replayed. |
+| Cross-route fragment fails to load handlers | Every marker participates. The fragment's own onLoad runs once per inserted marker, followed by usable handlers. Supplied init attack reports loadsEdit=1 and clickSave=1 on both versions; Chromium asserts two markers and deduplication. |
+| Unrelated SPA edits trigger client full reload | hotUpdate returns immediately for empty context.modules. Client invalidation/reload happens only if the client table changes, including route onLoad metadata. Server graph edits still reload the SSR runner, preserving the Phase 4b edit matrix. New HMR regression and original reviewer script show update-only frames for CSS and TypeScript. |
+| Native defaults silently canceled | No native event is canceled in a loading window. Chromium checks checkbox toggle, typed input, paste/drop cancellation state and request owners during a delayed swap. |
+| hx-on::load warning noise | No continuation warning machinery exists. Dropped htmx:load deliberately emits no dev warning. Browser production fixtures assert no warnings. All supplied loop variants report zero warnings. |
+| minify:false comment disclosure | All source comments are removed from client slices before bundling, including dropped-function JSDoc and /*! comments. JS, external maps and decoded inline maps are leak-scanned with minify:false. UTF-16 mappings of retained handlers remain tested. |
+| Relative Vite base falls back to / | Relative/empty bases now fail configuration. Regression covers './', '' and 'relative/'. Absolute CDN bases remain supported. Rooted /_admin/ still passes the real two-Worker proxy fixture. |
+| Persistent version mismatch reload loop | sessionStorage flag is keyed by HTML/client version pair. At most one reload per pair; further mismatch reports an error and refuses dispatch. If storage is unavailable, automatic reload is disabled. Chromium serves persistently stale HTML and asserts exactly two document requests total. |
+
+Round 1 and Phase 4b protections remain: redacted external/inline maps; user entries;
+onLoad before deferred confirm; dev fs boundary; builtin bans; exact server source
+input and handler IDs; compact attributes; reproducible versions; opaque keys;
+rooted base prefix and absolute CDN URLs; exported entry readiness; namespace/signing and strict colon loaders; server edit matrix.
+
+### Verification and reviewer scripts
+
+- Package suite: **48 files, 1,436 passed**, including plain Vite, Cloudflare
+  1.65.0 and 2.0.0-beta.v.5 client integrations and the /_admin two-Worker service
+  binding proxy with modern/legacy roots.
+- Package typecheck (including consumer declarations) and build: pass.
+- Conformance typecheck: pass. Both `farm-0.0.27,ts` targets: **1,054 passed,
+  7 expected skips**. The first run rebuilt all fixtures; the final pass includes the strict
+  root-scripts span assertion and the final runtime.
+- Playground typecheck/build/check: pass, 2 tests.
+- Chromium **156.0.8078.4**, Playwright **1.64.1**, htmx **1.9.12 / 2.0.11**:
+  both root styles pass initial module-before-DCL and first-process checks,
+  blocked initial assets holding DCL, real streamed Suspense, all request-owner
+  attacks, body events, native defaults during swaps, history, HX-Location,
+  push-url, fragment onLoad, import retry and persistent reload guards.
+  Playwright is a package devDependency; install Chromium before package tests
+  with `pnpm --filter recooler exec playwright install chromium`.
+- Original init, hist, hist-modern, replay and failure scripts, plus all four
+  settle-loop event variants: exit 0 on both versions. Original hmr.mjs sends
+  only update frames. These jsdom scripts cannot validate static module timing
+  and their old meta diagnostics are obsolete; Chromium validates the new contract.
+- Original skew.mjs assumes a meta marker and stops at that obsolete selector.
+  Selector-only copies under /private/tmp/rc-review2-compat use the span marker;
+  both refuse mixed-version dispatch. Chromium additionally verifies real reload
+  behavior, which jsdom does not implement. Original reviewer files are untouched.
+
+Logs: `/private/tmp/rc-package-r2-final.log`,
+`/private/tmp/rc-conformance-r2-final.log`, `/private/tmp/rc-typecheck-r2-final.log`,
+`/private/tmp/rc-build-r2-final.log`, `/private/tmp/rc-conformance-typecheck-r2.log`,
+`/private/tmp/rc-playground-r2.log`, `/private/tmp/rc-chromium1.log`,
+`/private/tmp/rc-chromium2-final.log`, `/private/tmp/rc-attacks-{1,2}.log`,
+`/private/tmp/rc-hmr-review.log`, `/private/tmp/rc-skew-{1,2}.log` and
+`/private/tmp/rc-failure-recovered-{1,2}.log`.
