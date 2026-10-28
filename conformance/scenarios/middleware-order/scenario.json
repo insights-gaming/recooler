@@ -1,0 +1,42 @@
+{
+  "name": "middleware-order: file-name sorting within directory and shallowest-first middleware",
+  "source": "src/routes.rs route_plan_orders_directory_middleware_shallowest_first; docs/plans/typescript-rewrite.md reference middleware",
+  "requests": [
+    {
+      "name": "GET /deep",
+      "path": "/deep",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>page</p>"
+        ],
+        "trace": [
+          "plain-base",
+          "plain-10",
+          "plain-2",
+          "group-base",
+          "group-10",
+          "group-2",
+          "deep"
+        ]
+      }
+    },
+    {
+      "name": "GET /deep/nope",
+      "path": "/deep/nope",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "plain-base",
+          "plain-10",
+          "plain-2",
+          "deep"
+        ]
+      }
+    }
+  ]
+}

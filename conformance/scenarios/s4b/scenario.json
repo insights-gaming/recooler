@@ -1,0 +1,596 @@
+{
+  "name": "s4b: guard runs after public action registration falls through; identical paths use separate methods",
+  "source": "agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s4.json + 8e48a9b1 main transcript rv5/sc/s4b correction",
+  "requests": [
+    {
+      "name": "GET /about",
+      "path": "/about",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-about</p>"
+        ],
+        "trace": [
+          "public-group"
+        ]
+      }
+    },
+    {
+      "name": "POST /about",
+      "path": "/about",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "POST /about?action=bogus",
+      "path": "/about?action=bogus",
+      "method": "POST",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "unknown action",
+        "trace": [
+          "public-group"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
+          "ts": {
+            "status": 404
+          }
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies valid same-origin action headers so this tests lookup, not CSRF."
+        }
+      ]
+    },
+    {
+      "name": "PUT /about",
+      "path": "/about",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /hook",
+      "path": "/hook",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-hook</p>"
+        ],
+        "trace": [
+          "public-group",
+          "onRequest public-hook"
+        ]
+      }
+    },
+    {
+      "name": "POST /hook",
+      "path": "/hook",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "onRequest public-hook",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "PUT /hook",
+      "path": "/hook",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "public-group",
+          "onRequest public-hook"
+        ]
+      }
+    },
+    {
+      "name": "POST /plainpage",
+      "path": "/plainpage",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /x",
+      "path": "/x",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "POST /x",
+      "path": "/x",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "HEAD /x",
+      "path": "/x",
+      "method": "HEAD",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "OPTIONS /about",
+      "path": "/about",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /dup",
+      "path": "/dup",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-pub-dup</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /dup",
+      "path": "/dup",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by b-adm-group",
+        "trace": [
+          "b-adm-group"
+        ]
+      }
+    },
+    {
+      "name": "HEAD /about",
+      "path": "/about",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "",
+        "trace": [
+          "public-group"
+        ]
+      }
+    },
+    {
+      "name": "action 0 from /about",
+      "method": "POST",
+      "action": {
+        "page": "/about",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action public-about"
+        ],
+        "trace": [
+          "public-group"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "admin action submitted to /about",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/about",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
+          "ts": {
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "public-group",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin action submitted to /hook",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "onRequest public-hook",
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/hook",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
+          "ts": {
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "public-group",
+              "onRequest public-hook",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin action submitted to /plainpage",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/plainpage",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
+          "ts": {
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin action submitted to /x",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/x",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
+          "ts": {
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "DELETE /about",
+      "path": "/about",
+      "method": "DELETE",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /x",
+      "path": "/x",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "admin action submitted to /about with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "public-group",
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/about",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "public-group",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "admin action submitted to /hook with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "public-group",
+          "onRequest public-hook",
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/hook",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "public-group",
+              "onRequest public-hook",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "admin action submitted to /plainpage with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/plainpage",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "admin action submitted to /x with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/x",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
+      }
+    }
+  ]
+}

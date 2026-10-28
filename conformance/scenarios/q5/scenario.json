@@ -1,0 +1,94 @@
+{
+  "name": "q5: page first next to POST-only differently named param route",
+  "source": "agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh",
+  "requests": [
+    {
+      "name": "GET /posts/a",
+      "path": "/posts/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>page-with-action slug=a</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /posts/a",
+      "path": "/posts/a",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "admin onPost postId=a",
+        "trace": []
+      }
+    },
+    {
+      "name": "PUT /posts/a",
+      "path": "/posts/a",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /posts/a",
+      "method": "POST",
+      "action": {
+        "page": "/posts/a",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "page-action"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "HEAD /posts/a",
+      "path": "/posts/a",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "body": "",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /posts/a",
+      "path": "/posts/a",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "name": "c6: same-shape catch-alls with disjoint methods",
+  "source": "agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh",
+  "requests": [
+    {
+      "name": "GET /x/y",
+      "path": "/x/y",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>page slug=</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /x/y",
+      "path": "/x/y",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "b onPost x/y",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "HEAD /x/y",
+      "path": "/x/y",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "body": "",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /x/y",
+      "path": "/x/y",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "PUT /x/y",
+      "path": "/x/y",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    }
+  ]
+}

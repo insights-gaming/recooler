@@ -1,0 +1,17 @@
+{
+  "name": "m14: TS fixes the oracle discrepancy",
+  "source": "conformance/known-issues/README.md; recovered review probes",
+  "targets": [
+    "ts"
+  ],
+  "buildError": [
+    "src/routes/middleware.ts",
+    "must export a middleware function"
+  ],
+  "buildErrors": {
+    "ts": [
+      "src/routes/middleware.ts",
+      "must export a middleware function"
+    ]
+  }
+}

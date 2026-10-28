@@ -1,0 +1,35 @@
+{
+  "name": "layout-groups: layout ancestry follows filesystem groups",
+  "source": "rv4 q6 plain posts/layout does not wrap grouped posts; explicit ancestry extension",
+  "requests": [
+    {
+      "name": "grouped ancestry",
+      "path": "/posts/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<section data-layout=\"root\"><section data-layout=\"pub\"><section data-layout=\"pub-posts\"><p>grouped</p>"
+        ],
+        "excludes": [
+          "data-layout=\"plain\""
+        ]
+      }
+    },
+    {
+      "name": "plain ancestry",
+      "path": "/posts/plain",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<section data-layout=\"root\"><section data-layout=\"plain\"><p>plain</p>"
+        ],
+        "excludes": [
+          "data-layout=\"pub\"",
+          "data-layout=\"pub-posts\""
+        ]
+      }
+    }
+  ]
+}

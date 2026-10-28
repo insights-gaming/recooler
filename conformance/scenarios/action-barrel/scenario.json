@@ -1,0 +1,42 @@
+{
+  "name": "action-barrel: unused admin re-export cannot authorize a public action",
+  "source": "docs/plans/typescript-rewrite.md \u00a73.5 D6; 0.0.27 barrel registration hole",
+  "requests": [
+    {
+      "name": "admin action through public barrel",
+      "method": "POST",
+      "action": {
+        "page": "/admin",
+        "attribute": "hx-post",
+        "path": "/public",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": "admin barrel action",
+        "trace": [
+          "public",
+          "action admin-barrel"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Importing a barrel does not authorize an action URL signed for a different route.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "public"
+            ],
+            "traceExcludes": [
+              "action admin-barrel"
+            ]
+          }
+        }
+      ],
+      "form": {}
+    }
+  ]
+}

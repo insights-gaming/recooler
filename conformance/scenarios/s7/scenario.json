@@ -1,0 +1,102 @@
+{
+  "name": "s7: root action POST fall-through cannot bypass param route group guard",
+  "source": "agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s7.json",
+  "requests": [
+    {
+      "name": "GET /posts/new",
+      "path": "/posts/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-posts-new</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /posts/new",
+      "path": "/posts/new",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "POST /posts/7",
+      "path": "/posts/7",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /posts/7",
+      "path": "/posts/7",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "DELETE /posts/new",
+      "path": "/posts/new",
+      "method": "DELETE",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /posts/new",
+      "method": "POST",
+      "action": {
+        "page": "/posts/new",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "root action"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+export default function Root(Content: any, scripts: string[]) { if (!Array.isArray(scripts)) throw new Error("scripts must be an array"); return (props: any) => <html><head><title>Scripts root</title></head><body><Content {...props} />{scripts.map((src) => <script type="module" src={src}></script>)}</body></html>; }

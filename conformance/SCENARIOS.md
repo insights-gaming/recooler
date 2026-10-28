@@ -1,0 +1,127 @@
+# Conformance scenarios
+
+One line per runnable scenario. Transcript names refer to the review JSONL archive supplied with the task. All source trees are checked in; running needs no transcript files. `targets: ts` entries are intentionally skipped on the oracle.
+
+- `action-nested` — captured locals, shorthand ctx, data attributes and returned nested actions. Source: docs/reviews/0.0.27.md c25b2c7/5f863e3/aa025e7; new integration coverage.
+- `action-params` — route params encoded in rendered action URLs and decoded by dispatch. Source: docs/reviews/0.0.27.md ac7b3f1/71634e4; docs/plans/typescript-rewrite.md htmx transform.
+- `action-rest` — route params encoded in rendered action URLs and decoded by dispatch. Source: docs/reviews/0.0.27.md ac7b3f1/71634e4; docs/plans/typescript-rewrite.md htmx transform.
+- `action-results` — escaped children, Response passthrough, nullish 204, reserved action and HEAD/OPTIONS. Source: docs/plans/typescript-rewrite.md reference handlers; docs/reviews/0.0.27.md 9906fd3/7589954/0c7b16f.
+- `action-signing` — removed/altered signatures, wrong method, scope tampering and exact-pathname replay after chain middleware, including oracle-signed captured scopes. Source: docs/plans/typescript-rewrite.md §3.3/§3.5; second-round N1/N2.
+- `action-barrel` — unused admin re-export runs under public middleware on 0.0.27; TS rejects the foreign binding. Source: docs/plans/typescript-rewrite.md §3.5 D6.
+- `c1` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c2` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c3` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c3b` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c4` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c5` — GET page can coexist with OPTIONS-only same-shape route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c6` — same-shape catch-alls with disjoint methods. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c7` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c8` — page actions coexist with PUT-only same-shape route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `c9` — same-shape catch-alls with disjoint methods. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `csrf` — valid same-origin headers and four action rejection cases. Source: docs/plans/typescript-rewrite.md D7; project lead CSRF decisions.
+- `d1` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d10` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d11` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d2` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d3` — identical paths: page actions first, then POST-only group. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh.
+- `d4` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d5` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d6` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d7` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `d8` — identical paths: guarded POST-only group after public page. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh.
+- `d9` — identical group-stripped paths conflict on terminal methods. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `e1` — disjoint same-shape methods, page/action ordering and catch-all layout actions. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `e2` — disjoint same-shape methods, page/action ordering and catch-all layout actions. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `e3` — disjoint same-shape methods, page/action ordering and catch-all layout actions. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `e3b` — disjoint same-shape methods, page/action ordering and catch-all layout actions. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `e4` — disjoint same-shape methods, page/action ordering and catch-all layout actions. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version).
+- `e5` — guard and directory chains after same-shape form-action fall-through. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh.
+- `e6` — guard and directory chains after same-shape form-action fall-through. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh.
+- `e7` — guard and directory chains after same-shape form-action fall-through. Source: agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh.
+- `empty` — empty scan builds and every request falls through to 404. Source: src/routes.rs scan_without_route_files_or_root_component.
+- `error-duplicate-layout` — reject ambiguous file tree. Source: src/routes.rs scan_rejects_two_layout_or_route_files_in_a_dir / scan_rejects_two_layouts_or_routes_for_a_path.
+- `error-duplicate-route` — reject ambiguous file tree. Source: src/routes.rs scan_rejects_two_layout_or_route_files_in_a_dir / scan_rejects_two_layouts_or_routes_for_a_path.
+- `error-layout-alias` — reject ambiguous file tree. Source: src/routes.rs scan_rejects_two_layout_or_route_files_in_a_dir / scan_rejects_two_layouts_or_routes_for_a_path.
+- `error-param-alias` — reject ambiguous file tree. Source: src/routes.rs scan_rejects_two_layout_or_route_files_in_a_dir / scan_rejects_two_layouts_or_routes_for_a_path.
+- `handler-order` — middleware, actions, onRequest, method handlers and page ordering. Source: docs/plans/typescript-rewrite.md reference handlers; new integration coverage.
+- `head-alias` — head export alias resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-as-parens` — head export as-parens resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-async-function` — head export async-function resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-call-function` — head export call-function resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-call-object` — head export call-object resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-deep-mutation` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
+- `head-destructure` — head export destructure resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-function` — head export function resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-import-export` — head export import-export resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-isolation` — head-only layout and per-request shallow head isolation. Source: docs/reviews/0.0.27.md a513d8b/f58865e; src/routes.rs layout_without_hoc_does_not_wrap_page.
+- `head-local-export` — head export local-export resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-namespace` — head export namespace resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-null` — head export null resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-object` — head export object resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-reexport` — head export reexport resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-satisfies` — head export satisfies resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-star` — head export star resolved through root/layout/leaf chain. **Targets: ts.** Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-undefined` — head export undefined resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `head-uninitialized` — head export uninitialized resolved through root/layout/leaf chain. Source: docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe.
+- `hidden-and-rest` — hidden directories routed, rest requires at least one segment. Source: src/routes.rs scan_hidden_dirs; docs/plans/typescript-rewrite.md reference params.
+- `layout-forms` — layout aliases/reexports wrap innermost outward. Source: docs/plans/typescript-rewrite.md reference pages; docs/reviews/0.0.27.md layout without HOC.
+- `layout-groups` — layout ancestry follows filesystem groups. Source: rv4 q6 plain posts/layout does not wrap grouped posts; explicit ancestry extension.
+- `m1` — middleware default export form accepted. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m10` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m11` — middleware default export form accepted. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m12` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m13` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m14` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
+- `m15` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
+- `m16` — middleware default export form accepted. **Targets: ts.** Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m18` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m2` — middleware default export form accepted. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m3` — middleware default export form accepted. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m4` — middleware default export form accepted. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m5` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m6` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m7` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m8` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `m9` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
+- `middleware-order` — file-name sorting within directory and shallowest-first middleware. Source: src/routes.rs route_plan_orders_directory_middleware_shallowest_first; docs/plans/typescript-rewrite.md reference middleware.
+- `mount-basePath` — public middleware and guarded action fall-through under basePath. Source: agent-a661255d0075a9714.jsonl probe-extra on rv3/sc/s4; rv5/sc/s4b terminal-method correction; action render authenticated for foreign-id extraction.
+- `mount-mount` — public middleware and guarded action fall-through under mount. Source: agent-a661255d0075a9714.jsonl probe-extra on rv3/sc/s4; rv5/sc/s4b terminal-method correction; action render authenticated for foreign-id extraction.
+- `mount-root` — public middleware and guarded action fall-through under route. Source: agent-a661255d0075a9714.jsonl probe-extra on rv3/sc/s4; rv5/sc/s4b terminal-method correction; action render authenticated for foreign-id extraction.
+- `mount-route` — public middleware and guarded action fall-through under route. Source: agent-a661255d0075a9714.jsonl probe-extra on rv3/sc/s4; rv5/sc/s4b terminal-method correction; action render authenticated for foreign-id extraction.
+- `ordering` — specificity across all groups, earlier segment, deeper paths and catch-all suffix. Source: src/routes.rs static_segment_before_param_before_catch_all, deeper_and_shallower_paths, route_path_order_is_total_and_deterministic, route_plan_orders_routes_of_all_groups_together, route_plan_orders_readme_example.
+- `p1` — identical route shapes conflict. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p10` — identical route shapes conflict. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p11` — identical route shapes conflict. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p2` — identical route shapes conflict. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p3` — identical route shapes conflict. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p4` — different route shapes remain distinct. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p5` — identical route shapes conflict. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p6` — different route shapes remain distinct. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p7` — different route shapes remain distinct. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p8` — identical route shapes conflict. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `p9` — different route shapes remain distinct. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes.
+- `playground` — all 19 original playground test behaviours. Source: playground/test/app.test.mjs (19 cases; multi-request cases expanded).
+- `q1` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `q2` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `q2z` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh; public directory renamed to (0pub).
+- `q3` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `q3z` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh; public directory renamed to (0pub).
+- `q4` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `q5` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `q5z` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh; public directory renamed to (0pub).
+- `q6` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `q7` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
+- `r1` — blocking auth re-exported by group and directory runs per module. Source: agent-a95e42b5d8a531ef8.jsonl rv5 L300-L301 r1.
+- `root-head-only` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
+- `root-scripts` — custom root receives script URL array. **Targets: ts.** Source: docs/plans/typescript-rewrite.md Part 2 root HOC scripts array.
+- `s1` — static/param/catch-all shadowing across groups. Source: agent-a9b2b4dbc360a7e35.jsonl, rv2/specs/s1.json; docs/reviews/0.0.27.md routing 6f8249e.
+- `s2` — earlier segments, nested catch-alls and dot-star specificity. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s2.json; src/routes.rs static_segment_before_param_before_catch_all/deeper_and_shallower_paths.
+- `s3` — group-only and plain prefix middleware, nested depth and unmatched paths. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s3.json.
+- `s4b` — guard runs after public action registration falls through; identical paths use separate methods. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s4.json + 8e48a9b1 main transcript rv5/sc/s4b correction.
+- `s5` — root actions, terminal methods and fall-through to catch-all. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s5.json.
+- `s6` — dots, adjacent groups and group index paths strip consistently from action URLs. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s6.json.
+- `s7` — root action POST fall-through cannot bypass param route group guard. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s7.json.
+- `s8` — shared guards, retry of same Request, group/directory ordering and public prefix isolation. Source: agent-a661255d0075a9714.jsonl rv3/sc/s8 (final shared.ts correction); agent-ab598d8d56091e5e8.jsonl rv4 L96 probe-s8 (restored methods, encodings, failures and repeated dispatch).
+- `s9` — middleware runs once before root/route actions and before onRequest. Source: agent-a661255d0075a9714.jsonl rv3/sc/s9.
+- `x10` — nested dispatch, mounted guards and repeated identical Request object. Source: agent-ab598d8d56091e5e8.jsonl rv4/sc x10 and probe-x10.mjs.
+- `x11` — one shared middleware function re-exported by two modules runs twice. Source: agent-ab598d8d56091e5e8.jsonl rv3/sc/x11.

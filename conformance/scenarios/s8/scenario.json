@@ -1,0 +1,848 @@
+{
+  "name": "s8: shared guards, retry of same Request, group/directory ordering and public prefix isolation",
+  "source": "agent-a661255d0075a9714.jsonl rv3/sc/s8 (final shared.ts correction); agent-ab598d8d56091e5e8.jsonl rv4 L96 probe-s8 (restored methods, encodings, failures and repeated dispatch)",
+  "changes": [
+    {
+      "decision": "D9",
+      "reason": "Plain-directory middleware runs first, even deeper than adjacent group middleware."
+    }
+  ],
+  "requests": [
+    {
+      "name": "GET /admin",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      },
+      "headers": {}
+    },
+    {
+      "name": "GET /admin (2)",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>admin-page user=alice</p>"
+        ],
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "GET /admin/help",
+      "path": "/admin/help",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-admin-help</p>"
+        ],
+        "trace": [
+          "root",
+          "public-group"
+        ]
+      },
+      "headers": {}
+    },
+    {
+      "name": "GET /admin/plain",
+      "path": "/admin/plain",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>plain-admin-plain (no group)</p>"
+        ],
+        "trace": [
+          "root"
+        ]
+      },
+      "headers": {}
+    },
+    {
+      "name": "GET /admin/nope",
+      "path": "/admin/nope",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "admin-dir:user=undefined"
+        ]
+      },
+      "headers": {}
+    },
+    {
+      "name": "GET /admin/reqhook",
+      "path": "/admin/reqhook",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>reqhook-page user=alice</p>"
+        ],
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice",
+          "onRequest reqhook user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "GET /staff/new",
+      "path": "/staff/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>pubg-staff-new</p>"
+        ],
+        "trace": [
+          "root",
+          "shared@/staff/new"
+        ]
+      },
+      "headers": {}
+    },
+    {
+      "name": "GET /x",
+      "path": "/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-b-x</p>"
+        ],
+        "trace": [
+          "root",
+          "plain-x-dir",
+          "a-group",
+          "b-group",
+          "b-x-dir"
+        ]
+      },
+      "headers": {}
+    },
+    {
+      "name": "GET /x/y",
+      "path": "/x/y",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-x-c-y</p>"
+        ],
+        "trace": [
+          "root",
+          "plain-x-dir",
+          "plain-x-y-dir(depth2)",
+          "a-group",
+          "a-x-dir",
+          "c-group"
+        ]
+      },
+      "headers": {}
+    },
+    {
+      "name": "POST /staff/new",
+      "path": "/staff/new",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by shared",
+        "trace": [
+          "root",
+          "shared@/staff/new",
+          "shared@/staff/:id"
+        ]
+      }
+    },
+    {
+      "name": "POST /staff/new (2)",
+      "path": "/staff/new",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "STAFF onPost id=new",
+        "trace": [
+          "root",
+          "shared@/staff/new",
+          "shared@/staff/:id"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "action 0 from /staff/new",
+      "method": "POST",
+      "action": {
+        "page": "/staff/new",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "pubg action"
+        ],
+        "trace": [
+          "root",
+          "shared@/staff/new"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "GET /admin (3)",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group",
+          "RETRY",
+          "root",
+          "admin-group"
+        ]
+      },
+      "headers": {
+        "x-retry": "1"
+      }
+    },
+    {
+      "name": "action 0 from /admin",
+      "method": "POST",
+      "action": {
+        "page": "/admin",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "headers": {
+        "HX-Request": "true",
+        "x-auth": "yes"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "page-action user=alice"
+        ],
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "action 1 from /admin",
+      "method": "POST",
+      "action": {
+        "page": "/admin",
+        "attribute": "hx-post",
+        "index": 1,
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "headers": {
+        "HX-Request": "true",
+        "x-auth": "yes"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "layout-action user=alice"
+        ],
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "PUT /admin",
+      "path": "/admin",
+      "method": "PUT",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "onPut user=alice",
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "GET /%61dmin no auth",
+      "path": "/%61dmin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "PUT /%61dmin no auth",
+      "path": "/%61dmin",
+      "method": "PUT",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /ADMIN no auth",
+      "path": "/ADMIN",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "GET //admin no auth",
+      "path": "//admin",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin%2F no auth",
+      "path": "/admin%2F",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/ no auth",
+      "path": "/admin/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "admin-dir:user=undefined"
+        ]
+      }
+    },
+    {
+      "name": "HEAD /admin no auth",
+      "path": "/admin",
+      "method": "HEAD",
+      "expect": {
+        "status": 401,
+        "body": "",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "PUT /admin no auth",
+      "path": "/admin",
+      "method": "PUT",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "OPTIONS /admin no auth",
+      "path": "/admin",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "admin-dir:user=undefined"
+        ]
+      }
+    },
+    {
+      "name": "PROPFIND /admin no auth",
+      "path": "/admin",
+      "method": "PROPFIND",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "admin-dir:user=undefined"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/%2e%2e/admin no auth",
+      "path": "/admin/%2e%2e/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/posts/%6eew no auth",
+      "path": "/admin/posts/%6eew",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/reqhook/ no auth",
+      "path": "/admin/reqhook/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "admin-dir:user=undefined"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin;x no auth",
+      "path": "/admin;x",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin?x=1 no auth",
+      "path": "/admin?x=1",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin#f no auth",
+      "path": "/admin#f",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "internal retry after x-db-down",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group",
+          "RETRY",
+          "root",
+          "admin-group"
+        ]
+      },
+      "headers": {
+        "x-retry": "1",
+        "x-db-down": "1"
+      }
+    },
+    {
+      "name": "same Request after x-db-down",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 500,
+        "body": "Internal Server Error",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      },
+      "repeat": 2,
+      "repeatExpect": [
+        {
+          "status": 401,
+          "body": "BLOCKED by admin-group",
+          "trace": [
+            "root",
+            "admin-group"
+          ]
+        }
+      ],
+      "headers": {
+        "x-db-down": "1"
+      }
+    },
+    {
+      "name": "internal retry after x-ratelimit",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group",
+          "RETRY",
+          "root",
+          "admin-group"
+        ]
+      },
+      "headers": {
+        "x-retry": "1",
+        "x-ratelimit": "1"
+      }
+    },
+    {
+      "name": "same Request after x-ratelimit",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 429,
+        "body": "slow down",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      },
+      "repeat": 2,
+      "repeatExpect": [
+        {
+          "status": 401,
+          "body": "BLOCKED by admin-group",
+          "trace": [
+            "root",
+            "admin-group"
+          ]
+        }
+      ],
+      "headers": {
+        "x-ratelimit": "1"
+      }
+    },
+    {
+      "name": "same unauthenticated Request twice",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      },
+      "repeat": 2
+    },
+    {
+      "name": "same authed Request preserves user on second dispatch",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice"
+        ],
+        "includes": [
+          "admin-page user=alice"
+        ]
+      },
+      "repeat": 2,
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "public middleware runs on both dispatches",
+      "path": "/pub",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "trace": [
+          "root",
+          "public-group"
+        ],
+        "includes": [
+          "<p>pub</p>"
+        ]
+      },
+      "repeat": 2
+    },
+    {
+      "name": "direct shared guard POST /staff/7",
+      "path": "/staff/7",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by shared",
+        "trace": [
+          "root",
+          "shared@/staff/:id"
+        ]
+      }
+    },
+    {
+      "name": "hookonly no auth",
+      "path": "/admin/hookonly",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "hookonly auth and trailing middleware once",
+      "path": "/admin/hookonly",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice",
+          "onRequest hookonly user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "POST public /admin/help",
+      "path": "/admin/help",
+      "method": "POST",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "admin-dir:user=undefined"
+        ]
+      }
+    },
+    {
+      "name": "GET group index",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "trace": [
+          "root",
+          "a-group"
+        ],
+        "includes": [
+          "<p>a-index</p>"
+        ]
+      }
+    },
+    {
+      "name": "POST same-group fall-through auth",
+      "path": "/admin/posts/new",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "onPost admin-posts-id user=alice id=new",
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice",
+          "onRequest admin-posts-new user=alice",
+          "onPost admin-posts-id"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "POST same-group fall-through no auth",
+      "path": "/admin/posts/new",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "POST param direct auth",
+      "path": "/admin/posts/9",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "onPost admin-posts-id user=alice id=9",
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice",
+          "onPost admin-posts-id"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "authorized retry wrapper does not retry success",
+      "path": "/admin",
+      "headers": {
+        "x-auth": "yes",
+        "x-retry": "1"
+      },
+      "expect": {
+        "status": 200,
+        "includes": [
+          "admin-page user=alice"
+        ],
+        "trace": [
+          "root",
+          "admin-group",
+          "admin-dir:user=alice"
+        ]
+      }
+    }
+  ]
+}

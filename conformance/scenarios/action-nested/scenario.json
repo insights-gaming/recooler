@@ -1,0 +1,158 @@
+{
+  "name": "action-nested: captured locals, shorthand ctx, data attributes and returned nested actions",
+  "source": "docs/reviews/0.0.27.md c25b2c7/5f863e3/aa025e7; new integration coverage",
+  "requests": [
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<button"
+        ],
+        "trace": [],
+        "excludes": [
+          "ctx=\""
+        ]
+      }
+    },
+    {
+      "name": "action 0 from /",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>scope &lt;&amp;&gt;</p>"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "action 0 from / (2)",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "data-hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>data action</p>"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "outer returns nested action",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "hx-post",
+        "index": 1
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<button"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "dispatch nested action from previous fragment",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "hx-post",
+        "index": 0,
+        "response": "outer returns nested action"
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>nested /</p>"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    }
+  ]
+}

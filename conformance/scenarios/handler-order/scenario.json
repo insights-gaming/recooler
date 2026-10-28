@@ -1,0 +1,120 @@
+{
+  "name": "handler-order: middleware, actions, onRequest, method handlers and page ordering",
+  "source": "docs/plans/typescript-rewrite.md reference handlers; new integration coverage",
+  "requests": [
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<button"
+        ],
+        "trace": [
+          "mw",
+          "onRequest",
+          "onGet",
+          "page"
+        ]
+      }
+    },
+    {
+      "name": "action 0 from /",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>action</p>"
+        ],
+        "trace": [
+          "mw",
+          "action"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "POST /",
+      "path": "/",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "post",
+        "trace": [
+          "mw",
+          "onRequest",
+          "onPost"
+        ]
+      }
+    },
+    {
+      "name": "OPTIONS /",
+      "path": "/",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "options",
+        "trace": [
+          "mw",
+          "onRequest",
+          "onOptions"
+        ]
+      }
+    },
+    {
+      "name": "HEAD /",
+      "path": "/",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "",
+        "trace": [
+          "mw",
+          "onRequest",
+          "onGet",
+          "page"
+        ]
+      }
+    },
+    {
+      "name": "DELETE /",
+      "path": "/",
+      "method": "DELETE",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "mw",
+          "onRequest"
+        ]
+      }
+    }
+  ]
+}

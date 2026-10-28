@@ -1,0 +1,156 @@
+{
+  "name": "csrf: valid same-origin headers and four action rejection cases",
+  "source": "docs/plans/typescript-rewrite.md D7; project lead CSRF decisions",
+  "requests": [
+    {
+      "name": "same-origin action",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "post action",
+        "trace": [
+          "post-action"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/",
+        "attribute": "hx-post"
+      }
+    },
+    {
+      "name": "cross-site POST",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "post action",
+        "trace": [
+          "post-action"
+        ]
+      },
+      "omitHeaders": [],
+      "headers": {
+        "Origin": "https://evil.test",
+        "Sec-Fetch-Site": "cross-site"
+      },
+      "action": {
+        "page": "/",
+        "attribute": "hx-post"
+      },
+      "form": {},
+      "changes": [
+        {
+          "decision": "D7",
+          "reason": "CSRF is on by default; reject before executing the action body.",
+          "ts": {
+            "status": 403,
+            "trace": [],
+            "excludes": [
+              "post action",
+              "get action"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST with no Origin or Sec-Fetch-Site",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "post action",
+        "trace": [
+          "post-action"
+        ]
+      },
+      "omitHeaders": [
+        "Origin",
+        "Sec-Fetch-Site"
+      ],
+      "action": {
+        "page": "/",
+        "attribute": "hx-post"
+      },
+      "form": {},
+      "changes": [
+        {
+          "decision": "D7",
+          "reason": "CSRF is on by default; reject before executing the action body.",
+          "ts": {
+            "status": 403,
+            "trace": [],
+            "excludes": [
+              "post action",
+              "get action"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST with no HX-Request",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "post action",
+        "trace": [
+          "post-action"
+        ]
+      },
+      "omitHeaders": [
+        "HX-Request"
+      ],
+      "action": {
+        "page": "/",
+        "attribute": "hx-post"
+      },
+      "form": {},
+      "changes": [
+        {
+          "decision": "D7",
+          "reason": "CSRF is on by default; reject before executing the action body.",
+          "ts": {
+            "status": 403,
+            "trace": [],
+            "excludes": [
+              "post action",
+              "get action"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "hx-get with no HX-Request",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "body": "get action",
+        "trace": [
+          "get-action"
+        ]
+      },
+      "omitHeaders": [
+        "HX-Request"
+      ],
+      "action": {
+        "page": "/",
+        "attribute": "hx-get"
+      },
+      "changes": [
+        {
+          "decision": "D7",
+          "reason": "CSRF is on by default; reject before executing the action body.",
+          "ts": {
+            "status": 403,
+            "trace": [],
+            "excludes": [
+              "post action",
+              "get action"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

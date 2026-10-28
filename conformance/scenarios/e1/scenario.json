@@ -1,0 +1,29 @@
+{
+  "name": "e1: disjoint same-shape methods, page/action ordering and catch-all layout actions",
+  "source": "agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version)",
+  "requests": [
+    {
+      "name": "GET /t/x",
+      "path": "/t/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a page</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /t/x",
+      "path": "/t/x",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "b onPost",
+        "trace": []
+      }
+    }
+  ]
+}

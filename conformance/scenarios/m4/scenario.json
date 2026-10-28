@@ -1,0 +1,20 @@
+{
+  "name": "m4: middleware default export form accepted",
+  "source": "agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports",
+  "requests": [
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>x</p>"
+        ],
+        "trace": [
+          "mw"
+        ]
+      }
+    }
+  ]
+}

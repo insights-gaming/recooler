@@ -1,0 +1,164 @@
+{
+  "name": "e7: guard and directory chains after same-shape form-action fall-through",
+  "source": "agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh",
+  "requests": [
+    {
+      "name": "GET /posts/a",
+      "path": "/posts/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>pub page</p>"
+        ],
+        "trace": [
+          "pub",
+          "pub-dir"
+        ]
+      },
+      "headers": {
+        "x-auth": "1"
+      }
+    },
+    {
+      "name": "POST /posts/a",
+      "path": "/posts/a",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "admin onPost",
+        "trace": [
+          "pub",
+          "pub-dir",
+          "admin",
+          "admin-dir"
+        ]
+      },
+      "headers": {
+        "x-auth": "1"
+      }
+    },
+    {
+      "name": "POST /posts/a (2)",
+      "path": "/posts/a",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED admin",
+        "trace": [
+          "pub",
+          "pub-dir",
+          "admin"
+        ]
+      }
+    },
+    {
+      "name": "action 0 from /posts/a",
+      "method": "POST",
+      "action": {
+        "page": "/posts/a",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "1"
+        }
+      },
+      "headers": {
+        "HX-Request": "true",
+        "x-auth": "1"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "pub action"
+        ],
+        "trace": [
+          "pub",
+          "pub-dir"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "GET without auth",
+      "path": "/posts/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>pub page</p>"
+        ],
+        "trace": [
+          "pub",
+          "pub-dir"
+        ]
+      }
+    },
+    {
+      "name": "action without auth",
+      "method": "POST",
+      "action": {
+        "page": "/posts/a",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "1"
+        }
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "pub action"
+        ],
+        "trace": [
+          "pub",
+          "pub-dir"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "PUT directory fall-through",
+      "path": "/posts/a",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [
+          "admin-dir",
+          "pub-dir"
+        ]
+      }
+    }
+  ]
+}

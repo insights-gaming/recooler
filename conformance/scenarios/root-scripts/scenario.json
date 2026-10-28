@@ -1,0 +1,30 @@
+{
+  "name": "root-scripts: custom root receives script URL array",
+  "source": "docs/plans/typescript-rewrite.md Part 2 root HOC scripts array",
+  "targets": [
+    "ts"
+  ],
+  "requests": [
+    {
+      "name": "root renders external module scripts",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<title>Scripts root</title>",
+          "<script type=\"module\" src="
+        ],
+        "matches": [
+          "(?:<body[^>]*\\sdata-recooler-route=[\"'][^\"']+[\"']|<meta(?=[^>]*\\sname=[\"']recooler-route[\"'])(?=[^>]*\\scontent=[\"'][^\"']+[\"'])[^>]*>)"
+        ],
+        "clientIncludes": [
+          "root-scripts-handler"
+        ],
+        "inlineScriptExcludes": [
+          "root-scripts-handler"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "name": "e3b: disjoint same-shape methods, page/action ordering and catch-all layout actions",
+  "source": "agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version)",
+  "requests": [
+    {
+      "name": "GET /t/x",
+      "path": "/t/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>c page</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /t/x",
+      "path": "/t/x",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "a onPost",
+        "trace": []
+      }
+    },
+    {
+      "name": "PUT /t/x",
+      "path": "/t/x",
+      "method": "PUT",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "b onPut",
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /t/x",
+      "method": "POST",
+      "action": {
+        "page": "/t/x",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "c action"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    }
+  ]
+}

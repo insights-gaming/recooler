@@ -1,0 +1,29 @@
+{
+  "name": "p6: different route shapes remain distinct",
+  "source": "agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes",
+  "requests": [
+    {
+      "name": "GET /v/1",
+      "path": "/v/1",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>v/[id]</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /v/a/b",
+      "path": "/v/a/b",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    }
+  ]
+}

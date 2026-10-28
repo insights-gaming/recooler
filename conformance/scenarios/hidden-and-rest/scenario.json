@@ -1,0 +1,73 @@
+{
+  "name": "hidden-and-rest: hidden directories routed, rest requires at least one segment",
+  "source": "src/routes.rs scan_hidden_dirs; docs/plans/typescript-rewrite.md reference params",
+  "requests": [
+    {
+      "name": "GET /.well-known",
+      "path": "/.well-known",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>page</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files",
+      "path": "/files",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/",
+      "path": "/files/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/a",
+      "path": "/files/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "rest=a",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/a/b",
+      "path": "/files/a/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "rest=a/b",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /.well-known/",
+      "path": "/.well-known/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    }
+  ]
+}

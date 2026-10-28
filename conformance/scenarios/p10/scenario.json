@@ -1,0 +1,16 @@
+{
+  "name": "p10: identical route shapes conflict",
+  "source": "agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes",
+  "buildError": [
+    "src/routes/v/[p{.*}]/index.tsx",
+    "src/routes/v/[q{.*}]/index.tsx",
+    "respond to GET"
+  ],
+  "buildErrors": {
+    "ts": [
+      "src/routes/v/[p{.*}]/index.tsx",
+      "src/routes/v/[q{.*}]/index.tsx",
+      "GET"
+    ]
+  }
+}

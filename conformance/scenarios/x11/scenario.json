@@ -1,0 +1,21 @@
+{
+  "name": "x11: one shared middleware function re-exported by two modules runs twice",
+  "source": "agent-ab598d8d56091e5e8.jsonl rv3/sc/x11",
+  "requests": [
+    {
+      "name": "GET /admin",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>admin</p>"
+        ],
+        "trace": [
+          "auth",
+          "auth"
+        ]
+      }
+    }
+  ]
+}

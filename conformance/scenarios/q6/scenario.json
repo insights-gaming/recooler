@@ -1,0 +1,65 @@
+{
+  "name": "q6: page first next to POST-only differently named param route",
+  "source": "agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh",
+  "requests": [
+    {
+      "name": "GET /posts/a",
+      "path": "/posts/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>page slug=a</p>"
+        ],
+        "trace": [],
+        "excludes": [
+          "layout-post-action",
+          "hx-post=",
+          "<form"
+        ]
+      }
+    },
+    {
+      "name": "POST /posts/a",
+      "path": "/posts/a",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "admin onPost postId=a",
+        "trace": []
+      }
+    },
+    {
+      "name": "PUT /posts/a",
+      "path": "/posts/a",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "HEAD /posts/a",
+      "path": "/posts/a",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "body": "",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /posts/a",
+      "path": "/posts/a",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    }
+  ]
+}

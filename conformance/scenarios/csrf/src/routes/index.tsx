@@ -1,0 +1,1 @@
+export default function Page() { return <div><button hx-post={() => { (globalThis.__t ??= []).push("post-action"); return "post action"; }}>post</button><button hx-get={() => { (globalThis.__t ??= []).push("get-action"); return "get action"; }}>get</button></div>; }

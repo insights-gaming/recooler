@@ -1,0 +1,16 @@
+{
+  "name": "c3b: same-shaped terminal handlers conflict",
+  "source": "agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh",
+  "buildError": [
+    "src/routes/(admin)/posts/[postId]/index.tsx",
+    "src/routes/(pub)/posts/[slug]/index.tsx",
+    "respond to PUT"
+  ],
+  "buildErrors": {
+    "ts": [
+      "src/routes/(admin)/posts/[postId]/index.tsx",
+      "src/routes/(pub)/posts/[slug]/index.tsx",
+      "PUT"
+    ]
+  }
+}

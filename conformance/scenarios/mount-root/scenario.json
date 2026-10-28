@@ -1,0 +1,140 @@
+{
+  "name": "mount-root: public middleware and guarded action fall-through under route",
+  "source": "agent-a661255d0075a9714.jsonl probe-extra on rv3/sc/s4; rv5/sc/s4b terminal-method correction; action render authenticated for foreign-id extraction",
+  "requests": [
+    {
+      "name": "GET protected mount",
+      "path": "/x",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/"
+      }
+    },
+    {
+      "name": "POST protected mount",
+      "path": "/x",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/"
+      }
+    },
+    {
+      "name": "GET public mount",
+      "path": "/about",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "trace": [
+          "public-group"
+        ],
+        "includes": [
+          "<p>public-about</p>"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/"
+      }
+    },
+    {
+      "name": "POST public fall-through mount",
+      "path": "/about",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "admin-group"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/"
+      }
+    },
+    {
+      "name": "public action under mount",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action public-about",
+        "trace": [
+          "public-group"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/"
+      },
+      "form": {},
+      "action": {
+        "page": "/about",
+        "attribute": "hx-post",
+        "oraclePath": "/about"
+      }
+    },
+    {
+      "name": "foreign admin action under mount",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/about",
+        "headers": {
+          "x-auth": "yes"
+        },
+        "oraclePath": "/about"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
+          "ts": {
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "public-group",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "mount": {
+        "type": "route",
+        "prefix": "/"
+      }
+    }
+  ]
+}

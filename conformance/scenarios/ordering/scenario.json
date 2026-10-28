@@ -1,0 +1,171 @@
+{
+  "name": "ordering: specificity across all groups, earlier segment, deeper paths and catch-all suffix",
+  "source": "src/routes.rs static_segment_before_param_before_catch_all, deeper_and_shallower_paths, route_path_order_is_total_and_deterministic, route_plan_orders_routes_of_all_groups_together, route_plan_orders_readme_example",
+  "requests": [
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "root",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /about",
+      "path": "/about",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "about",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /blog",
+      "path": "/blog",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "blog",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /blog/entry",
+      "path": "/blog/entry",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "blog-post",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /top/new",
+      "path": "/top/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "top-new",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /top/7",
+      "path": "/top/7",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "top-id",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /top/a/b",
+      "path": "/top/a/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "top-rest",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /re/a/edit",
+      "path": "/re/a/edit",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "re-edit",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /re/a",
+      "path": "/re/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "re-id",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /re/a/b",
+      "path": "/re/a/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "re-dotstar",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /q/x",
+      "path": "/q/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "param-static",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /q/r",
+      "path": "/q/r",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "param-param",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /q/new",
+      "path": "/q/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "param-new",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /a/b/x",
+      "path": "/a/b/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "rest-suffix",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /a/b/c",
+      "path": "/a/b/c",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "rest",
+        "trace": []
+      }
+    }
+  ]
+}

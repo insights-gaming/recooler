@@ -1,0 +1,194 @@
+{
+  "name": "s1: static/param/catch-all shadowing across groups",
+  "source": "agent-a9b2b4dbc360a7e35.jsonl, rv2/specs/s1.json; docs/reviews/0.0.27.md routing 6f8249e",
+  "requests": [
+    {
+      "name": "GET /top/new",
+      "path": "/top/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>top-new</p>"
+        ],
+        "trace": [
+          "mw-root"
+        ]
+      }
+    },
+    {
+      "name": "GET /top/5",
+      "path": "/top/5",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>top-id</p>"
+        ],
+        "trace": [
+          "mw-root"
+        ]
+      }
+    },
+    {
+      "name": "GET /docs/new",
+      "path": "/docs/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>m-docs-new</p>"
+        ],
+        "trace": [
+          "mw-root",
+          "mw-m"
+        ]
+      }
+    },
+    {
+      "name": "GET /docs/x",
+      "path": "/docs/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-docs-slug</p>"
+        ],
+        "trace": [
+          "mw-root",
+          "mw-a"
+        ]
+      }
+    },
+    {
+      "name": "GET /plain",
+      "path": "/plain",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>plain</p>"
+        ],
+        "trace": [
+          "mw-root"
+        ]
+      }
+    },
+    {
+      "name": "GET /docs2/a/b",
+      "path": "/docs2/a/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>docs2-rest</p>"
+        ],
+        "trace": [
+          "mw-root"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>m-admin</p>"
+        ],
+        "trace": [
+          "mw-root",
+          "mw-m"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/x",
+      "path": "/admin/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-rest</p>"
+        ],
+        "trace": [
+          "mw-root",
+          "mw-a"
+        ]
+      }
+    },
+    {
+      "name": "GET /anything/deep",
+      "path": "/anything/deep",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-rest</p>"
+        ],
+        "trace": [
+          "mw-root",
+          "mw-a"
+        ]
+      }
+    },
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "mw-root"
+        ]
+      }
+    },
+    {
+      "name": "GET /top/new/",
+      "path": "/top/new/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-rest</p>"
+        ],
+        "trace": [
+          "mw-root",
+          "mw-a"
+        ]
+      }
+    },
+    {
+      "name": "GET /plain/",
+      "path": "/plain/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-rest</p>"
+        ],
+        "trace": [
+          "mw-root",
+          "mw-a"
+        ]
+      }
+    },
+    {
+      "name": "HEAD /docs/new",
+      "path": "/docs/new",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "",
+        "trace": [
+          "mw-root",
+          "mw-m"
+        ]
+      }
+    }
+  ]
+}

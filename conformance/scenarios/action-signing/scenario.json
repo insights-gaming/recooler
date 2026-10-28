@@ -1,0 +1,423 @@
+{
+  "name": "action-signing: exact pathname, method and scope binding after chain middleware",
+  "source": "docs/plans/typescript-rewrite.md \u00a73.3/\u00a73.5 D6; second-round N1/N2 probes",
+  "farm": {
+    "action_secret": "conformance-only-test-key"
+  },
+  "ts": {
+    "htmxOptions": {
+      "secret": "conformance-only-test-key"
+    }
+  },
+  "requests": [
+    {
+      "name": "valid own-route action",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 200,
+        "trace": [
+          "chain",
+          "action plain"
+        ],
+        "body": "plain action"
+      }
+    },
+    {
+      "name": "signature removed",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "tamper": "drop-sig"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 200,
+        "trace": [
+          "chain",
+          "action plain"
+        ],
+        "body": "plain action"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "signature altered",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "tamper": "flip-sig"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 200,
+        "trace": [
+          "chain",
+          "action plain"
+        ],
+        "body": "plain action"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "wrong method",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "tamper": "method"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 200,
+        "trace": [
+          "chain"
+        ],
+        "includes": [
+          "<button"
+        ],
+        "traceExcludes": [
+          "action plain",
+          "action scoped",
+          "action get"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "scope tampered",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "tamper": "scope"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 200,
+        "trace": [
+          "chain",
+          "action plain"
+        ],
+        "body": "plain action"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "pathname replay",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "path": "/users/2"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 200,
+        "trace": [
+          "chain",
+          "action plain"
+        ],
+        "body": "plain action"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "scoped signature removed",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 1,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "tamper": "drop-sig"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 403,
+        "trace": [
+          "chain"
+        ],
+        "body": "invalid action scope signature"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "scoped signature altered",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 1,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "tamper": "flip-sig"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 403,
+        "trace": [
+          "chain"
+        ],
+        "body": "invalid action scope signature"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "signed scope tampered",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 1,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "tamper": "scope"
+      },
+      "headers": {
+        "x-auth": "yes",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 403,
+        "trace": [
+          "chain"
+        ],
+        "body": "invalid action scope signature"
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Verify route id, exact pathname, method, action id and scope after chain middleware; a mismatch falls through.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "pathname replay without authentication",
+      "method": "POST",
+      "action": {
+        "page": "/users/1",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        },
+        "path": "/users/2"
+      },
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED",
+        "trace": [
+          "chain"
+        ],
+        "traceExcludes": [
+          "action plain",
+          "action scoped",
+          "action get"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The guard runs before verification and rejects the unauthenticated replay.",
+          "ts": {
+            "status": 401,
+            "body": "BLOCKED",
+            "trace": [
+              "chain"
+            ],
+            "traceExcludes": [
+              "action plain",
+              "action scoped",
+              "action get"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      }
+    }
+  ]
+}
