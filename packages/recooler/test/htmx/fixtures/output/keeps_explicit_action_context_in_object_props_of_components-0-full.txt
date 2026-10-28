@@ -10,14 +10,8 @@ export default function C(props) {
 		ctx,
 		"hx-post": __recooler_actionUrl("src/routes/article/[id]/index.tsx@1", {}, ctx)
 	}} />
-              <a {...{
-		ctx: rc,
-		"hx-post": __recooler_actionUrl("src/routes/article/[id]/index.tsx@2", {}, rc)
-	}} />
-              <Btn {...props} {...{ x: {
-		ctx: rc,
-		"hx-post": __recooler_actionUrl("src/routes/article/[id]/index.tsx@3", {}, rc)
-	} }} />
+              <a {...{ "hx-post": __recooler_actionUrl("src/routes/article/[id]/index.tsx@2", {}, rc) }} />
+              <Btn {...props} {...{ x: { "hx-post": __recooler_actionUrl("src/routes/article/[id]/index.tsx@3", {}, rc) } }} />
             </>;
 }
 export const _action$post$0 = /*#__PURE__*/ __recooler_wrapActionWithPayload((() => 1));

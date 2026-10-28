@@ -1,6 +1,7 @@
-import { contains, isRuntimeVariable, walk } from "./analysis.js";
+import { isRuntimeVariable, walk } from "./analysis.js";
 import type { Analysis, Node, Span, Variable } from "./analysis.js";
-import { attrName, ownerAt } from "./collect.js";
+import { SpanIndex } from "./spans.js";
+import { attrName } from "./collect.js";
 import type { Candidate, Diagnostic, TransformOptions } from "./types.js";
 
 export interface SliceNode {
@@ -44,34 +45,37 @@ export function dynamicImports(analysis: Analysis, node: Node, skip: (n: Node) =
 
 export function sliceModule(analysis: Analysis, candidates: Candidate[], options: TransformOptions, diagnostics: Diagnostic[]): Slice {
   const nodes: SliceNode[] = [];
+  const owners = new SpanIndex(candidates);
+  const expressions = new Set(candidates.map(c => c.expression));
+  const actionsAt = new Map<Node, Candidate[]>();
   const bindings = new Map<Variable, number[]>();
   const roots: Root[] = [];
   const kept = new Set<Node>();
   const onLoadItems = new Set<Node>();
   const onLoadSpecifiers = new Set<Node>();
   const refs = (node: Node): Variable[] => {
-    const owner = ownerAt(candidates, node);
+    const owner = owners.owner(node);
     return [...new Set(analysis.refs(node).filter(r => {
-      const inner = ownerAt(candidates, { start: r.identifier.range[0], end: r.identifier.range[1] });
+      const inner = owners.owner({ start: r.identifier.range[0], end: r.identifier.range[1] });
       return inner === owner;
     }).map(r => r.resolved).filter((v): v is Variable => !!v))];
   };
-  const dynamic = (node: Node) => dynamicImports(analysis, node, n => candidates.some(c => c.expression === n && c.expression !== node));
+  const dynamic = (node: Node) => dynamicImports(analysis, node, n => expressions.has(n) && n !== node);
   const add = (item: Node, node: Node, source?: string): number => {
     const index = nodes.length;
     const nodeRefs = refs(node);
     // The original bodies are moved away. Only scope/context expressions remain
     // at their sites and may keep a module binding alive.
-    for (const c of candidates.filter(c => contains(node, c.expression) && !c.parent)) {
+    const contained = owners.within(node);
+    actionsAt.set(node, contained.filter(c => c.kind === "action" && !c.parent));
+    for (const c of contained.filter(c => !c.parent)) {
       nodeRefs.push(...c.variables);
       if (c.explicitContext) nodeRefs.push(...analysis.refs(c.explicitContext).flatMap(r => r.resolved ? [r.resolved] : []));
     }
     nodes.push({ item, node, refs: nodeRefs, dynamic: dynamic(node), source });
-    for (const v of analysis.variables) {
-      if (v.scope.type === "module" && v.identifiers.some(id => contains(node, { start: id.range[0], end: id.range[1] }))) {
-        const entries = bindings.get(v) ?? [];
-        entries.push(index); bindings.set(v, entries);
-      }
+    for (const v of analysis.moduleVariables(node)) {
+      const entries = bindings.get(v) ?? [];
+      entries.push(index); bindings.set(v, entries);
     }
     return index;
   };
@@ -155,12 +159,16 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
     };
     root.dynamic.forEach(source => report(source, [root.name]));
     // Source order decides ties, as in the reference; BFS determines shortest paths.
-    nodes.forEach((node, index) => {
-      const path = paths.get(index);
-      if (!path) return;
+    for (const index of [...paths.keys()].sort((a, b) => a - b)) {
+      const node = nodes[index]!;
+      const path = paths.get(index)!;
+      for (const action of actionsAt.get(node.node) ?? []) diagnostics.push({
+        severity: "error", code: "action-in-client-slice", start: action.start, end: action.end,
+        message: `${root.description} reaches form action ${action.id} (${action.exportName}) via ${path.join(" → ")}; action URLs require server request context and signing`,
+      });
       node.dynamic.forEach(source => report(source, path));
       if (node.source) report(node.source, path);
-    });
+    }
   }
   return { kept, onLoadItems, onLoadSpecifiers };
 }

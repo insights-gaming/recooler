@@ -1,7 +1,8 @@
 import MagicString from "magic-string";
-import { contains, parseAndAnalyze } from "./analysis.js";
+import { contains, ParseError, parseAndAnalyze, unwrap, walk } from "./analysis.js";
 import type { Analysis, Node, Span, Variable } from "./analysis.js";
-import { collect, ownerAt } from "./collect.js";
+import { SpanIndex } from "./spans.js";
+import { attrKind, attrName, collect, isFunction } from "./collect.js";
 import { emitActionUrl, emitRegistration } from "./codegen.js";
 import { sliceModule, warnOnLoad } from "./slice.js";
 import { handlerOnlyDeclarations } from "./server.js";
@@ -27,8 +28,9 @@ export function transform(code: string, options: TransformOptions): TransformRes
   let analysis: Analysis;
   try { analysis = parseAndAnalyze(code, options.id, options.rawTransfer); }
   catch (error) {
-    diagnostics.push({ severity: "error", code: "parse-error", start: 0, end: 0,
-      message: error instanceof Error ? error.message : String(error) });
+    const errors = error instanceof ParseError ? error.diagnostics : [{ start: 0, end: 0,
+      message: error instanceof Error ? error.message : String(error) }];
+    diagnostics.push(...errors.map(e => ({ ...e, severity: "error" as const, code: "parse-error" })));
     return result();
   }
   const candidates = collect(analysis, options, diagnostics);
@@ -44,15 +46,17 @@ export function transform(code: string, options: TransformOptions): TransformRes
   for (const variable of analysis.variables) names.add(variable.name);
   // Include unresolved references too: an injected import must not shadow a global.
   for (const ref of analysis.references) names.add(ref.identifier.name);
+  const counters = new Map<string, number>();
   const unique = (base: string) => {
-    let name = base, i = 0;
+    let name = base, i = counters.get(base) ?? 0;
     while (names.has(name)) name = `${base}$${++i}`;
-    names.add(name); return name;
+    counters.set(base, i); names.add(name); return name;
   };
   // These are public generated export names. Silently renaming them would break
   // plugin metadata and client registration, so diagnose user collisions.
-  for (const candidate of candidates) if (analysis.variables.some(v => ["module", "global"].includes(v.scope.type) && v.name === candidate.exportName)
-    || analysis.references.some(r => !r.resolved && r.identifier.name === candidate.exportName)) diagnostics.push({
+  const reserved = new Set([...analysis.variables.filter(v => ["module", "global"].includes(v.scope.type)).map(v => v.name),
+    ...analysis.references.filter(r => !r.resolved).map(r => r.identifier.name)]);
+  for (const candidate of candidates) if (reserved.has(candidate.exportName)) diagnostics.push({
     severity: "error", code: "reserved-export", start: candidate.start, end: candidate.end,
     message: `${options.relativePath}: ${candidate.exportName} is reserved for generated htmx exports`,
   });
@@ -65,6 +69,9 @@ export function transform(code: string, options: TransformOptions): TransformRes
   };
   for (const c of candidates) for (const variable of c.variables) c.aliases.set(variable, unique("__recooler_capture"));
   const moved = candidates.filter(c => mode === "client-slice" ? c.kind === "handler" : mode !== "server" || c.kind === "action");
+  const movedSet = new Set(moved);
+  const owners = new SpanIndex(moved);
+  const candidateOwners = new SpanIndex(candidates);
   const dropped: Span[] = [];
   const drop = (start: number, end: number) => { if (start < end) dropped.push({ start, end }); };
 
@@ -103,13 +110,16 @@ export function transform(code: string, options: TransformOptions): TransformRes
         else trimList(decl.declarations, d => !clientOnly.has(d), drop);
       }
     }
+    const clientOwners = new SpanIndex([...clientOnly]);
     for (const item of analysis.program.body) if (item.type === "ImportDeclaration" && item.specifiers.length) {
       const kept = item.specifiers.filter(spec => {
-        const variable = analysis.variables.find(v => v.identifiers.some(id => id.range[0] === spec.local.start));
-        const refs = variable?.references.filter(r => r.isValueReference) ?? [];
-        return refs.some(r => !candidates.some(c => c.kind === "handler"
-          && contains(c.expression, { start: r.identifier.range[0], end: r.identifier.range[1] }))
-          && ![...clientOnly].some(node => analysis.inside(node, r)));
+        const variable = analysis.moduleVariables(spec)[0];
+        const refs = variable?.references.filter(r => analysis.isValueReference(r)) ?? [];
+        return !refs.length || refs.some(r => {
+          const span = { start: r.identifier.range[0], end: r.identifier.range[1] };
+          const owner = candidateOwners.owner(span);
+          return owner?.kind === "action" || (owner?.kind !== "handler" && !clientOwners.owner(span));
+        });
       });
       if (!kept.length) drop(item.start, item.end);
       else if (kept.length !== item.specifiers.length) rewriteImport(ms, code, item, kept);
@@ -119,19 +129,27 @@ export function transform(code: string, options: TransformOptions): TransformRes
 
   // Remove only the gaps around moved subranges. Removing an entire component
   // would also erase the moved handler's original chunks and its mappings.
-  for (const range of dropped) removeExcept(ms, range, moved);
-  const alive = (span: Span) => !dropped.some(d => contains(d, span)
-    && !moved.some(c => contains(d, c) && contains(c, span)));
-  const siteAlive = (c: Candidate) => !dropped.some(d => contains(d, c)
-    && !(mode === "server" && c.kind === "handler" && d.start === c.start && d.end === c.end)
-    && !moved.some(p => p !== c && contains(d, p) && contains(p, c)));
+  const removed: Span[] = [];
+  for (const range of dropped) removeExcept(ms, range, owners.within(range), removed);
+  const removedIndex = new SpanIndex(removed);
+  const alive = (span: Span) => !removedIndex.owner(span);
+  const handlerSites = new Set(candidates.filter(c => c.kind === "handler").map(c => `${c.start}:${c.end}`));
+  const droppedIndex = new SpanIndex(dropped.filter(d => mode !== "server" || !handlerSites.has(`${d.start}:${d.end}`)));
+  const siteAlive = (c: Candidate) => {
+    const d = droppedIndex.owner(c);
+    if (!d) return true;
+    const parent = owners.owner({ start: c.start, end: c.end });
+    // The candidate's own hoisted body doesn't preserve its original site.
+    if (parent === c) return !!c.parent && movedSet.has(c.parent) && contains(d, c.parent);
+    return !!parent && contains(d, parent);
+  };
 
   // Rename resolved captures, including shorthand object references, before
   // moving any text. The closest moved function owns a reference.
   for (const ref of analysis.references) {
     const span = { start: ref.identifier.range[0], end: ref.identifier.range[1] };
     if (!alive(span)) continue;
-    const owner = ownerAt(moved, span);
+    const owner = owners.owner(span);
     const alias = ref.resolved && owner?.aliases.get(ref.resolved);
     if (!alias) continue;
     const node = ref.identifier as unknown as Node;
@@ -143,7 +161,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
   }
   const valueAtSite = (variable: Variable, c: Candidate) => {
     for (let parent = c.parent; parent; parent = parent.parent) {
-      if (moved.includes(parent) && parent.aliases.has(variable)) return parent.aliases.get(variable)!;
+      if (movedSet.has(parent) && parent.aliases.has(variable)) return parent.aliases.get(variable)!;
     }
     return variable.name;
   };
@@ -155,7 +173,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
       // the value is an expression when it is reused as the URL override.
       if (c.explicitContext.type === "Identifier") {
         const ref = analysis.referenceAt.get(c.explicitContext.start);
-        const owner = ownerAt(moved, c.explicitContext);
+        const owner = owners.owner(c.explicitContext);
         return (ref?.resolved && owner?.aliases.get(ref.resolved)) || c.explicitContext.name;
       }
       return ms.slice(c.explicitContext.start, c.explicitContext.end);
@@ -171,7 +189,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
       const param = firstParam(c.component);
       if (!param) return;
       const pat = param.type === "AssignmentPattern" ? param.left : param;
-      if (pat.type === "Identifier") return `${pat.name}.ctx`;
+      if (pat.type === "Identifier") return `${pat.name}?.ctx`;
       if (pat.type === "RestElement" && pat.argument.type === "Identifier") return `${pat.argument.name}[0]?.ctx`;
       let props = components.get(c.component);
       if (!props) { props = unique("__recooler_props"); components.set(c.component, props); }
@@ -179,6 +197,19 @@ export function transform(code: string, options: TransformOptions): TransformRes
     }
   };
   for (const c of candidates) if (c.kind === "action" && siteAlive(c)) c.context = contextFor(c);
+  // Only a direct object spread into a component passes ctx through. Nested
+  // object props with actions consume ctx here, before it can leak into props.
+  walk(analysis.program, node => {
+    if (node.type !== "ObjectExpression" || !alive(node)) return;
+    if (!node.properties.some(p => p.type === "Property" && attrKind(attrName(p.key, p.computed))
+      && attrKind(attrName(p.key, p.computed)) !== "handler" && isFunction(unwrap(p.value)))) return;
+    const parent = analysis.parents.get(node);
+    const opening = parent && analysis.parents.get(parent);
+    if (parent?.type === "JSXSpreadAttribute" && opening?.type === "JSXOpeningElement"
+      && !(opening.name.type === "JSXIdentifier" && /^[a-z]/.test(opening.name.name))) return;
+    trimList(node.properties, p => !(p.type === "Property" && attrName(p.key, p.computed) === "ctx"),
+      (start, end) => ms.remove(start, end));
+  });
   for (const [fn, props] of components) rewriteProps(ms, fn, props);
   for (const c of moved) if (c.addContext) addFirstParam(ms, code, c.fn, c.addContext);
 
@@ -198,7 +229,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
       }
       ms.appendLeft(c.start, replacement);
     }
-    if (!moved.includes(c)) continue;
+    if (!movedSet.has(c)) continue;
     const factory = c.variables.length ? `({ ${c.variables.map(v => `${JSON.stringify(v.name)}: ${c.aliases.get(v)}`).join(", ")} }) => ` : "";
     let prefix = `\nexport const ${c.exportName} = `, suffix = ";\n";
     if (c.kind === "action") {
@@ -282,13 +313,13 @@ function trimList<T extends Span>(parts: readonly T[], keep: (part: T) => boolea
   }
 }
 
-function removeExcept(ms: MagicString, range: Span, protectedRanges: Span[]): void {
+function removeExcept(ms: MagicString, range: Span, protectedRanges: Span[], removed: Span[]): void {
   const protectedParts = protectedRanges.filter(p => contains(range, p))
     .sort((a, b) => a.start - b.start || b.end - a.end);
   let cursor = range.start;
   for (const part of protectedParts) {
-    if (part.start > cursor) ms.remove(cursor, Math.min(part.start, range.end));
+    if (part.start > cursor) { ms.remove(cursor, part.start); removed.push({ start: cursor, end: part.start }); }
     cursor = Math.max(cursor, part.end);
   }
-  if (cursor < range.end) ms.remove(cursor, range.end);
+  if (cursor < range.end) { ms.remove(cursor, range.end); removed.push({ start: cursor, end: range.end }); }
 }

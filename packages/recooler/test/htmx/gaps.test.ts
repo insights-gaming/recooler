@@ -10,7 +10,7 @@ describe('0.0.27 gaps', () => {
     expect(result.actions[0]?.captures).toEqual(['n']);
     expect(result.handlers[0]?.captures).toEqual(['n']);
     expect(parseSync('test.tsx', result.code).errors).toEqual([]);
-    const error = transform(`const props = { [attribute]: () => 1 };`, options);
+    const error = transform(`const props = <i {...{ [attribute]: () => 1 }} />;`, options);
     expect(error.diagnostics.map(e => e.code)).toEqual(['computed-handler-key']);
   });
   it('rejects actions nested in event handlers in JSX and object forms', () => {

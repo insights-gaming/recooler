@@ -28,7 +28,10 @@ map retains the supplied `id` as its source and embeds the original content.
 Each entry has `id`, `exportName`, sorted original capture names, and original
 `start`/`end` offsets; actions also have a lowercase HTTP `method`. IDs are
 `${relativePath}@${index.toString(36)}`, with separate preorder action and handler
-counters. Export names retain decimal counters (`_action$post$36`, `_handler$36`).
+counters. ESTree visitor order differs from SWC in two cases: class `extends`
+actions precede body actions here (Rust visits the body first), and `do…while`
+body actions precede test actions here (the oracle visits the test first). These
+orders are intentional; no compatibility special cases are applied. Export names retain decimal counters (`_action$post$36`, `_handler$36`).
 Callers supply the same project-relative path in every variant. No route pathname
 is needed, and the transform does not normalize or URL-encode this identity.
 
@@ -42,14 +45,23 @@ reserved at module scope; injected helpers, captures and props are collision-fre
 - `full` (default): retain source code, export actions and handlers, and register
   the module's actions. Useful for tests and inspection.
 - `server`: retain action exports and rendered handler strings, remove handler
-  bodies, and prune their imports. Private declarations reachable exclusively
-  from handlers are removed transitively, including their initializers. Exports,
-  shared server uses and standalone side effects keep their dependencies alive.
-  Explicit side-effect imports are retained.
+  bodies, and prune their imports. Drop a specifier only when it has value
+  references and all of them are in removed client code. Imports with no value
+  references (including JSX pragmas and metadata types) and explicit side-effect
+  imports stay. Private handler-only declarations are removed only when evaluation
+  is side-effect free: literals, functions, arrows, and classes without static
+  blocks, decorators, effectful static fields, computed keys or extends. Possibly
+  effectful initializers, destructuring, exports and shared server uses stay and
+  keep their dependencies. Hoisted action bodies are always server roots.
 - `client-slice`: keep handler exports and their breadth-first dependency closure;
   trim partial imports/declarators and type-only imports; remove server code,
   unrelated exports and standalone side effects. Each slice assigns its own
   functions to `globalThis.$handlers`, creating the table if necessary.
+  A retained action site is an `action-in-client-slice` build error naming the
+  handler (or `onLoad`), action and dependency chain: D3 ambient request context
+  and D6 signing need the server. Valid slices contain neither action bodies nor
+  server runtime helpers. Error results retain the original source for reporting
+  and must never be emitted by the caller.
 
 Set `moduleKind: "route"` to keep `onLoad` and its dependency closure, including
 declarations, local aliases, re-exports and namespace re-exports. `layout` and
@@ -66,7 +78,8 @@ expressions, not glob patterns; `/g` and `/y` flags do not make matching statefu
 The separately exported `moduleIdForms`, `isBannedModule` and `bannedClientModules`
 provide the resolved client-graph check for the bundler adapter. Match resolved
 paths there, ignoring queries and also checking the path after the last
-`node_modules` segment. `bannedClientModules` accepts an adjacency map in import
+`node_modules` segment. Only complete path segments match: `my_node_modules`
+is deliberately treated as an ordinary directory, unlike Rust's substring match. `bannedClientModules` accepts an adjacency map in import
 order and reports shortest module chains, including disconnected banned modules.
 The adapter still has to supply the actual bundle graph and reject the results.
 
@@ -80,6 +93,10 @@ actionUrl(id, { capturedName: capturedValue }, optionalContext)
 
 The runtime owns ambient request context, absolute URLs, mounts, route parameter
 encoding (including catch-all segments), scope serialization/signing and expiry.
+The runtime phase must port the route/action URL tests for `%40`,
+`encodeURIComponent(param)`, catch-all splitting, and parameter names `user-id`,
+`a$b` and `口`. The transform emits identities and scope objects, not encoding;
+the normalized route fixtures here do not verify runtime URL behavior.
 `actionScope` is a lower-level runtime contract; the transform passes scope objects
 to `actionUrl` instead of concatenating its query fragments itself.
 
@@ -89,19 +106,28 @@ parameter, adding one when needed and skipping a TypeScript `this` parameter.
 Destructured action contexts fall back to ambient context unless explicitly passed.
 
 For 0.0.27 compatibility, `componentContext` defaults to `true`: an outer component's
-first props parameter supplies `props.ctx` when present. Destructured/rest props
+first props parameter supplies `props?.ctx` when present. Destructured/rest props
 are rewritten, preserving defaults and annotations; missing props/ctx falls back
 to ambient context. Set it to `false` to remove this heuristic and its parameter
 rewriting. Explicit `ctx` and enclosing action contexts still work in that mode.
 Unlike the old transform, missing component context is not a compile error.
 
-`ctx` attributes, object props and JSX spreads remain for the JSX runtime to filter
-Hono Context values when rendering intrinsic elements. There is no `omitCtx` call.
+`ctx` attributes and arbitrary JSX spreads remain for the JSX runtime to filter
+Hono Context values when rendering intrinsic elements. Object literals with
+function actions consume their explicit `ctx`, including nested object props;
+only a direct object spread onto a component retains it for that component.
+There is no `omitCtx` call.
 
 Captured values use scope factories. Their object keys retain the source binding
 names; factory locals and references receive unique names so hoisting cannot
 introduce shadowing. Local functions/classes cannot be serialized and produce
-build errors. `wrapAction` is used for GET; other methods use
+build errors. Parenthesized, `as`, and `satisfies` functions are recognized too,
+unlike Rust's bare-function matching. Local TS enums may be captured and serialized
+as plain data (including their emitted numeric reverse mappings), fixing Rust's
+missing enum captures. Type-only references, including `typeof` type queries,
+never create captures or client dependencies. Arrow actions and handlers using
+lexical `this` or `arguments` produce build errors rather than changing meaning
+when hoisted. `wrapAction` is used for GET; other methods use
 `wrapActionWithPayload`. Captured actions pass their ID as the second wrapper
 argument, preserving the existing runtime factory contract. Handlers use
 `handlerScope` to embed their captured values into the attribute's invocation.
@@ -148,5 +174,12 @@ pnpm --filter recooler exec node test/htmx/benchmark.mjs
 Tests cover exact original line/column mappings through nested hoists and capture
 renames in all modes, normalized reference outputs, imports and reference chains,
 actual output execution with a stub runtime, and the playground TSX corpus.
+`performance.test.ts` compares median interleaved 1,000/8,000-line transforms in
+each mode, with a ratio bound rather than a machine-dependent time bound. Sorted
+reference/binding indexes, interval owners, graph reachability and per-base alias
+counters avoid repeated whole-module scans. `scripts/transform-corpus.mjs <dir>`
+reads every `.ts`/`.tsx` module in all three modes and reports diagnostic kinds,
+re-parse failures and timings as JSON; keep external corpus reports outside the
+repository. Build the package before running it.
 The benchmark separately measures parsing, scope analysis, their combined cost,
 the indexed frontend, and the full transform with a source map.

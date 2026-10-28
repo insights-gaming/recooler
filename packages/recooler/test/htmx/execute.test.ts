@@ -101,7 +101,7 @@ it('preserves shorthand capture keys in assignment defaults and ctx overrides', 
   expect(runtime.calls).toEqual([]);
   module.default({ count: 1, ctx: 'serializable-test-context' });
   const value = module['_action$post$0']({ scope: { count: 1, ctx: 'serializable-test-context' } });
-  expect(value.ctx).toBe('serializable-test-context');
+  expect(value.ctx).toBeUndefined();
   expect(runtime.calls[1]).toEqual({ id: 'test.tsx@1', scope: { count: 9 }, ctx: 'serializable-test-context' });
 });
 
@@ -126,4 +126,37 @@ it('escapes handler IDs in template literals, including quotes and backslashes',
   const element = module.default({ count: 5 });
   const run = new Function('$handlers', 'event', `return ${element.props['hx-on:click']}`);
   expect(run({ [result.handlers[0]!.id]: module['_handler$0'] }, {})).toBe(5);
+});
+
+for (const mode of ['full', 'server'] as const) it(`renders nullish optional props using ambient context: ${mode}`, async () => {
+  const { module, runtime } = await execute(`export default function Actions(opts?) { return <button hx-post={() => 1} />; }`, { mode });
+  expect(() => module.default()).not.toThrow();
+  expect(() => module.default(null)).not.toThrow();
+  expect(runtime.calls.map((c: { ctx: unknown }) => c.ctx)).toEqual([undefined, undefined]);
+});
+
+it('serializes local TS enums as plain captured data', async () => {
+  const { module, runtime } = await execute(`export default function Page() {
+    enum Status { Ready = 1, Done = 'done' }
+    return <i hx-post={() => Status.Ready} hx-on:click={() => Status.Done} />;
+  }`);
+  const element = module.default();
+  const captured = { '1': 'Ready', Ready: 1, Done: 'done' };
+  expect(runtime.calls[0].scope).toEqual({ Status: captured });
+  expect(module['_action$post$0']({ scope: { Status: captured } })).toBe(1);
+  const run = new Function('$handlers', 'event', `return ${element.props['hx-on:click']}`);
+  expect(run({ 'test.tsx@0': module['_handler$0'] }, {})).toBe('done');
+});
+
+it('consumes nested object ctx while preserving direct component spread props', async () => {
+  const { module, runtime } = await execute(`export default function Page(props) {
+    const rc = props.ctx;
+    return <Btn {...{ ctx: rc, 'hx-post': () => 1, x: { ctx: rc, 'hx-post': () => 2 } }} />;
+  }
+  function Btn() {}`);
+  const rc = { request: true };
+  const value = module.default({ ctx: rc });
+  expect(value.props.ctx).toBe(rc);
+  expect(value.props.x.ctx).toBeUndefined();
+  expect(runtime.calls.map((c: { ctx: unknown }) => c.ctx)).toEqual([rc, rc]);
 });

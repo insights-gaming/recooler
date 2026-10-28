@@ -22,7 +22,9 @@ export default function Page({ count }) {
 }`;
   const result = transform(input, { id: 'page.tsx', relativePath: 'page.tsx', moduleKind: 'route', mode });
   expect(result.diagnostics).toEqual([]);
-  const map = new TraceMap(JSON.parse(result.map.toString()));
+  const rawMap = JSON.parse(result.map.toString());
+  expect(rawMap.sourcesContent).toEqual([input]);
+  const map = new TraceMap(rawMap);
   const check = (generated: string, original: string, originalOffset = 0) => {
     const offset = result.code.indexOf(generated);
     expect(offset, result.code).toBeGreaterThanOrEqual(0);
@@ -44,4 +46,28 @@ export default function Page({ count }) {
     const alias = result.code.match(/"handler body", (__recooler_capture[^)]*)\)/)![1]!;
     check(`${alias});`, '"handler body", count', '"handler body", '.length);
   }
+});
+
+it('maps moved destructured props and retained import specifiers', () => {
+  const input = `import { browser, shared } from './lib';
+export default function Page({ count }: RouteProps) {
+  shared();
+  return <i hx-post={() => count} hx-on:click={() => browser(count)} />;
+}`;
+  const result = transform(input, { id: 'props.tsx', relativePath: 'props.tsx', mode: 'server' });
+  expect(result.diagnostics).toEqual([]);
+  expect(result.code).toContain('import { shared }');
+  expect(result.code).toContain('__recooler_props: RouteProps');
+  const rawMap = JSON.parse(result.map.toString());
+  expect(rawMap.sourcesContent).toEqual([input]);
+  const map = new TraceMap(rawMap);
+  for (const [generated, original] of [['{ count }', '{ count }'], ['RouteProps', 'RouteProps'], ["'./lib'", "'./lib'"], ['shared();', 'shared();']]) {
+    const offset = result.code.indexOf(generated!);
+    expect(offset).toBeGreaterThanOrEqual(0);
+    expect(originalPositionFor(map, position(result.code, offset))).toMatchObject({ source: 'props.tsx', ...position(input, input.indexOf(original!)) });
+  }
+  // Rebuilt import syntax/specifiers are generated text anchored to the original
+  // import statement; its untouched source literal retains an exact mapping.
+  const importOffset = result.code.indexOf('shared }');
+  expect(originalPositionFor(map, position(result.code, importOffset))).toMatchObject({ source: 'props.tsx', line: 1, column: 0 });
 });

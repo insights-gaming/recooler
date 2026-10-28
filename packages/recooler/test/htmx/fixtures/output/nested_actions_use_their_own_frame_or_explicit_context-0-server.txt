@@ -2,7 +2,7 @@ import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_
 export default function C(props) {
 	return <>
             <a ctx={props.ctx} hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", {}, props.ctx)} />
-            <p hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@3", {}, props.ctx)} />
+            <p hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@3", {}, props?.ctx)} />
           </>;
 }
 export const _action$post$2 = /*#__PURE__*/ __recooler_wrapActionWithPayload((() => 1));

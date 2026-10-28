@@ -1,10 +1,12 @@
-import { children, contains, unwrap } from "./analysis.js";
+import { children, unwrap } from "./analysis.js";
 import type { Analysis, Node } from "./analysis.js";
 import type { ActionMethod, Candidate, Diagnostic, FunctionNode, TransformOptions } from "./types.js";
 
-export function attrName(node: Node): string | undefined {
+export function attrName(node: Node, computed = false): string | undefined {
+  if (computed && node.type === "Identifier") return;
   if (node.type === "Identifier" || node.type === "JSXIdentifier") return node.name;
   if (node.type === "JSXNamespacedName") return `${node.namespace.name}:${node.name.name}`;
+  if (node.type === "TemplateLiteral" && !node.expressions.length) return node.quasis[0]?.value.cooked ?? undefined;
   if (node.type === "Literal" && typeof node.value === "string") return node.value;
 }
 
@@ -44,11 +46,11 @@ export function collect(analysis: Analysis, options: TransformOptions, diagnosti
       captures: [], variables: [], aliases: new Map(),
     };
     candidates.push(item);
-    if (item.kind === "handler" && fn.type === "ArrowFunctionExpression") {
+    if (fn.type === "ArrowFunctionExpression") {
       const used = lexicalBindings(fn, analysis);
-      for (const binding of used) error(fn, "lexical-handler-binding",
-        `event handler ${item.id} is an arrow function that uses \`${binding}\`, which arrow functions don't bind; ${binding === "this"
-          ? "use a `function` expression to get the element as `this`, or `event.currentTarget`"
+      for (const binding of used) error(fn, `lexical-${item.kind}-binding`,
+        `${item.kind === "handler" ? "event handler" : "form action"} ${item.id} is an arrow function that uses \`${binding}\`, which arrow functions don't bind; ${binding === "this"
+          ? item.kind === "handler" ? "use a `function` expression to get the element as `this`, or `event.currentTarget`" : "use an explicit parameter instead"
           : "use a rest parameter, e.g. `(...args) => ...`"}`);
     }
     for (const child of children(fn)) visit(child, { ...state, parent: item, inHandler: item.kind === "handler" });
@@ -76,14 +78,17 @@ export function collect(analysis: Analysis, options: TransformOptions, diagnosti
       return;
     }
     if (node.type === "ObjectExpression") {
-      const ctx = node.properties.find(p => p.type === "Property" && attrName(p.key) === "ctx");
+      const ctx = node.properties.find(p => p.type === "Property" && attrName(p.key, p.computed) === "ctx");
       const context = ctx?.type === "Property" ? ctx.value : undefined;
+      const parent = analysis.parents.get(node);
+      const htmxPosition = parent?.type === "JSXSpreadAttribute" || (parent?.type === "JSXExpressionContainer" && analysis.parents.get(parent)?.type === "JSXAttribute")
+        || node.properties.some(p => p.type === "Property" && attrName(p.key, p.computed)?.replace(/^data-/, "").startsWith("hx-"));
       for (const prop of node.properties) {
         if (prop.type === "Property" && prop.kind === "init" && !prop.method) {
-          if (prop.computed && prop.key.type !== "Literal" && isFunction(unwrap(prop.value))) {
+          if (htmxPosition && prop.computed && prop.key.type !== "Literal" && attrName(prop.key, true) === undefined && isFunction(unwrap(prop.value))) {
             error(prop.key, "computed-handler-key", "computed function property keys must be string literals so htmx attributes can be identified");
           }
-          const kind = attrKind(attrName(prop.key));
+          const kind = attrKind(attrName(prop.key, prop.computed));
           if (kind && isFunction(unwrap(prop.value))) { candidate(prop.value, kind, state, context); continue; }
         }
         visit(prop, state);
@@ -108,14 +113,10 @@ function lexicalBindings(fn: FunctionNode, analysis: Analysis): ("this" | "argum
     }
     if (node.type === "ThisExpression") thisUsed = true;
     if (node.type === "Identifier" && node.name === "arguments"
-      && analysis.referenceAt.get(node.start)?.isValueReference) argumentsUsed = true;
+      && (() => { const ref = analysis.referenceAt.get(node.start); return ref && analysis.isValueReference(ref); })()) argumentsUsed = true;
     for (const child of children(node)) visit(child);
   }
   visit(fn);
   return [...(thisUsed ? ["this" as const] : []), ...(argumentsUsed ? ["arguments" as const] : [])];
 }
 
-/** The moved body that owns a source position (nested bodies become separate exports). */
-export function ownerAt(candidates: Candidate[], node: { start: number; end: number }): Candidate | undefined {
-  return candidates.filter(c => contains(c.expression, node)).at(-1);
-}

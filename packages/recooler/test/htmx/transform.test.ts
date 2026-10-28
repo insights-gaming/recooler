@@ -19,7 +19,7 @@ describe("transform", () => {
     expect(parseSync(options.id, result.code).errors, result.code).toEqual([]);
     if (mode === "server") {
       expect(result.code).not.toContain("export const _handler$");
-      expect(result.code).not.toContain("from './browser'");
+      expect(result.code).toContain("import { unused } from './browser'");
     } else expect(result.code).toContain("export const _handler$0");
     if (mode === "client-slice") {
       expect(result.code).not.toContain("./db");

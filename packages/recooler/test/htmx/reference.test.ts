@@ -81,3 +81,28 @@ it('preserves the reference negative banned-import and non-route onLoad cases', 
   const source = fixtures.find(f => f.name === 'slices_on_load_without_event_handlers')!.inputs[0]!;
   expect(transform(source, { id: relativePath, relativePath, mode: 'client-slice', moduleKind: 'component' }).code.trim()).toBe('');
 });
+
+// These are raw transform assertions: lowering with transformWithOxc erases
+// types and unused imports, so normalized snapshots cannot enforce them.
+it('preserves the raw Rust slice import and type contracts', () => {
+  const run = (name: string) => transform(fixtures.find(f => f.name === name)!.inputs[0]!, {
+    id: relativePath, relativePath, mode: 'client-slice', moduleKind: 'route',
+  }).code;
+  const captured = run('slices_handlers_with_captured_scope');
+  expect(captured).toContain('import { fmt } from "./fmt";');
+  expect(captured).not.toContain('./db');
+  const types = run('slices_out_type_only_imports');
+  expect(types).toContain('import { c } from "./b";');
+  for (const token of ['./a', 'type B', './d']) expect(types).not.toContain(token);
+  const partial = run('slices_partially_used_import_declarations');
+  for (const line of ['import { a, c as d } from "./m";', 'import def from "./n";', 'import * as ns from "./o";', 'import f from "./p";']) expect(partial).toContain(line);
+  const closure = run('slices_handler_helpers_and_drops_server_code');
+  for (const token of ['faunadb', 'fql', 'admin-action', './Button', 'styles.css', 'interface Props', 'defaultMultipliers', 'side effect', 'ManageMultipliersButton', '_action$']) expect(closure).not.toContain(token);
+});
+
+it('preserves raw props and this parameter annotations', () => {
+  const run = (source: string) => transform(source, { id: relativePath, relativePath }).code;
+  expect(run('export default function C({ id }: RouteProps) { return <i hx-post={() => id} />; }')).toContain('__recooler_props: RouteProps');
+  const source = 'export default function C() { return <i hx-post={function (this: unknown) { return 1; }} hx-on:click={function (this: unknown) { return 2; }} />; }';
+  expect(run(source).match(/this: unknown/g)).toHaveLength(2);
+});

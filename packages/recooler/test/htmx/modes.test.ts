@@ -10,7 +10,7 @@ const check = (source: string, override: Partial<TransformOptions> = {}) => {
   return result;
 };
 
-it('drops direct and transitive handler-only imports on the server', () => {
+it('drops pure handler-only declarations and retains effectful initializers on the server', () => {
   const result = check(`
     import { browser } from 'browser-only';
     import { shared, usedByServer } from 'shared';
@@ -21,8 +21,8 @@ it('drops direct and transitive handler-only imports on the server', () => {
     export function serverApi() { return usedByServer(); }
     export default function Page() { return <b hx-on:click={() => [helper(), unusedClientHelper()]} />; }
   `, { mode: 'server' });
-  expect(result.code).not.toContain('browser-only');
-  expect(result.code).not.toContain('const state');
+  expect(result.code).toContain('browser-only');
+  expect(result.code).toContain('const state = browser.create();');
   expect(result.code).not.toContain('const helper');
   expect(result.code).not.toContain('unusedClientHelper');
   expect(result.code).not.toContain('export const _handler$');

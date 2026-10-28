@@ -1,5 +1,6 @@
 import { parseSync, rawTransferSupported, visitorKeys } from "oxc-parser";
 import type { Node, ParserOptions, Program } from "oxc-parser";
+import { lowerBound } from "./spans.js";
 import { analyze } from "@typescript-eslint/scope-manager";
 import type { Reference, ScopeManager, Variable } from "@typescript-eslint/scope-manager";
 
@@ -19,7 +20,9 @@ export function parseAndAnalyze(code: string, id: string, rawTransfer = true): A
   };
   const parsed = parseSync(id.split("?")[0]!, code, options);
   if (parsed.errors.length) {
-    throw new SyntaxError(parsed.errors.map(e => `${id}: ${e.message}`).join("\n"));
+    throw new ParseError(parsed.errors.map(e => ({
+      message: `${id}: ${e.message}`, start: e.labels[0]?.start ?? 0, end: e.labels[0]?.end ?? 0,
+    })));
   }
   const program = parsed.program;
   const scopes = analyze(program as unknown as Parameters<typeof analyze>[0], {
@@ -70,8 +73,17 @@ export function isRuntimeVariable(variable: Variable): boolean {
   });
 }
 
+export class ParseError extends SyntaxError {
+  constructor(readonly diagnostics: { message: string; start: number; end: number }[]) {
+    super(diagnostics.map(d => d.message).join("\n"));
+  }
+}
+
 export class Analysis {
   readonly references: Reference[];
+  private readonly valueReferences: Reference[];
+  private readonly valueSet: Set<Reference>;
+  private readonly moduleBindings: { start: number; end: number; variable: Variable }[];
   readonly parents = new Map<Node, Node>();
   readonly variables: Variable[];
   readonly referenceAt = new Map<number, Reference>();
@@ -80,11 +92,38 @@ export class Analysis {
       .sort((a, b) => a.identifier.range[0] - b.identifier.range[0]);
     this.variables = scopes.scopes.flatMap(scope => scope.variables);
     for (const ref of this.references) this.referenceAt.set(ref.identifier.range[0], ref);
-    walk(program, node => { for (const child of children(node)) this.parents.set(child, node); });
+    const typeNodes = new Set<Node>();
+    walk(program, node => {
+      for (const child of children(node)) {
+        this.parents.set(child, node);
+        // TS expression wrappers have runtime expressions; their annotations do not.
+        if (typeNodes.has(node) || (node.type.startsWith("TS")
+          && !["TSAsExpression", "TSSatisfiesExpression", "TSNonNullExpression", "TSTypeAssertion",
+            "TSInstantiationExpression", "TSEnumDeclaration", "TSEnumBody", "TSEnumMember",
+            "TSModuleDeclaration", "TSModuleBlock", "TSImportEqualsDeclaration", "TSExportAssignment",
+            "TSParameterProperty"].includes(node.type))) typeNodes.add(child);
+      }
+    });
+    this.valueReferences = this.references.filter(ref => ref.isValueReference && !typeNodes.has(ref.identifier as unknown as Node));
+    this.valueSet = new Set(this.valueReferences);
+    this.moduleBindings = this.variables.filter(v => v.scope.type === "module").flatMap(variable =>
+      variable.identifiers.map(id => ({ start: id.range[0], end: id.range[1], variable })))
+      .sort((a, b) => a.start - b.start);
+
   }
 
   refs(node: Span): Reference[] {
-    return this.references.filter(ref => ref.isValueReference && this.inside(node, ref));
+    const start = lowerBound(this.valueReferences, node.start, ref => ref.identifier.range[0]);
+    const end = lowerBound(this.valueReferences, node.end, ref => ref.identifier.range[0]);
+    return this.valueReferences.slice(start, end).filter(ref => this.inside(node, ref));
+  }
+
+  isValueReference(ref: Reference): boolean { return this.valueSet.has(ref); }
+
+  moduleVariables(node: Span): Variable[] {
+    const start = lowerBound(this.moduleBindings, node.start, binding => binding.start);
+    const end = lowerBound(this.moduleBindings, node.end, binding => binding.start);
+    return [...new Set(this.moduleBindings.slice(start, end).filter(b => contains(node, b)).map(b => b.variable))];
   }
 
   inside(node: Span, ref: Reference): boolean {

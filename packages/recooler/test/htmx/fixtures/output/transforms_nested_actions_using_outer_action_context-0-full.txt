@@ -1,7 +1,7 @@
 import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
 export default function C(props) {
 	const a = props.a;
-	return <button hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", { "a": a }, props.ctx)} />;
+	return <button hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", { "a": a }, props?.ctx)} />;
 }
 export const _action$post$1 = /*#__PURE__*/ __recooler_wrapActionWithPayload(({ "a": __recooler_capture$1 }) => (() => f(__recooler_capture$1)), "src/routes/article/[id]/index.tsx@1");
 export const _action$post$0 = /*#__PURE__*/ __recooler_wrapActionWithPayload(({ "a": __recooler_capture }) => ((__recooler_ctx) => <i hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@1", { "a": __recooler_capture }, __recooler_ctx)} />), "src/routes/article/[id]/index.tsx@0");
