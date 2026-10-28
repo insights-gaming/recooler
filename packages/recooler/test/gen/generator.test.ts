@@ -164,8 +164,6 @@ it('watches additions, removals and root changes using fs.watch', async () => {
   const results: string[] = [], errors: unknown[] = [];
   const watcher = await watchRoutes({ cwd, onResult: result => results.push(result.code), onError: error => errors.push(error) });
   try {
-    // fs.watch has no ready event; allow the native watcher stream to enroll before mutating.
-    await new Promise(resolve => setTimeout(resolve, 100));
     await put(cwd, 'src/routes/hello/index.ts', handler);
     await vi.waitFor(() => expect(results.at(-1)).toContain('routes/hello/index'), { timeout: 3000 });
     await put(cwd, 'src/root.tsx', 'export default Root;');
@@ -180,7 +178,6 @@ it('regenerates in watch mode without callbacks', async () => {
   const cwd = await fixture();
   const watcher = await watchRoutes({ cwd });
   try {
-    await new Promise(resolve => setTimeout(resolve, 100));
     await put(cwd, 'src/routes/index.ts', handler);
     await vi.waitFor(async () => expect(await readFile(path.join(cwd, 'src/routes.gen.ts'), 'utf8')).toContain('routes/index'), { timeout: 3000 });
   } finally { await watcher.close(); }
@@ -299,8 +296,6 @@ it('watches routes outside a missing srcDir and notices a later root', async () 
   const results: string[] = [];
   const watcher = await watchRoutes({ cwd, routesDir: 'api', out: 'generated/routes.ts', onResult: result => results.push(result.code) });
   try {
-    // macOS fs.watch enrolls asynchronously and has no ready event.
-    await new Promise(resolve => setTimeout(resolve, 100));
     await put(cwd, 'src/root.tsx', 'export const head = {};');
     await vi.waitFor(() => expect(results.at(-1)).toContain('rootFile: "root.tsx"'), { timeout: 3000 });
     await put(cwd, 'api/added/index.ts', handler);
@@ -336,7 +331,7 @@ it('starts a real Vite 8 dev server with invalid routes, revalidates edits, and 
   const server = await createServer({
     root: cwd, configFile: false, customLogger: logger, plugins: [routes({ importExtension: '.js' })],
     resolve: { alias: { 'recooler/router': fileURLToPath(new URL('../../src/router/index.ts', import.meta.url)) } },
-    server: { port: 0, host: '127.0.0.1', watch: { usePolling: true, interval: 30 } },
+    server: { port: 0, host: '127.0.0.1', watch: { usePolling: true, interval: 100 } },
   });
   try {
     await server.listen();
@@ -344,11 +339,34 @@ it('starts a real Vite 8 dev server with invalid routes, revalidates edits, and 
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('has no default export'));
     await expect(server.ssrLoadModule('/src/entry.ts')).rejects.toThrow('has no default export');
     errors.mockClear();
+    const changes: string[] = [];
+    const recordChange = (file: string) => changes.push(file);
+    server.watcher.on('change', recordChange);
     await put(cwd, 'src/routes/middleware.ts', middleware);
-    const loaded = await vi.waitFor(async () => server.ssrLoadModule('/src/entry.ts'), { timeout: 5000 });
+    // Poll at 100 ms to exceed Chokidar's 50 ms change-event throttle.
+    // SSR can read the repaired file before the polling watcher observes it.
+    // Wait for that observation before restoring the original invalid contents.
+    await vi.waitFor(() => expect(changes.some(file => file.endsWith('/src/routes/middleware.ts'))).toBe(true), { timeout: 10000 });
+    server.watcher.off('change', recordChange);
+    const loaded = await vi.waitFor(async () => server.ssrLoadModule('/src/entry.ts'), { timeout: 10000 });
     expect((await loaded.default.request('/')).status).toBe(200);
     await put(cwd, 'src/routes/middleware.ts', 'export const guard = () => {};');
-    await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('has no default export')), { timeout: 5000 });
+    await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('has no default export')), { timeout: 10000 });
   } finally { await server.close(); }
   expect(server.watcher.listeners('change')).toHaveLength(0);
+}, 30000);
+
+
+it.each(['[id{[0-9+}]', '[a{}]', '[[r{x}]]'])('validates %s in generate and --check without writing', async segment => {
+  const cwd = await fixture({ [`src/routes/${segment}/index.ts`]: handler });
+  for (const check of [false, true]) {
+    await expect(generateRoutes({ cwd, check })).rejects.toThrow(`routes/${segment}/index.ts`);
+  }
+  await expect(stat(path.join(cwd, 'src/routes.gen.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+it.each(['100%', 'a#b', 'a?b'])('suggests renaming a non-portable literal directory %s', async segment => {
+  const cwd = await fixture({ [`src/routes/${segment}/index.ts`]: handler });
+  await expect(generateRoutes({ cwd })).rejects.toThrow('rename the directory');
+  await expect(generateRoutes({ cwd })).rejects.not.toThrow('digit patterns');
 });

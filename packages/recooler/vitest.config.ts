@@ -9,7 +9,7 @@ export default defineConfig({
         resolve: { alias: [{ find: /^hono$/, replacement: require.resolve(pkg!) }] },
         test: { name, include: ['test/router/**/*.test.ts'] },
       })),
-      { test: { name: 'gen', include: ['test/gen/**/*.test.ts'] } },
+      { test: { name: 'gen', testTimeout: 30000, include: ['test/gen/**/*.test.ts'] } },
       { test: { name: 'recooler', include: ['test/**/*.test.ts'], exclude: ['test/router/**', 'test/gen/**'] } },
     ],
   },

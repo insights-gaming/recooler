@@ -30,8 +30,11 @@ It can be combined with `--watch` after an initially successful check.
 `renderRoutes(options)` scans and returns `{ code, out, files, warnings }` without writing.
 `generateRoutes(options)` also returns `changed` and writes only when contents differ.
 `watchRoutes(options)` returns `{ close(): Promise<void> }` after initial generation and accepts `onResult`
-and `onError`. Await `close()` to finish any in-flight generation. Initial generation and
-debounced events are serialized. Routes can live outside a missing srcDir. It watches
+and `onError`. The optional `onReady` callback runs after the native watchers observe
+readiness events, before initial generation; await that signal before mutating files while
+initial generation is still pending. Awaiting `watchRoutes` itself also guarantees readiness. Await `close()` to finish any in-flight generation. Initial generation and
+debounced events are serialized. Routes can live outside a missing srcDir; its existing
+ancestors are watched non-recursively until the source directory appears. It watches
 content edits for validation as well as structural changes.
 The `recooler/vite` `routes()` plugin runs before build and on dev add/unlink/change
 (including root.tsx), using Vite's watcher. Build failures throw; serve-mode failures are

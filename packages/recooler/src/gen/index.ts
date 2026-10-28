@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { watch as fsWatch } from 'node:fs';
 import type { FSWatcher } from 'node:fs';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseSync } from 'oxc-parser';
 import { compareRoutePaths, isGroupSegment, lexical, resolveRoutes, RouteValidationError, routePathWithoutGroups, routeSegment } from '../router/resolve.js';
@@ -70,9 +70,10 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
     for (const entry of entries) {
       const file = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (/[\\%#?]/.test(entry.name)) errors.push(`invalid route directory ${display(file)}: names containing \\, %, # or ? are not portable; use [0-9] instead of \\d in digit patterns`);
-        if (entry.name.startsWith('[') && entry.name.endsWith(']') && routeSegment(entry.name) === entry.name)
-          errors.push(`invalid bracket parameter directory ${display(file)}: could not convert ${JSON.stringify(entry.name)}; use a name and a balanced pattern, e.g. [n{[0-9]+}]`);
+        if (/[\\%#?]/.test(entry.name)) {
+          const suggestion = entry.name.includes('\\d') ? 'use [0-9] instead of \\d in digit patterns' : 'rename the directory to avoid these characters';
+          errors.push(`invalid route directory ${display(file)}: names containing \\, %, # or ? are not portable; ${suggestion}`);
+        }
         node.children.push(await walk(file, [...segments, entry.name]));
       } else if (entry.isFile()) {
         if (routeFile.test(entry.name)) {
@@ -149,6 +150,8 @@ export async function generateRoutes(options: GenerateOptions = {}): Promise<Gen
 }
 
 export interface WatchOptions extends GenerateOptions {
+  /** Called after native watchers observe a readiness event, before initial generation. */
+  onReady?: () => void;
   onResult?: (result: GenerateResult) => void;
   onError?: (error: unknown) => void;
 }
@@ -163,6 +166,7 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
     closed = true;
     clearTimeout(timer);
     watchers.forEach(w => w.close());
+    await sourceQueue.catch(() => {});
     await queue.catch(() => {});
   };
   const report = (error: unknown) => (options.onError ?? console.error)(error);
@@ -172,6 +176,7 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
     options.onResult?.(result);
   };
   const run = () => {
+    if (closed) return;
     clearTimeout(timer);
     timer = setTimeout(() => { queue = queue.then(generate).catch(report); }, 20);
   };
@@ -179,24 +184,60 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
     watchers.push(watcher);
     watcher.on('error', error => { void close(); report(error); });
   };
-  try {
-    // Watch the nearest existing parent when srcDir has not been created yet.
-    let sourceWatchDir = srcDir;
+  // fs.watch has no ready event. Observe a private sentinel before allowing callers
+  // to mutate files; a timer alone can race native enrollment on a busy machine.
+  const watchReady = async (dir: string, recursive: boolean, changed: (filename: string | null) => void) => {
+    const sentinel = `.recooler-watch-ready-${randomUUID()}`;
+    const file = path.join(dir, sentinel);
+    let ready!: () => void;
+    let isReady = false;
+    const observed = new Promise<void>(resolve => { ready = () => { isReady = true; resolve(); }; });
+    attach(fsWatch(dir, { recursive }, (_event, filename) => {
+      if (String(filename) === sentinel) { ready(); return; }
+      changed(filename === null ? null : String(filename));
+    }));
+    const deadline = Date.now() + 10000;
+    try {
+      // Enrollment can miss the first write. Retry until an event is observed.
+      while (!isReady) {
+        if (closed) throw new Error(`watcher closed before readiness for ${dir}`);
+        if (Date.now() >= deadline) throw new Error(`watcher readiness timed out for ${dir}`);
+        await writeFile(file, '');
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try { await Promise.race([observed, new Promise<void>(resolve => { timer = setTimeout(resolve, 25); })]); }
+        finally { clearTimeout(timer); }
+      }
+    } finally { await unlink(file).catch(() => {}); }
+  };
+  const sourceWatchDirs = new Set<string>();
+  let sourceQueue = Promise.resolve();
+  const watchSource = async () => {
+    // Only direct children matter for root.tsx. If srcDir is missing, watch an
+    // existing ancestor non-recursively, then descend when its children appear.
+    let dir = srcDir;
     while (true) {
-      try { await stat(sourceWatchDir); break; }
+      try { await stat(dir); break; }
       catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-        sourceWatchDir = path.dirname(sourceWatchDir);
+        dir = path.dirname(dir);
       }
     }
-    attach(fsWatch(routesDir, { recursive: true }, (_event, filename) => {
-      if (filename && path.resolve(routesDir, String(filename)) === out) return;
+    if (closed || sourceWatchDirs.has(dir)) return;
+    sourceWatchDirs.add(dir);
+    await watchReady(dir, false, filename => {
+      const file = filename === null ? dir : path.resolve(dir, filename);
+      if (filename === null || file === path.join(srcDir, 'root.tsx') || file === srcDir || srcDir.startsWith(file + path.sep)) {
+        sourceQueue = sourceQueue.then(watchSource).then(run).catch(report);
+      }
+    });
+  };
+  try {
+    await watchReady(routesDir, true, filename => {
+      if (filename && path.resolve(routesDir, filename) === out) return;
       run();
-    }));
-    attach(fsWatch(sourceWatchDir, { recursive: true }, (_event, filename) => {
-      const file = path.resolve(sourceWatchDir, String(filename));
-      if (file === path.join(srcDir, 'root.tsx') || file === srcDir) run();
-    }));
+    });
+    await watchSource();
+    options.onReady?.();
     // Initial generation uses the same queue as debounced events and close().
     queue = queue.then(generate);
     await queue;
