@@ -9,8 +9,11 @@
     "jsxImportSource": "easy-jsx-html-engine",
     "declaration": true,
     "skipLibCheck": true,
-    "types": ["node", "easy-jsx-html-engine/jsx-runtime"]
+    "types": [
+      "node",
+      "easy-jsx-html-engine/jsx-runtime"
+    ]
   },
   "exclude": ["node_modules", "playground", "conformance", "tests/types"],
-  "include": ["**/*.ts", "global.d.ts"]
+  "include": ["src/helpers.ts", "global.d.ts", "options.d.ts"]
 }
