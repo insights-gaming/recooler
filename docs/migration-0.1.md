@@ -457,7 +457,13 @@ handler/`onLoad` reference chain, including literal dynamic imports and global
 chunk's `moduleIds`, including lazy/shared chunks and transitive side-effect
 imports; it also checks package-relative paths after the last `node_modules`
 segment. Both checks fail the build. Include resolved-path patterns for aliases
-that hide a server-only raw specifier. Raw specifiers are also observed through
+that hide a server-only raw specifier. Workspace packages resolve to their real
+source paths, which have no `node_modules` segment, so a pattern written with the
+package name (`^my-common/lib/session`) catches only imports written by that name.
+Relative imports inside the package, and imports through a remapped `exports`
+entry, slip past it. Write such patterns path-agnostically, for example
+`(^|/)(my-common|packages/common/src)/lib/(session|kv)(\.[jt]s)?$`, and make sure a
+build fails with a deliberate banned import. Raw specifiers are also observed through
 transitive client helpers, and browser-external stubs are always banned. These are explicit application bans;
 Recooler does not classify arbitrary dependencies as server-only automatically.
 
@@ -599,7 +605,11 @@ the application's existing manifest/config generator, including workflow names
 and deployment-only flags; avoid a second hand-copied map. Vite's `preview` mode
 can select a Cloudflare `develop` environment; those names need not be identical.
 Build CI Workers with `CLOUDFLARE_ENV=production vite build --mode production`, then
-deploy the generated config identified by `.wrangler/deploy/config.json`.
+deploy the generated config identified by `.wrangler/deploy/config.json`. Pass the
+same environment to the deploy as well (`wrangler deploy --env production`, or keep
+`CLOUDFLARE_ENV` set): Wrangler then rejects a generated config that was built for
+a different environment, whereas a bare `wrangler deploy` silently ships whatever
+environment the build selected.
 Wrangler's `--define` is ignored for Vite output: put deployment values in the
 Vite deployment profile and remove the inert flag from that deploy path.
 Deploy modes should default to deployed values; require an explicit local mode
@@ -608,6 +618,19 @@ a bundle assertion in CI, and fail before upload if the emitted Worker does not
 contain the expected deployed value. A tiny build-time assertion retained in the
 bundle can make this check independent of dead-code elimination. Keep generation
 deterministic and verify the generator leaves the committed files unchanged.
+
+Server source maps on Workers: Cloudflare plugin 1.64+ emits external Worker maps
+unless `build.sourcemap` or `upload_source_maps` says otherwise, and Wrangler
+4.150+ uploads them on deploy (`upload_source_maps: true` makes a missing map an
+upload error). Cloudflare applies them only to **uncaught** exceptions, shown in
+real-time logs, Tail Workers and Workers Issues. Maps are not available inside the
+Worker, so `Error.stack` read by application code stays bundle-relative. Errors
+handled by Hono's `onError` (every route error, unless rethrown) and stacks
+forwarded to an external error reporter are therefore never remapped. Remap them in
+the reporting pipeline with the maps from the same build, or keep the maps as
+build artifacts for manual lookup. Verify with a deliberate error after deploy.
+Client maps are separate (see "Browser handlers and custom roots") and default to
+off; check that `dist/client` contains no `.map` files when maps must stay private.
 
 For manifest-generated secret types, add `RECOOLER_SECRET` to `secrets.required`
 (or the corresponding generator declaration), regenerate environment types, and

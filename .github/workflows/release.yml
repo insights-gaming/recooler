@@ -26,16 +26,16 @@ jobs:
       contents: read
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 12.11.2
           run_install: false
 
       - name: Setup Node.js 24.x
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24.x
           cache: "pnpm"
@@ -43,15 +43,30 @@ jobs:
           scope: "@insights-gaming"
 
       - name: Install Dependencies
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 10
           command: pnpm i --frozen-lockfile
 
+      # every push to main runs this job, so publish only versions the registry doesn't have yet
+      - name: Check for an unpublished version
+        id: version
+        run: |
+          spec="$(node -p 'const p = require("./package.json"); p.name + "@" + p.version')"
+          if npm view "$spec" version >/dev/null 2>&1; then
+            echo "$spec is already published"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # prepack builds dist
       - name: Publish to GitHub Packages
+        if: steps.version.outputs.publish == 'true'
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
