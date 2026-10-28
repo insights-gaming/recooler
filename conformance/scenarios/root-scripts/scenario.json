@@ -15,8 +15,14 @@
           "<title>Scripts root</title>",
           "<script type=\"module\" src="
         ],
-        "excludes": [
-          "<script>"
+        "matches": [
+          "(?:<body[^>]*\\sdata-recooler-route=[\"\\'][^\"\\']+[\"\\']|<meta[^>]*\\sname=[\"\\']recooler-route[\"\\'][^>]*\\scontent=[\"\\'][^\"\\']+[\"\\'])"
+        ],
+        "clientIncludes": [
+          "root-scripts-handler"
+        ],
+        "inlineScriptExcludes": [
+          "root-scripts-handler"
         ]
       }
     }

@@ -44,7 +44,7 @@ for (const name of selected) {
           for (const request of scenario.requests!) {
             test(request.name, async () => {
               const firstExpected = expectationFor(request, scenario, target);
-              const results = await performRequest(request, fetch, responses);
+              const results = await performRequest(request, fetch, responses, target);
               for (const [index, actual] of results.entries()) {
                 const expected = index > 0 ? request.repeatExpect?.[index - 1] ?? firstExpected : firstExpected;
                 expect(actual.status).toBe(expected.status);
@@ -55,11 +55,22 @@ for (const name of selected) {
                 for (const [pattern, count] of Object.entries(expected.counts ?? {})) expect([...actual.body.matchAll(new RegExp(pattern, "g"))]).toHaveLength(count);
                 for (const [header, value] of Object.entries(expected.headers ?? {})) expect(actual.headers.get(header)).toBe(value);
                 for (const part of expected.traceExcludes ?? []) expect(actual.trace).not.toContain(part);
-                if (expected.clientExcludes || expected.clientIncludes) {
+                for (const script of actual.body.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)) {
+                  for (const part of expected.inlineScriptExcludes ?? []) expect(script[1]).not.toContain(part);
+                }
+                if (expected.clientExcludes || expected.clientIncludes || expected.noClientEntry) {
                   expect(actual.clientChunks, "Target must expose every emitted client chunk").toBeDefined();
                   const chunks = Object.values(actual.clientChunks!).join("\n");
                   for (const part of expected.clientExcludes ?? []) expect(chunks).not.toContain(part);
                   for (const part of expected.clientIncludes ?? []) expect(chunks).toContain(part);
+                  if (expected.noClientEntry) {
+                    const urls = Object.keys(actual.clientChunks!);
+                    expect(urls.length, "Target must expose the app's client entry even on handler-free pages").toBeGreaterThan(0);
+                    for (const script of actual.body.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)) {
+                      const src = new URL(script[1]!, "http://localhost").pathname;
+                      for (const url of urls) expect(src).not.toBe(new URL(url, "http://localhost").pathname);
+                    }
+                  }
                 }
                 if (expected.trace) expect(actual.trace).toEqual(expected.trace);
               }

@@ -45,7 +45,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -274,11 +274,13 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "The admin catch-all action must not execute through a public route. TS rejects the route-signature mismatch with 404.",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
           "ts": {
-            "status": 404,
-            "excludes": [
-              "action admin-rest"
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "public-group",
+              "admin-group"
             ],
             "traceExcludes": [
               "action admin-rest"
@@ -314,11 +316,14 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "The admin catch-all action must not execute through a public route. TS rejects the route-signature mismatch with 404.",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
           "ts": {
-            "status": 404,
-            "excludes": [
-              "action admin-rest"
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "public-group",
+              "onRequest public-hook",
+              "admin-group"
             ],
             "traceExcludes": [
               "action admin-rest"
@@ -352,11 +357,12 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "The admin catch-all action must not execute through a public route. TS rejects the route-signature mismatch with 404.",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
           "ts": {
-            "status": 404,
-            "excludes": [
-              "action admin-rest"
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "admin-group"
             ],
             "traceExcludes": [
               "action admin-rest"
@@ -390,7 +396,17 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Both URLs match the admin catch-all pattern; its guard must still reject the unauthenticated request."
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
+          "ts": {
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
         }
       ]
     },
@@ -412,6 +428,168 @@
         "status": 404,
         "body": "404 Not Found",
         "trace": []
+      }
+    },
+    {
+      "name": "admin action submitted to /about with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "public-group",
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/about",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "public-group",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "admin action submitted to /hook with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "public-group",
+          "onRequest public-hook",
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/hook",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "public-group",
+              "onRequest public-hook",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "admin action submitted to /plainpage with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/plainpage",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "admin action submitted to /x with authentication",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "action admin-rest",
+        "trace": [
+          "admin-group",
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/x",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Exact pathname and route id are signed. After authenticated chain middleware, the replay falls through to 404.",
+          "ts": {
+            "status": 404,
+            "trace": [
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ],
+      "headers": {
+        "x-auth": "yes"
       }
     }
   ]

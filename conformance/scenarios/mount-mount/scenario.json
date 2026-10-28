@@ -87,7 +87,7 @@
       "action": {
         "page": "/m/about",
         "attribute": "hx-post",
-        "path": "/m/about"
+        "oraclePath": "/m/about"
       }
     },
     {
@@ -111,16 +111,19 @@
         "path": "/m/about",
         "headers": {
           "x-auth": "yes"
-        }
+        },
+        "oraclePath": "/m/about"
       },
       "changes": [
         {
           "decision": "D6",
-          "reason": "The admin catch-all action must not execute through a public route. TS rejects the route-signature mismatch with 404.",
+          "reason": "The receiving chain runs before signature verification. Its unauthenticated guard returns 401; the action body never runs.",
           "ts": {
-            "status": 404,
-            "excludes": [
-              "action admin-rest"
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "public-group",
+              "admin-group"
             ],
             "traceExcludes": [
               "action admin-rest"
@@ -133,5 +136,10 @@
         "prefix": "/m"
       }
     }
-  ]
+  ],
+  "ts": {
+    "htmxOptions": {
+      "base": "/m"
+    }
+  }
 }

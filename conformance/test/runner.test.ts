@@ -6,6 +6,7 @@ import { describe, expect, test } from "vitest";
 import { actionUrl, buildErrorFor, expectationFor, loadScenario, observe, performRequest } from "../src/runner.js";
 import type { Observation } from "../src/runner.js";
 import type { Scenario, ScenarioRequest } from "../src/target.js";
+import { tsUnavailable } from "../src/targets/ts.js";
 
 describe("portable request contract", () => {
   test("follows signed absolute URLs, relative URLs and escaped query parameters", () => {
@@ -76,6 +77,55 @@ describe("portable request contract", () => {
     expect(seen[0]!.headers.get("HX-Request")).toBe("true");
     expect(seen[1]!.headers.get("Origin")).toBe("https://evil.test");
     expect(seen[1]!.headers.has("HX-Request")).toBe(false);
+  });
+
+  test.each(["drop-sig", "flip-sig", "scope", "method"] as const)("tampers with an extracted action: %s", async (tamper) => {
+    const seen: Request[] = [];
+    await performRequest({
+      name: tamper, method: "POST", action: { page: "/users/1", attribute: "hx-post", tamper }, expect: { status: 404 },
+    }, async (input) => {
+      seen.push(input);
+      return { status: 200, body: '<button hx-post="?action=real&amp;sig=abc&amp;scope=%7B%22value%22%3A%22original%22%7D">', headers: new Headers(), trace: [] };
+    }, new Map(), "ts");
+    const sent = seen[1]!;
+    const url = new URL(sent.url);
+    expect(url.pathname).toBe("/users/1");
+    expect(url.searchParams.get("action")).toBe("real");
+    expect(url.searchParams.get("sig")).toBe(tamper === "drop-sig" ? null : tamper === "flip-sig" ? "0bc" : "abc");
+    expect(JSON.parse(url.searchParams.get("scope")!)).toEqual({ value: tamper === "scope" ? "tampered" : "original" });
+    expect(sent.method).toBe(tamper === "method" ? "GET" : "POST");
+    expect(sent.headers.get("HX-Request")).toBe("true");
+  });
+
+  test.each(["farm-0.0.27", "ts"])("applies the mounted URL correction only to the oracle: %s", async (target) => {
+    const seen: Request[] = [];
+    await performRequest({
+      name: "mount", method: "POST", action: { page: "/app/page", attribute: "hx-post", oraclePath: "/app/page" }, expect: { status: 200 },
+    }, async (input) => {
+      seen.push(input);
+      return { status: 200, body: '<button hx-post="/page?action=real&amp;sig=abc">', headers: new Headers(), trace: [] };
+    }, new Map(), target);
+    expect(new URL(seen[1]!.url).pathname).toBe(target === "ts" ? "/page" : "/app/page");
+    expect(new URL(seen[1]!.url).searchParams.get("sig")).toBe("abc");
+  });
+
+  test.each(["recooler/htmx", "recooler/vite"])("allows a missing public entrypoint to skip: %s", async (missing) => {
+    const reason = await tsUnavailable(async (name) => {
+      if (name === missing) throw Object.assign(new Error("missing entry"), { code: "ERR_MODULE_NOT_FOUND", url: import.meta.resolve(name) });
+      return { createApp() {} };
+    });
+    expect(reason).toBe(`${missing} is not built yet`);
+  });
+
+  test.each([
+    new SyntaxError("broken bundle"),
+    Object.assign(new Error("missing dependency"), { code: "ERR_MODULE_NOT_FOUND", url: "file:///missing-dependency.js" }),
+  ])("fails for a broken TS build: %s", async (failure) => {
+    await expect(tsUnavailable(async () => { throw failure; })).rejects.toBe(failure);
+  });
+
+  test("fails for a built router with an invalid public export", async () => {
+    await expect(tsUnavailable(async () => ({}))).rejects.toThrow("must export createApp");
   });
 
   test("preserves leading double slashes as a local request path", async () => {

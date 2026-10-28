@@ -130,8 +130,10 @@ export async function performRequest(
   request: ScenarioRequest,
   fetch: ReturnType<typeof observe>,
   responses: Map<string, { body: string; url: string }>,
+  target: string | Pick<Target, "name" | "expectationFamily"> = "farm-0.0.27",
 ): Promise<Observation[]> {
   let url = requestUrl(request.path ?? "/").href;
+  let method = request.method ?? "GET";
   if (request.action) {
     const action = request.action;
     let rendered = action.response ? responses.get(action.response) : undefined;
@@ -143,10 +145,25 @@ export async function performRequest(
       rendered = { body: response.body, url: page };
     }
     url = actionUrl(rendered.body, action.attribute, action.index ?? 0, rendered.url);
-    if (action.path) {
-      const destination = new URL(action.path, url);
+    const override = targetKey(target) === "farm-0.0.27" ? action.oraclePath ?? action.path : action.path;
+    if (override) {
+      const destination = new URL(override, url);
       destination.search = new URL(url).search;
       url = destination.href;
+    }
+    if (action.tamper) {
+      const altered = new URL(url);
+      switch (action.tamper) {
+        case "drop-sig": altered.searchParams.delete("sig"); break;
+        case "flip-sig": {
+          const sig = altered.searchParams.get("sig") ?? "";
+          altered.searchParams.set("sig", (sig.startsWith("0") ? "1" : "0") + sig.slice(1));
+          break;
+        }
+        case "scope": altered.searchParams.set("scope", '{"value":"tampered"}'); break;
+        case "method": method = method === "POST" ? "GET" : "POST"; break;
+      }
+      url = altered.href;
     }
   }
   const headers = new Headers();
@@ -157,7 +174,7 @@ export async function performRequest(
   }
   new Headers(request.headers).forEach((value, name) => headers.set(name, value));
   for (const name of request.omitHeaders ?? []) headers.delete(name);
-  const init: RequestInit = { method: request.method ?? "GET", headers };
+  const init: RequestInit = { method, headers };
   if (request.form) init.body = new URLSearchParams(request.form);
   else if (request.body !== undefined) init.body = request.body;
   const input = new Request(url, init);

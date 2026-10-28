@@ -342,7 +342,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -366,7 +366,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -390,7 +390,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }

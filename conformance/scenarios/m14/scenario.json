@@ -5,13 +5,13 @@
     "ts"
   ],
   "buildError": [
-    "middleware",
-    "function"
+    "src/routes/middleware.ts",
+    "must export a middleware function"
   ],
   "buildErrors": {
     "ts": [
-      "middleware",
-      "function"
+      "src/routes/middleware.ts",
+      "must export a middleware function"
     ]
   }
 }

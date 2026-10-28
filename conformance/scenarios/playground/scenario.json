@@ -305,7 +305,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -328,7 +328,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -402,6 +402,10 @@
             ],
             "clientIncludes": [
               "clicked"
+            ],
+            "inlineScriptExcludes": [
+              "clicked",
+              "window.$handlers="
             ]
           }
         }
@@ -413,9 +417,27 @@
       "expect": {
         "status": 200,
         "excludes": [
-          "<script"
+          "?script",
+          "window.$handlers="
+        ],
+        "inlineScriptExcludes": [
+          "clicked"
         ]
-      }
+      },
+      "changes": [
+        {
+          "decision": "D4",
+          "reason": "Handler-free pages do not reference the client entry; unrelated scripts are allowed.",
+          "ts": {
+            "status": 200,
+            "noClientEntry": true,
+            "inlineScriptExcludes": [
+              "clicked",
+              "window.$handlers="
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "authorized playground mount",

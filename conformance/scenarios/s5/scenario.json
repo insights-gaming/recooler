@@ -30,10 +30,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Oracle ignores the reserved query on this method-only chain; TS reserves action and rejects unsigned or unknown values before the terminal handler (404).",
-          "ts": {
-            "status": 404
-          }
+          "reason": "Preserve 0.0.27: action is reserved only on routes with actions for the receiving method."
         },
         {
           "decision": "D7",
@@ -83,7 +80,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -135,7 +132,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -189,7 +186,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }
@@ -242,10 +239,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Oracle ignores the reserved query on this method-only chain; TS reserves action and rejects unsigned or unknown values before the terminal handler (404).",
-          "ts": {
-            "status": 404
-          }
+          "reason": "Preserve 0.0.27: action is reserved only on routes with actions for the receiving method."
         },
         {
           "decision": "D7",
@@ -268,7 +262,7 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
           "ts": {
             "status": 404
           }

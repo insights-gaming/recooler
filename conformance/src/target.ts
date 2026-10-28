@@ -1,8 +1,14 @@
-/** Targets build and run in this process/realm for globalThis.__t instrumentation.
+/** Targets run in this process/realm for globalThis.__t instrumentation.
+ * Each scenario must be a self-contained build, with no shared application or
+ * dependency module state across scenarios (for example a Vite SSR build with
+ * ssr.noExternal: true into a per-scenario directory). A query on only the entry
+ * module does not isolate its unbundled dependencies.
+ * The TS adapter must build both server and client with Vite for htmx/D4 probes.
  * Remote runtimes (including workerd) cannot implement this trace contract. */
 export interface BuiltApp {
   kind: "app";
-  /** Emitted browser chunks only, including lazy handler chunks; never server output. */
+  /** Emitted browser chunks keyed by served URL, including the entry and lazy
+   * handler chunks; never server output. Include them even on handler-free pages. */
   clientChunks?: Record<string, string>;
   fetch(request: Request): Response | Promise<Response>;
   /** Optional route table used to exercise Hono's route()/basePath() mounts. */
@@ -33,6 +39,10 @@ export interface Expectation {
   /** Inspect all emitted browser chunks (requires BuiltApp.clientChunks). */
   clientExcludes?: string[];
   clientIncludes?: string[];
+  /** No script element may inline these handler-code markers. */
+  inlineScriptExcludes?: string[];
+  /** No script src may refer to a client chunk supplied by the target. */
+  noClientEntry?: boolean;
 }
 
 export interface IntentionalChange {
@@ -56,6 +66,10 @@ export interface ScenarioRequest {
     page: string;
     /** Keep the rendered query, but send it to another path (foreign-action probes). */
     path?: string;
+    /** Correct the oracle's unprefixed mount URL without masking TS URL generation. */
+    oraclePath?: string;
+    /** Mutate an extracted URL; method sends POST as GET (or another method as POST). */
+    tamper?: "drop-sig" | "flip-sig" | "method" | "scope";
     attribute: string;
     index?: number;
     headers?: Record<string, string>;
@@ -83,4 +97,5 @@ export interface Scenario {
   buildErrors?: Record<string, string | string[]>;
   /** Plugin-specific build settings belong in the adapter, not in fixture sources. */
   farm?: Record<string, unknown>;
+  ts?: { htmxOptions?: { base?: string; secret?: string | false } };
 }

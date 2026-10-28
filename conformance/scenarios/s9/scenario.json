@@ -97,7 +97,8 @@
           "b-action user=alice"
         ],
         "trace": [
-          "admin"
+          "admin",
+          "action b"
         ]
       },
       "changes": [
@@ -275,6 +276,9 @@
         "trace": [],
         "excludes": [
           "b-action"
+        ],
+        "traceExcludes": [
+          "action b"
         ]
       },
       "form": {},
@@ -295,6 +299,9 @@
             "trace": [],
             "excludes": [
               "b-action"
+            ],
+            "traceExcludes": [
+              "action b"
             ]
           }
         }

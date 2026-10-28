@@ -6,6 +6,8 @@ One line per runnable scenario. Transcript names refer to the review JSONL archi
 - `action-params` — route params encoded in rendered action URLs and decoded by dispatch. Source: docs/reviews/0.0.27.md ac7b3f1/71634e4; docs/plans/typescript-rewrite.md htmx transform.
 - `action-rest` — route params encoded in rendered action URLs and decoded by dispatch. Source: docs/reviews/0.0.27.md ac7b3f1/71634e4; docs/plans/typescript-rewrite.md htmx transform.
 - `action-results` — escaped children, Response passthrough, nullish 204, reserved action and HEAD/OPTIONS. Source: docs/plans/typescript-rewrite.md reference handlers; docs/reviews/0.0.27.md 9906fd3/7589954/0c7b16f.
+- `action-signing` — removed/altered signatures, wrong method, scope tampering and exact-pathname replay after chain middleware, including oracle-signed captured scopes. Source: docs/plans/typescript-rewrite.md §3.3/§3.5; second-round N1/N2.
+- `action-barrel` — unused admin re-export runs under public middleware on 0.0.27; TS rejects the foreign binding. Source: docs/plans/typescript-rewrite.md §3.5 D6.
 - `c1` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
 - `c2` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
 - `c3` — same-shaped terminal handlers conflict. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
@@ -72,7 +74,6 @@ One line per runnable scenario. Transcript names refer to the review JSONL archi
 - `m14` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
 - `m15` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
 - `m16` — middleware default export form accepted. **Targets: ts.** Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
-- `m17` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
 - `m18` — middleware without a runtime default export rejected. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
 - `m2` — middleware default export form accepted. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
 - `m3` — middleware default export form accepted. Source: agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports.
