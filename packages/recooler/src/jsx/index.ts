@@ -1,13 +1,19 @@
 /// <reference types="easy-jsx-html-engine/jsx-runtime" preserve="true" />
 import {
-  createElement, dangerouslyPreventEscaping, defaultCatch, Fragment, Suspense as EngineSuspense,
+  dangerouslyPreventEscaping, Fragment, Suspense as EngineSuspense,
 } from 'easy-jsx-html-engine';
 import { renderToStream } from 'easy-jsx-html-engine/stream-webapi';
-import type { Context, Handler } from 'hono';
+import type { Context, Env, Handler } from 'hono';
+import { createElement } from './jsx-runtime.js';
 import type { Children, Component, ErrorBoundaryProps, ResolvedTemplateProps, SuspenseProps } from './types.js';
 import { mergePageExtras, type PageAdapter, type ResolvedRoute } from '../router/index.js';
+export { createElement } from './jsx-runtime.js';
 
-export interface RouteProps<TContext = Context> {
+/** Augment this interface in recooler/jsx to type route bindings and variables. */
+export interface RouteEnv extends Env {}
+export type RouteContext = Context<RouteEnv>;
+
+export interface RouteProps<TContext = RouteContext> {
   rid: string | number;
   url: URL;
   ctx: TContext;
@@ -27,19 +33,19 @@ export interface RouteHead {
   scripts?: JSX.IntrinsicElements['script'][];
 }
 
-export interface RouteHeadFn<TContext = Context> {
+export interface RouteHeadFn<TContext = RouteContext> {
   (ctx: TContext, prev: RouteHead): RouteHead | null | undefined | PromiseLike<RouteHead | null | undefined>;
 }
 
 /** The string argument is retained for one release for legacy clientScript users. */
-export type RootHOC = (Content: Component<RouteProps>, scripts?: string[] | string) => Component<RouteProps>;
+export type RootHOC = (Content: Component<RouteProps>, clientScript?: string) => Component<RouteProps>;
 export type LayoutHOC = (Content: Component<RouteProps>) => Component<RouteProps>;
 
 export interface JSXPage {
   route: ResolvedRoute;
   Content: Component<RouteProps>;
   Root: RootHOC;
-  head(ctx: Context): Promise<RouteHead>;
+  head(ctx: RouteContext): Promise<RouteHead>;
   scripts: string[];
   /** @deprecated */
   clientScript?: string;
@@ -58,29 +64,55 @@ function isPlainObject(value: unknown): value is RouteHead {
   return proto === Object.prototype || proto === null;
 }
 
+/** Copy only plain containers; promises, URLs, engine elements and instances keep their semantics. */
+function copyContainers(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
+  if (!Array.isArray(value) && !isPlainObject(value)) return value;
+  if (seen.has(value)) return seen.get(value);
+  const copy: Record<string, unknown> | unknown[] = Array.isArray(value) ? [] : Object.create(Object.getPrototypeOf(value));
+  seen.set(value, copy);
+  for (const key of Object.keys(value)) {
+    Object.defineProperty(copy, key, { value: copyContainers((value as Record<string, unknown>)[key], seen),
+      enumerable: true, configurable: true, writable: true });
+  }
+  return copy;
+}
+
 function copyHead(value: unknown, source: string): RouteHead {
   if (!isPlainObject(value) || typeof (value as { then?: unknown }).then === 'function') {
     throw new TypeError(`Invalid head in ${source}: expected a function, plain object, or nullish value`);
   }
-  return structuredClone(value);
+  return copyContainers(value) as RouteHead;
 }
 
-/** Resolve namespace exports on each request, including aliases and star re-exports. */
-async function resolveHead(route: ResolvedRoute, ctx: Context): Promise<RouteHead> {
+/** Resolve live namespace exports, starting at the last replacing object. */
+async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<RouteHead> {
+  // TODO: use required router source metadata once the router branch lands.
+  const files = route as ResolvedRoute & { rootFile?: string; layoutFiles?: (string | undefined)[] };
+  const entries = [
+    { module: route.root, source: files.rootFile ?? `root (used by ${route.file})` },
+    ...route.layouts.map((module, i) => ({ module, source: files.layoutFiles?.[i] ?? `layout ${i + 1} (used by ${route.file})` })),
+    { module: route.module, source: route.file },
+  ].map(({ module, source }) => ({ entry: module?.head, source }));
+  let start = 0;
+  for (const [i, { entry }] of entries.entries()) {
+    if (entry != null && typeof entry !== 'function') start = i;
+  }
   let head: RouteHead = {};
-  for (const module of [route.root, ...route.layouts, route.module]) {
-    const entry = module?.head;
+  for (const { entry, source } of entries.slice(start)) {
     if (entry == null) continue;
-    if (typeof entry === 'function') {
-      const result: unknown = await (entry as RouteHeadFn)(ctx, head);
-      // Clone function results too: a function can return a module-level constant.
-      head = result == null ? {} : copyHead(result, route.file);
-    } else {
-      head = copyHead(entry, route.file);
+    try {
+      const result: unknown = typeof entry === 'function' ? await (entry as RouteHeadFn)(ctx, head) : entry;
+      head = result == null ? {} : copyHead(result, source);
+    } catch (error) {
+      if (error instanceof Response) throw error;
+      const message = `Head in ${source}: ${error instanceof Error ? error.message : String(error)}`;
+      throw error instanceof TypeError ? new TypeError(message, { cause: error }) : new Error(message, { cause: error });
     }
   }
   return head;
 }
+
+const markedRequests = new WeakSet<object>();
 
 export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
   return {
@@ -99,7 +131,7 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
       if (Root !== DefaultRootHOC) {
         const Page = Content;
         Content = (props: RouteProps) => createElement(Fragment, {},
-          createElement('meta', { name: 'recooler-route', content: props.route }),
+          !markedRequests.has(props.ctx) && createElement('meta', { name: 'recooler-route', content: props.route }),
           createElement(Page, props));
       }
       const extra = mergePageExtras(extras);
@@ -116,25 +148,43 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         head: ctx => resolveHead(route, ctx),
       };
       const render: Handler = async ctx => {
-        let waitUntil: ((promise: Promise<unknown>) => void) | undefined;
-        try { waitUntil = ctx.executionCtx.waitUntil?.bind(ctx.executionCtx); } catch { /* Node has no executionCtx. */ }
+        let ctxWaitUntil: ((promise: Promise<unknown>) => void) | undefined;
+        try { ctxWaitUntil = ctx.executionCtx.waitUntil?.bind(ctx.executionCtx); } catch { /* Node has no executionCtx. */ }
+        let body: string | ReadableStream<Uint8Array> | undefined;
         try {
           const head = await page.head(ctx);
           const requestScripts = [...page.scripts];
-          return ctx.newResponse(await renderToStream(
-            (rid: RouteProps['rid']) => createElement(page.Root(page.Content, page.clientScript ?? requestScripts), {
+          let shell: JSX.Element | undefined;
+          body = await renderToStream(
+            (rid: RouteProps['rid']) => shell = createElement(page.Root(page.Content, page.clientScript), {
               rid, url: new URL(ctx.req.url), ctx, head, route: route.path,
               scripts: requestScripts, clientScript: page.clientScript,
             }),
-            { waitUntil, ResolvedTemplate: options.ResolvedTemplate,
+            { waitUntil: promise => {
+              const handled = promise.catch(error => { console.error(error); });
+              ctxWaitUntil?.(handled);
+            }, ResolvedTemplate: options.ResolvedTemplate,
               cleanupScriptMiddleware: options.suspenseCleanupScriptMiddleware },
-          ), { headers: { 'content-type': 'text/html' } });
+          );
+          // The engine already awaits the shell before writing. Await it here too,
+          // so async status changes and thrown Responses precede response creation.
+          await shell;
+          if (ctx.req.method === 'HEAD' && body instanceof ReadableStream) await body.cancel();
+          return ctx.newResponse(body, { headers: { 'content-type': 'text/html' } });
         } catch (error) {
+          if (body instanceof ReadableStream) await body.cancel().catch(cancelError => { console.error(cancelError); });
           if (error instanceof Response) return error;
           throw error;
         }
       };
-      return options.handlerFactory?.(page, render) ?? render;
+      const handler = options.handlerFactory?.(page, render) ?? render;
+      return async (ctx, next) => {
+        try { return await handler(ctx, next); }
+        catch (error) {
+          if (error instanceof Response) return error;
+          throw error;
+        }
+      };
     },
   };
 }
@@ -153,33 +203,56 @@ function hasCharsetMeta(head: RouteHead): boolean {
     ([key, value]) => key.toLowerCase() === 'charset' && (!!value || value === 0)));
 }
 
-export const DefaultRootHOC: RootHOC = (Content, scripts) => (props: RouteProps) => createElement(Fragment, {},
-  dangerouslyPreventEscaping('<!DOCTYPE html>'),
-  createElement('html', {},
-    createElement('head', {},
-      !hasCharsetMeta(props.head) && createElement('meta', { charset: 'utf-8' }),
-      renderHeadElements(props.head)),
-    createElement('body', { 'data-recooler-route': props.route },
-      createElement(Content, props),
-      // Legacy source is made available to custom roots, but never inlined here.
-      (Array.isArray(scripts) ? scripts : props.scripts)?.map(src => createElement('script', { type: 'module', src })))));
+export const DefaultRootHOC: RootHOC = Content => (props: RouteProps) => {
+  markedRequests.add(props.ctx);
+  return createElement(Fragment, {},
+    dangerouslyPreventEscaping('<!DOCTYPE html>'),
+    createElement('html', {},
+      createElement('head', {},
+        !hasCharsetMeta(props.head) && createElement('meta', { charset: 'utf-8' }),
+        renderHeadElements(props.head)),
+      createElement('body', { 'data-recooler-route': props.route },
+        createElement(Content, props),
+        props.scripts.map(src => createElement('script', { type: 'module', src })))));
+};
+
+/** Logs the error; stack traces in HTML require an explicit opt-in. */
+export function defaultCatch(error: unknown, options: { showStack?: boolean } = {}): JSX.Element {
+  console.error(error);
+  return createElement('pre', {}, options.showStack && error instanceof Error ? error.stack ?? error.message : 'Internal Server Error');
+}
 
 /** Like the engine boundary, but a Response escapes every catch, including the default catch. */
 export function ErrorBoundary(props: ErrorBoundaryProps): JSX.Element {
+  return boundary(props, true);
+}
+
+function boundary(props: ErrorBoundaryProps, escapeResponses: boolean): JSX.Element {
   const children = props.children;
-  const result = Promise.resolve().then(() => createElement(Fragment, {},
-    Array.isArray(children) && children.length === 1 && typeof children[0] === 'function'
-      ? children[0]() : children as Children));
-  return result.catch(error => {
-    if (error instanceof Response) throw error;
-    if (props.catch == null) return defaultCatch(error);
+  let result: JSX.Element;
+  try {
+    if (Array.isArray(children) && children.length === 1 && typeof children[0] === 'function') {
+      const render = children[0];
+      result = Promise.resolve().then(() => createElement(Fragment, {}, render()));
+    } else { result = createElement(Fragment, {}, children as Children); }
+  } catch (error) { result = Promise.reject(error); }
+  // Preserve synchronous Suspense children: they need no fallback or stream.
+  if (!('then' in result)) return result;
+  return Promise.resolve(result).catch(error => {
+    if (escapeResponses && error instanceof Response) throw error;
+    if (props.catch == null) return defaultCatch(error, props);
+    if (error instanceof Response) console.error(error);
     return typeof props.catch === 'function' ? props.catch(error) : createElement(Fragment, {}, props.catch);
   }).catch(error => {
-    if (error instanceof Response) throw error;
-    return defaultCatch(error);
+    if (escapeResponses && error instanceof Response) throw error;
+    return defaultCatch(error, props);
   });
 }
 
-export const Suspense: (props: SuspenseProps) => JSX.Element = EngineSuspense;
-export { defaultCatch };
+export function Suspense(props: SuspenseProps): JSX.Element {
+  const root = (globalThis as typeof globalThis & { SUSPENSE_ROOT?: { requests: Map<string | number, unknown> } }).SUSPENSE_ROOT;
+  if (!props.rid || !root?.requests.has(props.rid)) return ErrorBoundary(props);
+  return EngineSuspense({ ...props, children: boundary(props, false),
+    catch: (error: unknown) => defaultCatch(error, props) });
+}
 export type { ErrorBoundaryProps, SuspenseProps, ResolvedTemplateProps } from './types.js';

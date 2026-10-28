@@ -9,3 +9,16 @@ export const pages = jsxPages({ ResolvedTemplate: ({ id, children }) => <div dat
 export const context: Context = {} as Context;
 // @ts-expect-error ordinary HTML title still requires a string
 export const invalid = <p title={123}>bad</p>;
+
+// Module augmentation types every default RouteProps/RouteHeadFn context.
+declare module 'recooler/jsx' {
+  interface RouteEnv { Bindings: { DB: string }; Variables: { user: string } }
+}
+export const bindings = (props: RouteProps) => {
+  const db: string = props.ctx.env.DB;
+  const user: string = props.ctx.get('user');
+  // @ts-expect-error bindings are typed, not any
+  const invalid: number = props.ctx.env.DB;
+  return <div ctx="user data">{db}{user}{invalid}</div>;
+};
+export const keyed = (props: RouteProps) => <li {...{ title: 'item' }} ctx={props.ctx} key="id">item</li>;

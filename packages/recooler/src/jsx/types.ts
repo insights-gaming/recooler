@@ -8,12 +8,13 @@ export interface Component<P extends {} = Record<string, unknown>> {
   (props: P): Children;
 }
 export interface ErrorBoundaryProps {
+  /** Include server stack traces in the default HTML catch. Defaults to false. */
+  showStack?: boolean;
   children?: Children | [() => Children];
   catch?: ((error: any) => JSX.Element) | Children;
 }
-export interface SuspenseProps {
+export interface SuspenseProps extends ErrorBoundaryProps {
   rid?: string | number;
-  children?: Children;
   fallback?: Children;
   catch?: ((error: any) => JSX.Element) | JSX.Element;
 }
