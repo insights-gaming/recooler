@@ -1,0 +1,12 @@
+import { cpSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
+import { base } from './fixture.mjs';
+const root = join(base,'.generated/aggregator-reference');
+rmSync(root,{recursive:true,force:true});
+cpSync(join(base,'../../docs/plans/fixtures/aggregator'),root,{recursive:true});
+const result = JSON.parse(execFileSync(process.execPath,[join(root,'scripts/build-rolldown.mjs'), root],{encoding:'utf8'}));
+assert.deepEqual(result,{ order:['page','cycle','button'], actions:['page@0','cycle@0','button@0'], missing:'undefined', clientOnlyEvaluated:true, handlerKept:false });
+writeFileSync(new URL('results/aggregator.json',import.meta.url),JSON.stringify(result,null,2)+'\n');
+console.log('Reference aggregator fixture PASS',JSON.stringify(result));

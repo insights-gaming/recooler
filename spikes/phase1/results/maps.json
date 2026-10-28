@@ -1,0 +1,630 @@
+[
+  {
+    "includeContent": true,
+    "consumer": "server",
+    "directHiresPositions": 26,
+    "mapping": {
+      "positions": [
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 21
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 24
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 28
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 31
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 19
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 22
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 32
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 33
+          },
+          "granularity": "string-token"
+        }
+      ],
+      "hasSourcesContent": true,
+      "sources": [
+        "../../src/map-source.ts",
+        "../../src/entry.ts"
+      ]
+    },
+    "stack": "Error: MOVED_FRAME\n    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:9:8)\n    at Object.moved (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:3:9)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:44:31",
+    "frame": {
+      "frame": "    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:9:8)",
+      "generated": {
+        "line": 9,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/src/map-source.ts",
+        "line": 3,
+        "column": 10,
+        "name": null
+      }
+    },
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
+    "virtualPosition": {
+      "source": null,
+      "line": null,
+      "column": null,
+      "name": null
+    }
+  },
+  {
+    "includeContent": true,
+    "consumer": "client",
+    "directHiresPositions": 26,
+    "mapping": {
+      "positions": [
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 21
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 24
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 28
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 31
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 19
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 22
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 32
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 33
+          },
+          "granularity": "string-token"
+        }
+      ],
+      "hasSourcesContent": true,
+      "sources": [
+        "../../src/map-source.ts",
+        "../../src/entry.ts"
+      ]
+    },
+    "stack": "Error: MOVED_FRAME\n    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:9:8)\n    at Object.moved (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:3:9)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:44:31",
+    "frame": {
+      "frame": "    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:9:8)",
+      "generated": {
+        "line": 9,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/src/map-source.ts",
+        "line": 3,
+        "column": 10,
+        "name": null
+      }
+    },
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
+    "virtualPosition": {
+      "source": null,
+      "line": null,
+      "column": null,
+      "name": null
+    }
+  },
+  {
+    "includeContent": false,
+    "consumer": "server",
+    "directHiresPositions": 26,
+    "mapping": {
+      "positions": [
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 21
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 24
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 28
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 31
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 19
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 22
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 32
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 33
+          },
+          "granularity": "string-token"
+        }
+      ],
+      "hasSourcesContent": true,
+      "sources": [
+        "../../src/map-source.ts",
+        "../../src/entry.ts"
+      ]
+    },
+    "stack": "Error: MOVED_FRAME\n    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:9:8)\n    at Object.moved (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:3:9)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:44:31",
+    "frame": {
+      "frame": "    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:9:8)",
+      "generated": {
+        "line": 9,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/src/map-source.ts",
+        "line": 3,
+        "column": 10,
+        "name": null
+      }
+    },
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
+    "virtualPosition": {
+      "source": null,
+      "line": null,
+      "column": null,
+      "name": null
+    }
+  },
+  {
+    "includeContent": false,
+    "consumer": "client",
+    "directHiresPositions": 26,
+    "mapping": {
+      "positions": [
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 21
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 24
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "MOVED_FRAME",
+          "generated": {
+            "line": 9,
+            "column": 28
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 3,
+            "column": 20,
+            "name": null
+          },
+          "expected": {
+            "line": 3,
+            "column": 31
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 18
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 19
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 21
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 22
+          },
+          "granularity": "string-token"
+        },
+        {
+          "marker": "UNTOUCHED_FRAME",
+          "generated": {
+            "line": 6,
+            "column": 32
+          },
+          "original": {
+            "source": "../../src/map-source.ts",
+            "line": 8,
+            "column": 18,
+            "name": null
+          },
+          "expected": {
+            "line": 8,
+            "column": 33
+          },
+          "granularity": "string-token"
+        }
+      ],
+      "hasSourcesContent": true,
+      "sources": [
+        "../../src/map-source.ts",
+        "../../src/entry.ts"
+      ]
+    },
+    "stack": "Error: MOVED_FRAME\n    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:9:8)\n    at Object.moved (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:3:9)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:44:31",
+    "frame": {
+      "frame": "    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:9:8)",
+      "generated": {
+        "line": 9,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/src/map-source.ts",
+        "line": 3,
+        "column": 10,
+        "name": null
+      }
+    },
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
+    "virtualPosition": {
+      "source": null,
+      "line": null,
+      "column": null,
+      "name": null
+    }
+  }
+]

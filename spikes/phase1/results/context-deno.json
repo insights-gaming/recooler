@@ -1,0 +1,317 @@
+{
+  "runtime": "deno",
+  "results": {
+    "hono": [
+      {
+        "path": "/mount/item/00-a%20b/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "00-a b",
+          "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+          "routePath": "/mount/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "00-a b"
+          },
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            }
+          },
+          "url": "/mount/item/00-a%20b/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "00-a b",
+          "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+          "routePath": "/mount/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "00-a b"
+          },
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            }
+          },
+          "url": "/mount/item/00-a%20b/one/two%20three"
+        },
+        "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+      },
+      {
+        "path": "/mount/item/01-c%2Fd/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "01-c/d",
+          "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+          "routePath": "/mount/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "01-c/d"
+          },
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            }
+          },
+          "url": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "01-c/d",
+          "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+          "routePath": "/mount/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "01-c/d"
+          },
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            }
+          },
+          "url": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+      },
+      {
+        "path": "/base/nested/item/10-a%20b/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "10-a b",
+          "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+          "routePath": "/base/nested/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "10-a b"
+          },
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            }
+          },
+          "url": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "10-a b",
+          "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+          "routePath": "/base/nested/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "10-a b"
+          },
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            }
+          },
+          "url": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+      },
+      {
+        "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "11-c/d",
+          "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+          "routePath": "/base/nested/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "11-c/d"
+          },
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            }
+          },
+          "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "11-c/d",
+          "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+          "routePath": "/base/nested/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "11-c/d"
+          },
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            }
+          },
+          "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+        },
+        "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+      }
+    ],
+    "hono5": [
+      {
+        "path": "/mount/item/00-a%20b/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "00-a b",
+          "propertyRoutePath": null,
+          "routePath": "/mount/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "00-a b"
+          },
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            }
+          },
+          "url": "/mount/item/00-a%20b/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "00-a b",
+          "propertyRoutePath": null,
+          "routePath": "/*",
+          "params": {},
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            }
+          },
+          "url": "/mount/item/00-a%20b/one/two%20three"
+        },
+        "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+      },
+      {
+        "path": "/mount/item/01-c%2Fd/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "01-c/d",
+          "propertyRoutePath": null,
+          "routePath": "/mount/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "01-c/d"
+          },
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            }
+          },
+          "url": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "01-c/d",
+          "propertyRoutePath": null,
+          "routePath": "/*",
+          "params": {},
+          "matched": {
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            }
+          },
+          "url": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+      },
+      {
+        "path": "/base/nested/item/10-a%20b/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "10-a b",
+          "propertyRoutePath": null,
+          "routePath": "/base/nested/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "10-a b"
+          },
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            }
+          },
+          "url": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "10-a b",
+          "propertyRoutePath": null,
+          "routePath": "/*",
+          "params": {},
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            }
+          },
+          "url": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+      },
+      {
+        "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+        "initial": {
+          "where": "initial",
+          "id": "11-c/d",
+          "propertyRoutePath": null,
+          "routePath": "/base/nested/item/:id/:rest{.+}",
+          "params": {
+            "rest": "one/two three",
+            "id": "11-c/d"
+          },
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            }
+          },
+          "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+        },
+        "late": {
+          "where": "after-response",
+          "id": "11-c/d",
+          "propertyRoutePath": null,
+          "routePath": "/*",
+          "params": {},
+          "matched": {
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            }
+          },
+          "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+        },
+        "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+      }
+    ]
+  }
+}

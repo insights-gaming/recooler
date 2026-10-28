@@ -1,0 +1,256 @@
+[
+  {
+    "verbatim": true,
+    "built": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/type-named.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/type-named.ts@0",
+        "src/unused.ts@0"
+      ]
+    },
+    "dev": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/type-named.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/type-named.ts@0",
+        "src/unused.ts@0"
+      ]
+    },
+    "changed": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/added.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/type-named.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/added.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/type-named.ts@0",
+        "src/unused.ts@0"
+      ]
+    },
+    "computations": 2
+  },
+  {
+    "verbatim": false,
+    "built": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0"
+      ]
+    },
+    "dev": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0"
+      ]
+    },
+    "changed": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/added.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/added.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0"
+      ]
+    },
+    "computations": 2
+  },
+  {
+    "external": true,
+    "built": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "../../spike-actions",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/type-named.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/type-named.ts@0",
+        "src/unused.ts@0"
+      ]
+    }
+  }
+]
