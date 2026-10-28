@@ -12,7 +12,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '../..');
 const args = process.argv.slice(2);
 if (args.length && (args.length !== 2 || args[0] !== '--adapter')) throw new Error('Usage: self-test.mjs [--adapter MODULE.mjs]');
-const adapter = await import(args.length ? pathToFileURL(resolve(args[1])) : './adapters/farm-0.0.27.mjs');
+const adapterName = args[1] || 'farm-0.0.27';
+const adapter = await import(['farm-0.0.27', 'recooler-0.1'].includes(adapterName) ? `./adapters/${adapterName}.mjs` : pathToFileURL(resolve(adapterName)));
 register('../../fixtures/consumer-shape/node-loader.mjs', import.meta.url);
 const scratch = await mkdtemp('/private/tmp/recooler-equivalence-self-test-');
 await writeFile(join(scratch, 'package.json'), '{"type":"module"}\n');
@@ -68,9 +69,15 @@ for (const name of ['router', 'admin']) {
       assert.equal(guard.status, 404);
       assert.ok(guard.invoked.some(x => x.kind === 'middleware' && x.file.includes('(guarded)')));
       const nonResponse = traces.find(x => x.request.path === '/non-response' && x.request.method === 'GET');
-      assert.equal(nonResponse.error, 'NonResponse');
-      assert.equal(nonResponse.returnedType, 'object:[object Object]');
-      assert.ok(traces.some(x => x.request.path === '/non-response' && x.request.method === 'HEAD' && x.error === 'RangeError' && x.errorMessage));
+      if (adapter.fixtureOutcomes?.undefinedHandlerStatus) {
+        assert.equal(nonResponse.status, adapter.fixtureOutcomes.undefinedHandlerStatus);
+        assert.equal(nonResponse.error, undefined);
+        assert.ok(traces.some(x => x.request.path === '/non-response' && x.request.method === 'HEAD' && x.status === adapter.fixtureOutcomes.undefinedHandlerStatus));
+      } else {
+        assert.equal(nonResponse.error, 'NonResponse');
+        assert.equal(nonResponse.returnedType, 'object:[object Object]');
+        assert.ok(traces.some(x => x.request.path === '/non-response' && x.request.method === 'HEAD' && x.error === 'RangeError' && x.errorMessage));
+      }
     }
     assert.ok(traces.some(x => x.request.variant === 'plain'));
     assert.ok(requests.some(x => x.path.includes('%')));

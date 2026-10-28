@@ -75,19 +75,27 @@ export function deterministicEnvironment(options) {
 
 export async function loadRuntime({ packageRoot, packageOut, spec, mode }) {
   if (spec.fixture) {
-    const { default: worker } = await import(pathToFileURL(join(packageOut, mode, 'main.js')));
-    const entries = globalThis.__recoolerEquivalence;
-    const env = { SERVICE: { fetch: () => new Response('stub-service', { headers: { 'x-service': 'stub' } }) } };
-    const ctx = { waitUntil: task => { Promise.resolve(task).catch(() => {}); }, passThroughOnException() {} };
-    return { runtime: { fixture: true }, entries: async () => entries,
-      dispatch: input => dispatchWorker(worker, input, env, ctx),
-      async dispatchBatch(inputs) {
-        const responses = [];
-        for (const input of inputs) responses.push(await dispatchWorker(worker, input, env, ctx));
-        return responses;
-      }, dispose: async () => {} };
+    const { Worker } = await import('node:worker_threads');
+    const worker = new Worker(new URL('./fixture-runtime.mjs', import.meta.url), { workerData: { packageOut, spec, mode } });
+    let sequence = 0;
+    const pending = new Map();
+    worker.on('message', ({ id, value, error }) => {
+      const task = pending.get(id);
+      if (!task) return;
+      pending.delete(id);
+      error ? task.reject(new Error(error)) : task.resolve(value);
+    });
+    worker.on('error', error => { for (const task of pending.values()) task.reject(error); pending.clear(); });
+    const call = (method, input) => new Promise((resolve, reject) => {
+      const id = sequence++;
+      pending.set(id, { resolve, reject });
+      worker.postMessage({ id, method, input });
+    });
+    return { runtime: { fixture: true }, entries: () => call('entries'),
+      dispatch: input => call('dispatch', input), dispatchBatch: inputs => call('batch', inputs),
+      dispose: () => worker.terminate() };
   }
-  const require = createRequire(join(packageRoot, 'package.json'));
+  const require = createRequire(join(spec.runtimePackageRoot || packageRoot, 'package.json'));
   const wranglerRequire = createRequire(require.resolve('wrangler/package.json'));
   const { Miniflare, Log, LogLevel } = await import(pathToFileURL(wranglerRequire.resolve('miniflare')));
   const config = JSON.parse(await readFile(join(packageRoot, spec.wranglerConfig || 'wrangler.generated.json'), 'utf8'));

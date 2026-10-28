@@ -121,7 +121,8 @@ import { htmx } from 'recooler/htmx';
 Always pass that namespace: it is a stable hash of the absolute srcDir and matches
 all generated registrations, isolating projects with identical relative module
 IDs. Module/action IDs are **srcDir-relative**, with POSIX separators (including
-`../` for outside-source modules), exactly matching 0.0.27. Only Vite transport
+`../` for outside-source modules). Farm compiler paths can include a different
+source-root prefix; do not persist old IDs across the migration. Only Vite transport
 `?v=`/`?t=` queries are removed; meaningful variants remain distinct.
 
 Production builds define `__RECOOLER_PRODUCTION__` as true. `htmx()` throws at

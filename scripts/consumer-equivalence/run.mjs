@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { join, resolve, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { captureTraces, generateRequests, traceCounts, comparisonRecord, compareTraces } from './traces.mjs';
-const adapters = { 'farm-0.0.27': () => import('./adapters/farm-0.0.27.mjs') };
+const adapters = { 'farm-0.0.27': () => import('./adapters/farm-0.0.27.mjs'), 'recooler-0.1': () => import('./adapters/recooler-0.1.mjs') };
 
 const args = process.argv.slice(2);
 let comparePath, expectedDifferencesPath, adapterPath;

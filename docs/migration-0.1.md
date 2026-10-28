@@ -182,7 +182,7 @@ imports. The table is static; D5 development uses `invalidateAll` and a full SSR
 reload to re-evaluate the virtual table and recreate `createApp`. Getter mode is
 unsupported. Register actions before `createApp`: `actionUrl` throws if an action uses a method
 that was not reserved on the rendering route at app creation. Recreate the app
-after registering a new method. The Vite integration will provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+after registering a new method. The Vite integration provides this table automatically; see the [runtime interface](../packages/recooler/src/htmx/README.md).
 
 **D6: all action URLs are now signed**, including actions without captures. The
 signature covers the receiving route file, exact pathname, HTTP method, action
@@ -196,10 +196,11 @@ env.ACTION_SECRET`; env functions are cached per env object identity in a WeakMa
 Use a new env object or recreate the app to rotate a key within the same env. Missing/empty secrets fail startup or the first request
 with actions. `secret: false` now throws; use `secret: { unsafeUnsigned: true }` only for local
 development. This disables D6 replay protection (including unused barrel actions)
-while retaining CSRF and reachability checks. The Phase 4b Vite plugin must reject
-this mode in production using the exported `unsafeUnsignedMarker` on the extension.
-Each `htmx()` creation in this mode logs a runtime warning. The marker is a runtime
-property, so the plugin must evaluate the built server entry to check it.
+while retaining CSRF and reachability checks. Production Vite builds define a flag that makes `htmx()` reject this mode at
+startup, including custom entries, unless `allowUnsignedInProduction: true` is
+explicitly set. Each unsigned extension logs a warning and exposes the
+`unsafeUnsignedMarker` for runtime tooling; no Worker execution during the build
+is required.
 The plugin must also provide a stable per-project namespace to both
 `registerActions(moduleId, methods, namespace)` and `htmx({ namespace, ... })`; the
 default namespace remains shared for compatibility with current transform output.
@@ -327,3 +328,114 @@ Recooler does not classify arbitrary dependencies as server-only automatically.
 Dev edits invalidate the virtual entry and server graph and send a full reload
 over Vite's HMR socket. There is no preservation of browser component state.
 `playground-vite/` demonstrates this stack alongside the frozen Farm playground.
+
+## Practical Worker port checklist
+
+Use an ESM Vite config (`vite.config.mts`, or `.ts` inside a package with
+`"type": "module"`). Pin compatible platform peers together: Cloudflare plugin
+1.65.0 requires Wrangler `^4.152.0`; the verified Vite target is 8.3.5. Remove
+unused Farm dependencies and their pnpm patches. Keep the package's PostCSS
+configuration; Vite reads it directly without the Farm PostCSS plugin. Vite
+reserves the mode name `local`, so use a name such as `preview` for a local build
+profile. Update dev, build, deploy and Wrangler-manifest entry/build commands,
+including any generator that owns the Wrangler JSON. Rebuild before deploying
+through Vite's generated Wrangler configuration; an old `dist/main.js` reference
+is no longer the source entry.
+
+A custom Farm `route_handler_factory` becomes a `jsxPages(options)` adapter in
+an application-owned entry. The virtual app does not accept custom page-adapter
+options. Preserve streamed-template and cleanup hooks explicitly:
+
+```ts
+import { createApp } from 'recooler/router';
+import { jsxPages, type RouteEnv } from 'recooler/jsx';
+import { htmx } from 'recooler/htmx';
+import { manifest } from './routes.gen';
+import { table, clients, clientEntry, namespace } from 'virtual:recooler/htmx';
+
+const pages = jsxPages({
+  ResolvedTemplate: /* your existing resolved-template component */ undefined,
+  suspenseCleanupScriptMiddleware: script => script,
+});
+export default createApp<RouteEnv>(manifest, {
+  pages,
+  extensions: [htmx<RouteEnv>({
+    table, clients, clientEntry, namespace,
+    secret: env => env.RECOOLER_SECRET,
+    legacyClientScript: true, // only when the root still inlines argument two
+  })],
+});
+```
+
+Declare `RECOOLER_SECRET: string` in the application's Worker Bindings (and in
+its `RouteEnv` augmentation). Supply `htmx<YourEnv>` explicitly when a custom
+entry needs a typed binding callback; the surrounding `createApp<YourEnv>` does
+not infer that generic for a nested call. Provision the binding for every Worker
+that renders or dispatches actions. Do not turn it into a Vite define. Import
+`Suspense`, `ErrorBoundary` and `renderHeadElements` from `recooler/jsx` in place
+of the old helpers module.
+
+The old global `HonoContext`, `FormActionFn` and `EventHandlerFn` declarations
+are gone along with the ambient route types. Import `RouteContext` (or Hono's
+`Context<YourEnv>`) and the callback types from `recooler/jsx`; its automatic
+runtime supplies contextual types for inline htmx attributes. Tests that mock
+`easy-jsx-html-engine/jsx-runtime` to inspect JSX nodes must mock
+`recooler/jsx/jsx-runtime` after changing the import source. `RouteProps` gained
+`params`, `route` and `scripts`; helper components that only need `ctx` and `url`
+should use `Pick<RouteProps, 'ctx' | 'url'>` rather than omitting a few fields
+from the full page contract.
+
+When linking a checkout, keep Hono's resolved peer version consistent with the
+application. Separate versions can have incompatible private request brands in
+their TypeScript declarations. A package-manager link also retains its own
+runtime dependency resolution; verify both declarations and the emitted bundle.
+Absolute `link:` dependencies may be serialized as relative lockfile paths.
+Check those paths after moving or cloning a temporary workspace, especially with
+frozen installs.
+
+htmx 2's normal XHR headers include `HX-Request: true` and `HX-Current-URL`.
+`HX-Current-URL` is **not** a substitute for the provenance check. Browsers send
+`Sec-Fetch-Site: same-origin` for same-origin requests; scripts cannot set that
+Fetch Metadata header themselves. Non-browser/manual clients must send the HX
+header plus a matching `Origin` (or valid Fetch Metadata in test clients).
+Do not use `hx-request='{"noHeaders":true}'` for actions. A cross-origin frontend
+also needs an explicit `trustedOrigins` configuration and its normal CORS setup.
+
+The router now composes terminal handlers with Hono finalization semantics. A
+handler that returns undefined without setting `ctx.res` or calling `next()`
+produces Hono's "Context is not finalized" error response. In 0.0.27, outer
+`return await next()` middleware could instead leak a non-Response context and
+make HEAD throw a RangeError. Return a Response, set `ctx.res`, or call `next()`
+explicitly. Error responses pass through the application's `onError` as usual.
+
+Signed action URLs require an active rendering request. Do not evaluate
+action-bearing JSX at module initialization (including a header passed eagerly
+into a page HOC): the engine evaluates component functions immediately, and
+`actionUrl` then throws "Context is not available". Change, for example,
+`CollectionPage(<Header><ActionButton /></Header>, query)` to
+`CollectionPage(() => <Header><ActionButton /></Header>, query)` when that HOC
+accepts a component, or move the JSX into its request-time render function.
+Keep action source order stable while making this mechanical change.
+
+Diagnostic bodies containing `Error.stack` change with the Vite/Rolldown bundle,
+including function names, generated line/column locations and framework frames.
+This is an intended build-format change, even when the error's message, HTTP
+status and application invocation sequence are identical. Review these bodies
+explicitly in equivalence reports; do not normalize all text/JSON responses or
+silence other byte differences. Applications that need stable diagnostic APIs
+should return structured error messages instead of generated stacks.
+
+Vite's CSS output has its own `build.cssMinify` switch, independent of JavaScript
+`build.minify`. Set it explicitly when preserving readable CSS strings. Even
+without minification, Vite/PostCSS may serialize whitespace/comments differently
+and omit Farm's inline CSS source map; compare parsed rules and declarations
+when reviewing those exact byte changes.
+
+`signActionUrl` deliberately encodes an explicit scope object, defaulting to `{}`,
+even for capture-free actions. A raw legacy captured-action probe with no `scope`
+therefore changes from "missing action scope" to invoking the factory with an
+empty object when minted through this helper. Such a probe supplies no business
+capture data. Test real captured submissions using the complete rendered URL or
+an explicit synthetic scope, and keep any raw-probe difference narrowly listed
+in the private equivalence expectations. Never reuse cached 0.0.27 action IDs
+or URLs: compiler source roots may also change their module-ID prefix.

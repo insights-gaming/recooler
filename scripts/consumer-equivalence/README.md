@@ -231,3 +231,47 @@ Mutation checks show missing render calls, root scripts, layout/head HTML,
 headers and unlisted response differences fail comparison. They also exercise
 action URL hooks and explicit/stale expected differences. The 0.1 runtime and
 its signing helper remain requirements for the implementation phases.
+
+## recooler 0.1 adapter
+
+```sh
+pnpm --filter recooler build
+node scripts/consumer-equivalence/self-test.mjs --adapter recooler-0.1
+node scripts/consumer-equivalence/run.mjs /absolute/path/to/ported-checkout \
+  --target recooler-0.1 --probes /private/tmp/candidate-profile.json \
+  --compare /private/tmp/baseline/farm-0.0.27.json \
+  --expect-diff /private/tmp/expected-differences.json
+```
+
+The adapter uses the port's Vite configuration and **its own resolved Vite
+instance**, retaining Cloudflare's platform builder and native Rolldown plugin
+identity. Both server and client environments build. Server artifacts are written
+to the private baseline/probe directories with `main.js` as entry; named exports
+and chunks remain intact. The fixture mode applies a generic mechanical port in
+memory, leaving the Farm fixtures usable by their original adapter.
+
+Additional private per-package options are:
+
+- `actionSecret`: a nonempty synthetic test key, required outside fixtures.
+  It is injected into request bindings, never compiled into the application.
+- `secretBinding`: binding name, default `RECOOLER_SECRET`, matching the port.
+- `mode`: Vite mode, default `equivalence`.
+- `viteConfig`: package-relative config path, otherwise `.ts` then `.mts`.
+- `runtimePackageRoot`: optional dependency host for the shared Wrangler/
+  Miniflare runtime. Use the **same Miniflare 4 installation** for both captures
+  when the build tool upgrade changes Wrangler's transitive runtime. Miniflare 5
+  has a different configuration API and is not supported by this runtime wrapper.
+
+Probe instrumentation wraps manifest namespace export slots, returned HOC
+components, page handlers and registered actions. Action identities use package-relative source labels, mapping the target
+module prefix to its runtime action ID. Route templates map to manifest
+file IDs for dispatch-time `recooler/htmx/testing` signing. The uninstrumented
+Worker uses the same signed dispatch hook and independent runtime. Fixture
+runtimes use separate Node worker threads so persistent action registries and
+stream globals cannot leak between baseline and probe.
+
+Builds use a fixed **test-only** UUID cache token in both modes so client entry
+URLs are byte-comparable for instrumentation parity. Production builds retain
+Recooler's normal per-build token. The 0.1 fixture explicitly checks Hono's 500
+finalization response for an undefined terminal handler, while the Farm fixture
+continues to check its legacy non-Response/HEAD failure outcome.
