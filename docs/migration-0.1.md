@@ -103,11 +103,9 @@ also protect method-only routes, catch-alls and unmatched requests under its
 prefix. After-next middleware must still see `ctx.error` and `ctx.finalized` and
 may throw `HTTPException` with a response returned by `app.onError`.
 
-Send `HX-Request: true`, a same-origin `Origin`, and
-`Sec-Fetch-Site: same-origin` on manual action requests. Revisit CSRF and signed
-URL migration when the htmx implementation lands. The legacy two-argument root
-compatibility opt-in, exact script string and route marker through `props.head`
-remain design work for that phase; see the inventory's plan gaps.
+See the action URL and CSRF migration below for manual action requests. Client
+entry loading remains Phase 5 work; the JSX root compatibility contract is
+documented below.
 
 ## JSX pages
 
@@ -175,3 +173,52 @@ Suspense only when that output is desired.
 
 External module scripts execute after the entire Suspense stream finishes. Phase
 5 must account for this onLoad timing difference from the old inline script.
+
+
+## htmx action URLs and security (D3/D6/D7)
+
+Configure `htmx({ table, secret })` from `recooler/htmx` as a `createApp` extension
+alongside `jsxPages()`. The reachability table maps manifest `route.file` IDs to
+registered action-bearing module IDs, including roots, layouts and shared static
+imports. A synchronous getter supports development. The Vite integration will
+provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+
+**D6: all action URLs are now signed**, including actions without captures. The
+signature covers the receiving route file, exact pathname, HTTP method, action
+ID and serialized scope. Pages cached before this switch contain incompatible
+URLs: invalidate those pages and have users refresh them before submitting.
+Unknown, unsigned, tampered and replayed-to-another-path URLs fall through after
+route middleware and normally return 404 without running an action. A guard's
+401 still comes first. Supply a runtime secret string or `secret: env =>
+env.ACTION_SECRET`; it is resolved once per extension instance and cached, never
+inlined by the transform. Missing/empty secrets fail startup or the first request
+with actions. `secret: false` warns and permits unsigned local development URLs;
+it disables D6 replay protection while retaining CSRF and reachability checks.
+
+**D7: action requests require `HX-Request: true`**, including mutating GET actions.
+They also require acceptable Fetch Metadata or Origin. Manual requests should
+send `HX-Request: true`, `Origin` equal to the destination origin, and
+`Sec-Fetch-Site: same-origin`. Hono CSRF semantics allow either same-origin Fetch
+Metadata or an allowed Origin; `same-site` alone is insufficient. Configure
+`trustedOrigins` for additional exact origins or an origin predicate. Missing or
+invalid provenance and missing HX headers return 403 before action execution.
+These checks also apply to JSON and other non-form content types.
+
+**D3: actions post to the rendering route.** A component imported from an admin
+route and rendered on a public page now submits to the public page's middleware
+chain. In 0.0.27 it submitted to the defining route module. Keep authorization in
+the rendering route or action when sharing such components. Only page routes
+register actions; handler-only routes keep ordinary `action` query parameters.
+Forms returned by guard middleware must live on an unguarded route because the
+guard always runs before action dispatch.
+
+Use `htmx({ base: '/app', ... })` when `app.mount()` or a prefix-stripping proxy
+hides that external prefix. Mount actions without the appropriate base are
+unsupported. Omit `base` for `route()` and `basePath()`, whose request pathname
+already includes the prefix. URLs preserve exact encoded segments and stay local
+even when a root catch-all matches a path starting with `//`.
+
+The lower-level `actionScope` helper now requires the ambient rendering binding;
+`configureActions` is replaced by per-extension secrets. `page.scripts` is empty
+until Phase 5 supplies the client entry. Client handler slices already register
+their own handlers; loading those slices and invoking onLoad remain Phase 5 work.

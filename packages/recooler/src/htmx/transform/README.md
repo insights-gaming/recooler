@@ -153,9 +153,10 @@ registerActions(moduleId, { post: { "src/routes/index.tsx@0": _action$post$0 } }
 Both defaults are small exported functions in `codegen.ts` and can be overridden
 with `options.codegen.actionUrl` / `registerActions`. Their inputs include a
 collision-free local runtime helper name. All generated runtime imports come from
-`recooler/htmx/runtime`. That subpath currently contains **declarations only** for
-the runtime worker to implement; executing transformed output requires the real
-runtime (or the stub used by execution tests).
+`recooler/htmx/runtime`. That subpath is implemented by the
+[server runtime](../README.md); executing server output requires a route binding
+from the `htmx()` router extension. Client slices register their own handlers and
+do not import that server runtime.
 
 The bundler worker still owns SSR/client environment integration, action module
 reachability, dev invalidation, chunk loading and scheduling `onLoad`. Dynamic
