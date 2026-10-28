@@ -35,3 +35,13 @@ app.get('/typed', c => {
   const wrong: number = c.env.DB;
   return c.text(binding + variable + wrong);
 });
+
+// Inline htmx callbacks must receive contextual types under strict/noImplicitAny.
+const actionTypes = <form hx-post={(ctx, payload) => {
+  const context: import('recooler/jsx').RouteContext = ctx;
+  return context.text(String(payload.value));
+}} hx-on:click={function (event) {
+  const element: Element = this;
+  return [element, event.type];
+}} />;
+void actionTypes;

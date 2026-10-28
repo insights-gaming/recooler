@@ -46,3 +46,5 @@ export function jsxDEV(name: string | Component<any>, props: Record<string, unkn
 }
 
 export { jsx as jsxs, Fragment };
+
+export type { FormActionFn, EventHandlerFn } from './htmx-types.js';

@@ -301,3 +301,4 @@ export function Suspense(props: SuspenseProps): JSX.Element {
     catch: (error: unknown) => defaultCatch(error, props) });
 }
 export type { ErrorBoundaryProps, SuspenseProps, ResolvedTemplateProps } from './types.js';
+export type { FormActionFn, EventHandlerFn } from './htmx-types.js';
