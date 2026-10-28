@@ -44,7 +44,7 @@ it('orders extension handlers, onRequest, onGet and page within one chain', asyn
   const app = createApp(manifest({
     '(g)/middleware.ts': traceMiddleware(trace, 'group'),
     '(g)/index.tsx': { ...page, onRequest: through('onRequest'), onGet: through('onGet') },
-  }), { pages: adapter, extensions: [{ name: 'a', route: () => ({ handlers: [through('ext-a')] }) }, { name: 'b', route: () => ({ handlers: [through('ext-b')] }) }] });
+  }), { pages: adapter, extensions: [{ name: 'a', route: () => ({ methods: ['ALL'], handlers: [through('ext-a')] }) }, { name: 'b', route: () => ({ methods: ['ALL'], handlers: [through('ext-b')] }) }] });
   expect(await (await app.request('/')).text()).toBe('ok');
   expect(trace).toEqual(['group>', 'ext-a', 'ext-b', 'onRequest', 'onGet', 'page', '<group']);
   // Hono stores one entry per handler: one ALL registration with five handlers.
@@ -222,4 +222,85 @@ it('passes handler errors through Hono error handling and rejects double next', 
   });
   const response = await app.request('/');
   expect(response.status).toBe(500); expect(await response.text()).toContain('next() called multiple times');
+});
+
+
+it.each(['basename', 'missing'] as const)('scopes guards independently of %s middlewareFiles', async metadata => {
+  const input = manifest({
+    '(staff)/middleware.ts': { default: (c: Context) => c.text('blocked', 401) },
+    '(staff)/admin/index.ts': { onGet: text('secret') },
+    'zzz/middleware.ts': { default: pass },
+  });
+  for (const node of input.tree.children) node.middlewareFiles = metadata === 'basename' ? ['middleware.ts'] : undefined;
+  expect((await createApp(input).request('/admin')).status).toBe(401);
+});
+
+it('keeps eleven metadata-free middleware in array order', async () => {
+  const trace: number[] = [];
+  const input = manifest({ '(g)/index.ts': { onGet: text('ok') } });
+  const group = input.tree.children[0]!;
+  delete group.middlewareFiles;
+  group.middleware = Array.from({ length: 11 }, (_, i) => ({ default: async (_c: Context, next: () => Promise<void>) => { trace.push(i); await next(); } }));
+  await createApp(input).request('/');
+  expect(trace).toEqual(Array.from({ length: 11 }, (_, i) => i));
+});
+
+it('scopes extension arrays and per-method chains to their declared methods', async () => {
+  const seen: string[] = [];
+  const app = createApp(manifest({ 'index.ts': { onGet: text('get'), onPut: text('put') } }), {
+    extensions: [{ name: 'actions', route: () => ({ methods: ['POST'], handlers: [(c) => { seen.push(c.req.method); return c.text('action'); }] }) },
+      { name: 'other', route: () => ({ handlers: { DELETE: [text('deleted')] } }) }],
+  });
+  expect(await (await app.request('/?action=delete-account')).text()).toBe('get');
+  expect(await (await app.request('/', { method: 'PUT' })).text()).toBe('put');
+  expect((await app.request('/', { method: 'HEAD' })).status).toBe(200);
+  expect(await (await app.request('/', { method: 'DELETE' })).text()).toBe('deleted');
+  expect(await (await app.request('/', { method: 'POST' })).text()).toBe('action');
+  expect(seen).toEqual(['POST']);
+});
+
+it('collapses ALL to one registration without duplicate native dispatch', async () => {
+  let calls = 0;
+  const app = createApp(manifest({ 'index.ts': { onGet: async (_c: Context, next: () => Promise<void>) => { calls++; await next(); } } }), {
+    extensions: [{ name: 'any', route: () => ({ methods: ['ALL'], handlers: [pass] }) }],
+  });
+  expect((await app.request('/')).status).toBe(404);
+  expect(calls).toBe(1);
+  expect(new Set(app.routes.map(r => r.method))).toEqual(new Set(['ALL']));
+});
+
+it('calls and validates the page adapter only for own default exports', async () => {
+  let calls = 0;
+  const app = createApp(manifest({ '(a)/x/index.ts': { onPost: text('post') }, '(b)/x/index.ts': { onGet: text('get') } }), {
+    pages: { handler: () => { calls++; return text('page'); } },
+  });
+  expect(await (await app.request('/x')).text()).toBe('get');
+  expect(calls).toBe(0);
+  expect(() => createApp(manifest({ 'index.tsx': page }), { pages: { handler: () => 42 as unknown as Handler } })).toThrow('page adapter handler');
+});
+
+it('provides frozen copies to hooks and named page contributions additively', async () => {
+  let contributions: unknown;
+  const app = createApp(manifest({ '(g)/middleware.ts': { default: (c: Context) => c.text('blocked', 401) }, '(g)/index.tsx': page }), {
+    extensions: [{ name: 'first', route: route => {
+      expect(Object.isFrozen(route)).toBe(true);
+      expect(() => route.middleware.pop()).toThrow();
+      return { page: { title: 'first' } };
+    } }, { name: 'last', route: () => ({ page: { title: 'last' } }) }],
+    pages: { handler: (_route, extras, named) => { expect(extras).toEqual([{ title: 'first' }, { title: 'last' }]); contributions = named; return text('page'); } },
+  });
+  expect((await app.request('/')).status).toBe(401);
+  expect(contributions).toEqual([{ extension: 'first', page: { title: 'first' } }, { extension: 'last', page: { title: 'last' } }]);
+});
+
+it('types the returned Hono context variables with a generic Env', async () => {
+  const app = createApp<{ Variables: { greeting: string } }>(manifest({ 'index.ts': { onGet: text('ok') } }));
+  app.get('/typed', c => { c.set('greeting', 'hello'); return c.text(c.var.greeting); });
+  expect(await (await app.request('/typed')).text()).toBe('hello');
+});
+
+it('puts custom regex params before plain params regardless of their names', async () => {
+  const app = createApp(manifest({ '[n{[0-9]+}]/index.ts': { onGet: text('numeric') }, '[id]/index.ts': { onGet: text('plain') } }));
+  expect(await (await app.request('/42')).text()).toBe('numeric');
+  expect(await (await app.request('/abc')).text()).toBe('plain');
 });

@@ -20,11 +20,14 @@ app's `onError`/`notFound` using the API of your Hono version.
 `RouteValidationError` before registration and reports near-miss export warnings via
 `options.warn` (defaults to `console.warn`). Namespace exports are authoritative, including
 re-exports. Manifest version is 1; `layoutFile` and parallel `middlewareFiles` are optional
-source metadata for diagnostics. Middleware arrays are in filename order. Generated
+source ids relative to srcDir in POSIX form; they never determine middleware identity or scope.
+`Manifest.rootFile` is optional. Resolved routes expose `layoutFiles` (parallel to layouts,
+undefined where metadata was omitted), `rootFile`, and scoped `middlewareFiles`. Middleware arrays are in filename order. Generated
 `segment` values retain filesystem names; `path` values have converted params and no groups.
 
-Ordering matches 0.0.27's `routes.rs`. In particular, custom regex params share ordinary
-params' ordering class; `{.+}` and `{.*}` count as catch-alls. Same-shaped routes put pages
+Ordering follows 0.0.27 except that custom regex params always precede plain params.
+The segment order is static, custom pattern, plain param, catch-all; `{.+}` and `{.*}` count
+as catch-alls. Same-shaped routes put pages
 first, followed by path and group directory. Pages count as terminal GET handlers in
 validation even without an installed page adapter. Extensions' handlers do not count as
 terminal conflicts because their fall-through is intentional.
@@ -38,16 +41,25 @@ Plain directories inside groups also register a trailing prefix use for unmatche
 ## Extensions and pages
 
 A `RouterExtension` has a name and optional `route(resolvedRoute)` hook, called once at
-startup. It can return additional `methods`, `handlers` and `page` extras. Methods are
-uppercased; handlers follow scoped middleware and precede onRequest and method dispatch.
+startup with a frozen copy of the route and its array containers. Namespace identity is
+preserved. It can return additional `methods`, `handlers` and `page` extras. Methods are
+uppercased; array handlers run only for the declared methods. A handler map such as
+`handlers: { POST: [actionHandler] }` also declares its method keys. `ALL` covers every
+method, and GET includes HEAD. Handlers follow scoped middleware and precede onRequest
+and method dispatch. Extensions with array handlers must declare their methods.
+Whether selected handlers should precede scoped middleware remains an open question tied
+to htmx D5 (guard-rendered forms).
 Action handlers should return their response for a matching action and call `next()` when
 the request should reach another handler. Supply all methods that should run the extension,
 including methods for which the route has no native handler.
 
-A `PageAdapter` has `handler(route, extras)`, returning a Hono handler or undefined. The
-route includes namespaces for the page, layouts in **root-to-leaf order** (including
+A `PageAdapter` has `handler(route, extras, contributions)`, returning a Hono handler or undefined. The
+adapter is called only for routes with an own default export, and its return value is
+validated. The route includes namespaces for the page, layouts in **root-to-leaf order** (including
 head-only layouts), and optional root. Extras are passed as an array in extension order;
-entries without page extras are omitted. No data is silently merged before the adapter.
+entries without page extras are omitted. The additive third argument contains matching
+`{ extension, page }` pairs so adapters can resolve collisions by extension name.
+No data is silently merged before the adapter.
 
 The standard merge rule is exported as `mergePageExtras(extras)`: arrays concatenate in
 extension order; every other value replaces the previous value for the same key. Objects
@@ -60,3 +72,8 @@ such as scripts; they may interpret extension-specific fields from the ordered e
 Hono 4.12+ and 5.0.0-rc.1 are exercised by the test projects. Hono 5 uses `hono/mount`
 middleware in place of `app.mount()`, and uses Context-based error handlers. Recooler does
 not add compatibility methods to the Hono instance.
+
+Use `createApp<MyEnv>(manifest)` to type Hono context variables (for example
+`MyEnv = { Variables: { user: User } }`). `app.use()` called after `createApp()` does not
+run for matched terminal routes: Hono executes registrations in order. Install request
+middleware through the manifest or a parent app before routing the generated app.

@@ -22,8 +22,9 @@ describe('reference path ordering', () => {
     ['/', '/about'], ['/blog', '/blog/:post'], ['/a/:rest{.+}', '/:rest{.+}'],
     ['/:a/:rest{.+}', '/:rest{.+}'], ['/:rest{.+}/x', '/:rest{.+}'], ['/re/:id/edit', '/re/:p{.*}'], ['/re/:id', '/re/:p{.*}'],
   ])('%s precedes %s', (a, b) => expect(compareRoutePaths(a, b)).toBeLessThan(0));
-  it('does not invent a specificity class for custom patterns', () => {
+  it('prioritizes custom patterns regardless of param names', () => {
     expect(compareRoutePaths('/:a{[0-9]+}', '/:z')).toBeLessThan(0);
+    expect(compareRoutePaths('/:z{[0-9]+}', '/:a')).toBeLessThan(0);
   });
   it('keeps custom patterns in conflict shapes', () => {
     expect(routePathShape('/:id/x')).toBe('/:/x');
@@ -31,7 +32,7 @@ describe('reference path ordering', () => {
     expect(routePathShape('/a/:rest{.+}')).toBe('/a/:{.+}');
   });
   it.each([
-    ['[id]', ':id'], ['[p{regex}]', ':p{regex}'], ['[[rest]]', ':rest{.+}'],
+    ['[n{[0-9]+}]', ':n{[0-9]+}'], ['[n{a{2}}]', ':n{a{2}}'], ['[n{a]', '[n{a]'], ['[n{a}x]', '[n{a}x]'], ['[id]', ':id'], ['[p{regex}]', ':p{regex}'], ['[[rest]]', ':rest{.+}'],
     ['[]', '[]'], ['[[]]', '[[]]'], ['[id', '[id'], ['[a]]', '[a]]'], ['[post-id]', ':post-id'], ['[[a[b]]', ':a[b{.+}'],
   ])('converts %s exactly like the reference', (input, output) => expect(routeSegment(input)).toBe(output));
   it.each(['(a.b)', '(v2.0)', '(a(b)', '(日本語)'])('recognizes group %s', s => expect(isGroupSegment(s)).toBe(true));
@@ -124,4 +125,14 @@ it('orders late prefix middleware by directory paths, before appending /*', () =
     '(a)/(b)/[[rest]]/middleware.ts': mw(), '(g)/[[rest]]/x/middleware.ts': mw(),
   }));
   expect(plan.lateMiddlewares.map(m => m.path)).toEqual(['/:rest{.+}/x/*', '/:rest{.+}/*']);
+});
+
+
+it('preserves source ids alongside root, layouts and scoped middleware', () => {
+  const input = manifest({ 'layout.ts': {}, '(g)/layout.ts': {}, '(g)/middleware.ts': mw(), '(g)/index.tsx': page }, {});
+  input.rootFile = 'root.tsx';
+  const route = resolveRoutes(input).routes[0]!;
+  expect(route.layoutFiles).toEqual(['routes/layout.ts', 'routes/(g)/layout.ts']);
+  expect(route.rootFile).toBe('root.tsx');
+  expect(route.middlewareFiles).toEqual(['routes/(g)/middleware.ts']);
 });

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import type { Context, Handler, MiddlewareHandler, Next } from 'hono';
+import type { Context, Env, Handler, MiddlewareHandler, Next } from 'hono';
 import { methodExports, resolveRoutes, RouteValidationError } from './resolve.js';
-import type { CreateAppOptions, Manifest } from './types.js';
+import type { CreateAppOptions, Manifest, ResolvedRoute } from './types.js';
 export * from './types.js';
 export { compareRoutePaths, compareRouteShapes, isGroupSegment, routeSegment, routePathShape, routePathWithoutGroups, resolveRoutes, RouteValidationError } from './resolve.js';
 
@@ -44,20 +44,39 @@ function dispatch(handlers: Handler[], c: Context, next: Next): Promise<void> {
   return run(0);
 }
 
-export function createApp(manifest: Manifest, options: CreateAppOptions = {}): Hono {
+export function createApp<E extends Env = Env>(manifest: Manifest, options: CreateAppOptions<E> = {}): Hono<E> {
   const plan = resolveRoutes(manifest);
   if (plan.errors.length) throw new RouteValidationError(plan.errors);
   for (const warning of plan.warnings) (options.warn ?? console.warn)(warning);
-  const app = new Hono({ strict: true, ...options.hono });
+  const app = new Hono<E>({ strict: true, ...options.hono });
   for (const mw of plan.middlewares) app.use(mw.path, mw.handler);
   for (const route of plan.routes) {
-    const additions = (options.extensions ?? []).map(extension => extension.route?.(route)).filter(x => x !== undefined);
-    const page = options.pages?.handler(route, additions.flatMap(x => x.page ? [x.page] : []));
+    // Freeze copied containers so hooks cannot alter the planner's registration chains.
+    const view = Object.freeze(Object.fromEntries(Object.entries(route).map(([key, value]) =>
+      [key, Array.isArray(value) ? Object.freeze([...value]) : value]))) as unknown as ResolvedRoute;
+    const additions = (options.extensions ?? []).flatMap(extension => {
+      const addition = extension.route?.(view);
+      return addition ? [{ ...addition, extension: extension.name }] : [];
+    });
+    const contributions = additions.flatMap(x => x.page ? [{ extension: x.extension, page: x.page }] : []);
+    const page = Object.hasOwn(route.module, 'default')
+      ? options.pages?.handler(view, contributions.map(x => x.page), contributions) : undefined;
+    if (page !== undefined && typeof page !== 'function') throw new RouteValidationError([`page adapter handler for ${route.file} is not a function`]);
+    const scopedAdditions = additions.map(addition => ({
+      methods: new Set((addition.methods ?? []).map(m => m.toUpperCase())),
+      handlers: Array.isArray(addition.handlers) ? addition.handlers : undefined,
+      byMethod: Object.entries(Array.isArray(addition.handlers) ? {} : addition.handlers ?? {})
+        .map(([method, handlers]) => [method.toUpperCase(), handlers] as const),
+    }));
     const methods = new Set<string>();
     for (const [name, method] of Object.entries(methodExports)) if (typeof route.module[name] === 'function') methods.add(method);
     if (page) methods.add('GET');
-    for (const addition of additions) for (const method of addition.methods ?? []) methods.add(method.toUpperCase());
+    for (const addition of scopedAdditions) {
+      for (const method of addition.methods) methods.add(method);
+      for (const [method] of addition.byMethod) methods.add(method);
+    }
     if (typeof route.module.onRequest === 'function') { methods.clear(); methods.add('ALL'); }
+    if (methods.has('ALL')) { methods.clear(); methods.add('ALL'); }
     if (!methods.size) continue;
     const methodDispatch: Handler = async (c, next) => {
       const method = c.req.method === 'HEAD' ? 'GET' : c.req.method;
@@ -67,7 +86,14 @@ export function createApp(manifest: Manifest, options: CreateAppOptions = {}): H
     };
     const handlers: Handler[] = [
       ...route.middleware.map((mw, i) => once(mw, route.middlewareModules[i])),
-      ...additions.flatMap(x => x.handlers ?? []),
+      ...scopedAdditions.map(({ methods, handlers, byMethod }): Handler => (c, next) => {
+        const method = c.req.method;
+        const matches = (declared: string) => declared === 'ALL' || declared === method || (method === 'HEAD' && declared === 'GET');
+        return dispatch([
+          ...(handlers && [...methods].some(matches) ? handlers : []),
+          ...byMethod.flatMap(([declared, chain]) => matches(declared) ? chain : []),
+        ], c, next);
+      }),
       ...(typeof route.module.onRequest === 'function' ? [route.module.onRequest as Handler] : []),
       methodDispatch];
     app.on([...methods], route.path, handlers[0]!, ...handlers.slice(1));

@@ -80,7 +80,7 @@ The Farm plugin's 0.0.27 behaviour was settled through several rounds of adversa
 **Routing**
 - One flat Hono app with `strict: true`. Groups never become sub-apps.
 - **Route order:**
-  - Routes are compared segment by segment, and the earlier segment decides. Within a segment, static sorts before `:param`, then a custom pattern, then a catch-all; `{.*}` patterns count as catch-alls.
+  - Routes are compared segment by segment, and the earlier segment decides. For 0.1.0, a segment sorts static < custom pattern < plain `:param` < catch-all; `{.+}` and `{.*}` count as catch-alls. This deliberately changes 0.0.27, which put custom patterns and plain params in the same class and could silently shadow a regex route depending on parameter names.
   - Routes that match the same requests (the same path in several groups, or paths differing only in param names) are ordered with pages first, then by path, then by group directory.
 - **Build errors:**
   - two layout or route files in one directory

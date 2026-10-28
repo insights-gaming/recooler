@@ -9,15 +9,32 @@ export function isGroupSegment(segment: string): boolean {
   return segment.length > 2 && segment.startsWith('(') && segment.endsWith(')') && !segment.slice(1, -1).includes(')');
 }
 export function routeSegment(segment: string): string {
-  return segment.replace(/^\[([^\[\]][^\]]*)\]$/, ':$1').replace(/^\[\[([^\]]+)\]\]$/, ':$1{.+}');
+  if (segment.startsWith('[[') && segment.endsWith(']]')) {
+    const name = segment.slice(2, -2);
+    if (name && !name.includes(']')) return `:${name}{.+}`;
+  }
+  if (!segment.startsWith('[') || !segment.endsWith(']')) return segment;
+  const value = segment.slice(1, -1);
+  const brace = value.indexOf('{');
+  const name = brace < 0 ? value : value.slice(0, brace);
+  if (!name || /[\[\]{}]/.test(name)) return segment;
+  if (brace < 0) return `:${name}`;
+  let depth = 0;
+  for (let i = brace; i < value.length; i++) {
+    if (value[i] === '\\') { i++; continue; }
+    if (value[i] === '{') depth++;
+    if (value[i] === '}' && --depth === 0 && i !== value.length - 1) return segment;
+    if (depth < 0) return segment;
+  }
+  return depth === 0 && value.endsWith('}') ? `:${value}` : segment;
 }
 export function routePathWithoutGroups(path: string): string {
   return '/' + path.split('/').filter(s => s && !isGroupSegment(s)).join('/');
 }
 function kind(s: string): number {
-  return !s.startsWith(':') ? 0 : s.endsWith('{.+}') || s.endsWith('{.*}') ? 2 : 1;
+  return !s.startsWith(':') ? 0 : s.endsWith('{.+}') || s.endsWith('{.*}') ? 3 : s.includes('{') ? 1 : 2;
 }
-/** Exact 0.0.27 comparator: regex params share the ordinary-param class. */
+/** 0.1.0 specificity: static, custom pattern, plain param, catch-all. */
 export function compareRouteShapes(a: string, b: string): number {
   const aa = a.split('/').filter(Boolean), bb = b.split('/').filter(Boolean);
   let afterCatchAll = false;
@@ -30,7 +47,7 @@ export function compareRouteShapes(a: string, b: string): number {
     const k = kind(x);
     const order = k - kind(y) || (k === 0 ? lexical(x, y) : 0);
     if (order) return order;
-    afterCatchAll = k === 2;
+    afterCatchAll = k === 3;
   }
 }
 export function compareRoutePaths(a: string, b: string): number {
@@ -53,7 +70,9 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
   const plan: RoutePlan = { routes: [], middlewares: [], lateMiddlewares: [], errors: [], warnings: [] };
   if (manifest.version !== 1) plan.errors.push(`unsupported manifest version ${manifest.version}`);
   const dirs: { node: DirNode; directory: string; canonical: string; depth: number; inside: boolean }[] = [];
-  const allMiddleware: ResolvedMiddleware[] = [];
+  type Directory = (typeof dirs)[number];
+  type LocatedMiddleware = ResolvedMiddleware & { dir: Directory; index: number };
+  const allMiddleware: LocatedMiddleware[] = [];
   const routesByDir = new Map<string, string>();
   const layoutsByDir = new Map<string, string>();
   function walk(node: DirNode, segments: string[], inside: boolean) {
@@ -61,7 +80,8 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
     const canonical = '/' + segments.map(routeSegment).join('/');
     const path = routePathWithoutGroups(canonical);
     inside ||= node.group;
-    dirs.push({ node, directory, canonical, depth: segments.length, inside });
+    const dir = { node, directory, canonical, depth: segments.length, inside };
+    dirs.push(dir);
     if (node.group !== isGroupSegment(node.segment)) plan.errors.push(`directory ${directory} has inconsistent group metadata`);
     if (node.path !== path) plan.errors.push(`directory ${directory} has path ${node.path}, expected ${path}`);
     if (node.layout) {
@@ -70,11 +90,11 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
       if (other) plan.errors.push(`only one layout may be used per path, found ${other} and ${file} for ${canonical}`);
       layoutsByDir.set(canonical, file);
     }
-    const middleware = node.middleware.map((module, i): ResolvedMiddleware => {
+    const middleware = node.middleware.map((module, i): LocatedMiddleware => {
       const file = node.middlewareFiles?.[i] ?? `${directory}/middleware[${i}]`;
       if (!has(module, 'default')) plan.errors.push(`middleware ${file} has no default export`);
       else if (typeof module.default !== 'function') plan.errors.push(`middleware ${file} default export is not a function`);
-      return { path: usePath(path), file, module, handler: module.default as MiddlewareHandler };
+      return { dir, index: i, path: usePath(path), file, module, handler: module.default as MiddlewareHandler };
     });
     allMiddleware.push(...middleware);
     if (inside) {
@@ -90,27 +110,28 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
         if (expected && expected !== name) plan.warnings.push(`WARNING: found export ${name} but expected ${expected} in ${file}`);
         if ((expected === name) && typeof module[name] !== 'function') plan.errors.push(`handler ${name} in ${file} is not a function`);
       }
-      plan.routes.push({ path, file, module, layouts: [], root: manifest.root, middleware: [], middlewareModules: [], directory: canonical });
+      plan.routes.push({ path, file, module, layouts: [], layoutFiles: [], root: manifest.root, rootFile: manifest.rootFile, middleware: [], middlewareModules: [], middlewareFiles: [], directory: canonical });
     }
     for (const child of [...node.children].sort((a, b) => lexical(a.segment, b.segment))) walk(child, [...segments, child.segment], inside);
   }
   walk(manifest.tree, [], false);
-  const dirByFile = new Map<string, (typeof dirs)[number]>();
-  for (const dir of dirs) for (let i = 0; i < dir.node.middleware.length; i++) dirByFile.set(dir.node.middlewareFiles?.[i] ?? `${dir.directory}/middleware[${i}]`, dir);
   const compareMiddleware = (a: ResolvedMiddleware, b: ResolvedMiddleware) => {
-    const x = dirByFile.get(a.file)!, y = dirByFile.get(b.file)!;
-    return x.depth - y.depth || compareRoutePaths(routePathWithoutGroups(x.canonical), routePathWithoutGroups(y.canonical)) || lexical(x.canonical, y.canonical) || lexical(a.file, b.file);
+    const { dir: x, index: i } = a as LocatedMiddleware, { dir: y, index: j } = b as LocatedMiddleware;
+    return x.depth - y.depth || compareRoutePaths(routePathWithoutGroups(x.canonical), routePathWithoutGroups(y.canonical)) || lexical(x.canonical, y.canonical) || i - j;
   };
   allMiddleware.sort(compareMiddleware);
   const ancestor = (parent: string, child: string) => parent === '/' || parent === child || child.startsWith(parent + '/');
   // Alias directories such as [id] and :id share the reference's normalized layout/middleware
   // path, even when their files occupy distinct filesystem branches.
   for (const route of plan.routes) {
-    route.layouts = dirs.filter(d => d.node.layout && ancestor(d.canonical, route.directory))
-      .sort((a, b) => a.depth - b.depth).map(d => d.node.layout!);
-    const scoped = allMiddleware.filter(m => { const dir = dirByFile.get(m.file)!; return dir.inside && ancestor(dir.canonical, route.directory); });
+    const layouts = dirs.filter(d => d.node.layout && ancestor(d.canonical, route.directory))
+      .sort((a, b) => a.depth - b.depth);
+    route.layouts = layouts.map(d => d.node.layout!);
+    route.layoutFiles = layouts.map(d => d.node.layoutFile);
+    const scoped = allMiddleware.filter(m => { const dir = m.dir; return dir.inside && ancestor(dir.canonical, route.directory); });
     route.middleware = scoped.map(m => m.handler);
     route.middlewareModules = scoped.map(m => m.module);
+    route.middlewareFiles = scoped.map(m => m.file);
   }
   plan.middlewares.sort(compareMiddleware);
   plan.lateMiddlewares.sort(compareMiddleware);

@@ -4,7 +4,7 @@ import { isGroupSegment, routePathWithoutGroups, routeSegment } from '../../src/
 /** A hand-written source tree, with no generator involved. */
 export function manifest(files: Record<string, ModuleNs>, root?: ModuleNs): Manifest {
   const tree: DirNode = { segment: '', path: '/', group: false, middleware: [], middlewareFiles: [], children: [] };
-  for (const [file, module] of Object.entries(files)) {
+  for (const [file, module] of Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
     const segments = file.split('/');
     const name = segments.pop()!;
     let node = tree;

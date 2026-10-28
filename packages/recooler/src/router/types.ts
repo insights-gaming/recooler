@@ -1,10 +1,11 @@
-import type { Handler, MiddlewareHandler } from 'hono';
+import type { Env, Handler, MiddlewareHandler } from 'hono';
 import type { HonoOptions } from 'hono/hono-base';
 
 export type ModuleNs = Record<string, unknown>;
 export interface Manifest {
   version: 1;
   root?: ModuleNs;
+  rootFile?: string;
   tree: DirNode;
 }
 export interface DirNode {
@@ -31,10 +32,14 @@ export interface ResolvedRoute {
   module: ModuleNs;
   /** Layouts in outermost-to-innermost order, including head-only layouts. */
   layouts: ModuleNs[];
+  /** Source ids parallel to layouts; absent for hand-written metadata-free manifests. */
+  layoutFiles: (string | undefined)[];
   root?: ModuleNs;
+  rootFile?: string;
   middleware: MiddlewareHandler[];
   /** Parallel to middleware; identity is the namespace, never the default function. */
   middlewareModules: ModuleNs[];
+  middlewareFiles: string[];
   directory: string;
 }
 export interface RoutePlan {
@@ -48,18 +53,23 @@ export interface RouterExtension {
   name: string;
   route?(route: ResolvedRoute): {
     methods?: string[];
-    handlers?: Handler[];
+    /** Array handlers run only for methods; map keys also declare methods. */
+    handlers?: Handler[] | Record<string, Handler[]>;
     page?: Record<string, unknown>;
   } | void;
 }
+export interface PageContribution {
+  extension: string;
+  page: Record<string, unknown>;
+}
 export interface PageAdapter {
   /** Extras retain extension order. See mergePageExtras for the standard merge rule. */
-  handler(route: ResolvedRoute, extras: Record<string, unknown>[]): Handler | undefined;
+  handler(route: ResolvedRoute, extras: Record<string, unknown>[], contributions: PageContribution[]): Handler | undefined;
 }
-export interface CreateAppOptions {
+export interface CreateAppOptions<E extends Env = Env> {
   pages?: PageAdapter;
   extensions?: RouterExtension[];
-  hono?: HonoOptions<import('hono').Env>;
+  hono?: HonoOptions<E>;
   /** Defaults to console.warn. */
   warn?: (message: string) => void;
 }
