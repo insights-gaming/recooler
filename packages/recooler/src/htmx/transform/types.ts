@@ -28,6 +28,8 @@ export interface ActionUrlEmission {
   helper: string;
 }
 export interface RegistrationEmission {
+  namespace?: string;
+  moduleHash?: string;
   moduleId: string;
   actions: readonly Action[];
   helper: string;
