@@ -10,7 +10,7 @@
   ],
   "buildErrors": {
     "ts": [
-      "src/routes/middleware.ts",
+      "routes/middleware.ts",
       "must export a middleware function"
     ]
   }

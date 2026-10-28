@@ -67,7 +67,10 @@
       "mount": {
         "type": "basePath",
         "prefix": "/base"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "public action under mount",
@@ -88,7 +91,10 @@
         "page": "/base/about",
         "attribute": "hx-post",
         "oraclePath": "/base/about"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "foreign admin action under mount",
@@ -134,7 +140,10 @@
       "mount": {
         "type": "basePath",
         "prefix": "/base"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     }
   ]
 }

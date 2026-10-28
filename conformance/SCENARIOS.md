@@ -113,7 +113,7 @@ One line per runnable scenario. Transcript names refer to the review JSONL archi
 - `q7` — page first next to POST-only differently named param route. Source: agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh.
 - `r1` — blocking auth re-exported by group and directory runs per module. Source: agent-a95e42b5d8a531ef8.jsonl rv5 L300-L301 r1.
 - `root-head-only` — TS fixes the oracle discrepancy. **Targets: ts.** Source: conformance/known-issues/README.md; recovered review probes.
-- `root-scripts` — custom root receives script URL array. **Targets: ts.** Source: docs/plans/typescript-rewrite.md Part 2 root HOC scripts array.
+- `root-scripts` — custom root receives script URL array. **Targets: ts.** Source: docs/plans/typescript-rewrite.md Part 2 root props.scripts URL array.
 - `s1` — static/param/catch-all shadowing across groups. Source: agent-a9b2b4dbc360a7e35.jsonl, rv2/specs/s1.json; docs/reviews/0.0.27.md routing 6f8249e.
 - `s2` — earlier segments, nested catch-alls and dot-star specificity. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s2.json; src/routes.rs static_segment_before_param_before_catch_all/deeper_and_shallower_paths.
 - `s3` — group-only and plain prefix middleware, nested depth and unmatched paths. Source: agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s3.json.

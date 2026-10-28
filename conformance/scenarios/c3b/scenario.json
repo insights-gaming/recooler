@@ -8,8 +8,8 @@
   ],
   "buildErrors": {
     "ts": [
-      "src/routes/(admin)/posts/[postId]/index.tsx",
-      "src/routes/(pub)/posts/[slug]/index.tsx",
+      "routes/(admin)/posts/[postId]/index.tsx",
+      "routes/(pub)/posts/[slug]/index.tsx",
       "PUT"
     ]
   }

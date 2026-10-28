@@ -87,12 +87,13 @@ it.each([
   [{ 'src/routes/(a)/index.tsx': page, 'src/routes/(b)/index.ts': 'export const onRequest = () => {};' }, 'both respond to GET'],
   [{ 'src/routes/middleware.ts': 'export const mw = () => {};' }, 'has no default export'],
   [{ 'src/routes/middleware.ts': 'export type {Middleware as default} from "./mw";' }, 'has no default export'],
-  [{ 'src/routes/index.tsx': 'export default (' }, 'src/routes/index.tsx'],
+  [{ 'src/routes/index.tsx': 'export default (' }, 'routes/index.tsx'],
 ] as [Record<string, string>, string][])('reports every build error with source files: %s', async (files, message) => {
   const cwd = await fixture(files);
   let error: unknown;
   try { await generateRoutes({ cwd }); } catch (caught) { error = caught; }
   expect(String(error)).toContain(message);
+  expect(String(error)).not.toContain(cwd);
   for (const file of Object.keys(files)) expect(String(error)).toContain(file.replace(/^src\//, ''));
   await expect(stat(path.join(cwd, 'src/routes.gen.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
 });
@@ -189,7 +190,7 @@ it('provides a thin Vite plugin that regenerates before build and on add/unlink'
   // A minimal Vite server: callbacks are the same hooks used by real Vite.
   const events = new Map<string, (file: string) => void>();
   const off = vi.fn();
-  const server = { watcher: { add: vi.fn(), on(event: string, callback: (file: string) => void) { events.set(event, callback); return this; }, off }, config: { logger: { error: vi.fn() } }, httpServer: { once: vi.fn() } };
+  const server = { ws: { clients: new Set(), on: vi.fn(), off: vi.fn(), send: vi.fn() }, watcher: { add: vi.fn(), on(event: string, callback: (file: string) => void) { events.set(event, callback); return this; }, off }, config: { logger: { error: vi.fn() } }, httpServer: { once: vi.fn() } };
   const buildStart = plugin.buildStart as () => Promise<void>;
   const configureServer = plugin.configureServer as (server: unknown) => Promise<void>;
   await buildStart();
@@ -348,6 +349,9 @@ it('starts a real Vite 8 dev server with invalid routes, revalidates edits, and 
     // Wait for that observation before restoring the original invalid contents.
     await vi.waitFor(() => expect(changes.some(file => file.endsWith('/src/routes/middleware.ts'))).toBe(true), { timeout: 10000 });
     server.watcher.off('change', recordChange);
+    // The watch callback debounces generation; let it observe the repaired tree
+    // before restoring the same diagnostic (which is deduped while invalid).
+    await new Promise(resolve => setTimeout(resolve, 150));
     const loaded = await vi.waitFor(async () => server.ssrLoadModule('/src/entry.ts'), { timeout: 10000 });
     expect((await loaded.default.request('/')).status).toBe(200);
     await put(cwd, 'src/routes/middleware.ts', 'export const guard = () => {};');

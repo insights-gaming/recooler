@@ -1,3 +1,4 @@
+import 'recooler/vite/client';
 import { DefaultRootHOC, ErrorBoundary, Suspense, jsxPages, type RouteHead, type RouteHeadFn, type RouteProps } from 'recooler/jsx';
 import type { Context } from 'hono';
 
@@ -25,3 +26,12 @@ export const bindings = (props: RouteProps) => {
   return <div ctx="user data">{db}{user}{invalid}{params.id}</div>;
 };
 export const keyed = (props: RouteProps) => <li {...{ title: 'item' }} ctx={props.ctx} key="id">item</li>;
+
+import app from 'virtual:recooler/app';
+app.get('/typed', c => {
+  const binding: string = c.env.DB;
+  const variable: string = c.get('user');
+  // @ts-expect-error the virtual app carries the augmented Bindings
+  const wrong: number = c.env.DB;
+  return c.text(binding + variable + wrong);
+});

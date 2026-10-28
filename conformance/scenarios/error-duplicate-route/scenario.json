@@ -4,8 +4,9 @@
   "buildError": "only one route file may be used per directory",
   "buildErrors": {
     "ts": [
-      "src/routes/index.jsx",
-      "src/routes/index.tsx"
+      " routes/index.jsx",
+      " routes/index.tsx",
+      "only one route file may be used per directory"
     ]
   }
 }

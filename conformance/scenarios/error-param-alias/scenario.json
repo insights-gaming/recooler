@@ -4,8 +4,8 @@
   "buildError": "only one route may be used per path",
   "buildErrors": {
     "ts": [
-      "src/routes/:id/index.tsx",
-      "src/routes/[id]/index.tsx"
+      "routes/:id/index.tsx",
+      "routes/[id]/index.tsx"
     ]
   }
 }

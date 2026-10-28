@@ -113,7 +113,9 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
     const middleware = node.middleware.map((module, i): LocatedMiddleware => {
       const file = node.middlewareFiles?.[i] ?? `${directory}/middleware[${i}]`;
       if (!has(module, 'default')) plan.errors.push(`middleware ${file} has no default export`);
-      else if (typeof module.default !== 'function') plan.errors.push(`middleware ${file} default export is not a function`);
+      else if (typeof module.default !== 'function' || /^\s*class\b/.test(Function.prototype.toString.call(module.default))) {
+        plan.errors.push(`middleware ${file} must export a middleware function (default export is not a callable middleware)`);
+      }
       return { dir, index: i, path: usePath(path), file, module, handler: module.default as MiddlewareHandler };
     });
     allMiddleware.push(...middleware);

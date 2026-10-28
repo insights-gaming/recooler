@@ -8,8 +8,8 @@
   ],
   "buildErrors": {
     "ts": [
-      "src/routes/(admin)/dashboard/index.tsx",
-      "src/routes/(zpublic)/dashboard/index.tsx",
+      "routes/(admin)/dashboard/index.tsx",
+      "routes/(zpublic)/dashboard/index.tsx",
       "GET"
     ]
   }

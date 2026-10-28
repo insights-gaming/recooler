@@ -28,7 +28,10 @@
           "public-group",
           "admin-group"
         ]
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "POST /about?action=bogus",
@@ -54,6 +57,9 @@
           "decision": "D7",
           "reason": "Runner supplies valid same-origin action headers so this tests lookup, not CSRF."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -246,6 +252,9 @@
           "decision": "D7",
           "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -287,6 +296,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -330,6 +342,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -369,6 +384,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -408,6 +426,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -469,7 +490,10 @@
       ],
       "headers": {
         "x-auth": "yes"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "admin action submitted to /hook with authentication",
@@ -512,7 +536,10 @@
       ],
       "headers": {
         "x-auth": "yes"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "admin action submitted to /plainpage with authentication",
@@ -551,7 +578,10 @@
       ],
       "headers": {
         "x-auth": "yes"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "admin action submitted to /x with authentication",
@@ -590,7 +620,10 @@
       ],
       "headers": {
         "x-auth": "yes"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     }
   ]
 }

@@ -164,3 +164,10 @@ it.each([undefined, null, 'page', 42, {}])('rejects an own non-function page def
   expect(() => createApp(input)).toThrow('page default export in routes/(a)/x/index.ts is not a function');
   expect(() => createApp(manifest({ 'x/index.ts': { default: value } }))).toThrow('page default export in routes/x/index.ts is not a function');
 });
+
+
+it.each([{}, class {}, class/* no whitespace */ Guard {}])('rejects non-callable middleware defaults at startup (%j)', value => {
+  const input = manifest({ 'middleware.ts': { default: value }, 'index.ts': page });
+  expect(resolveRoutes(input).errors).toEqual(['middleware routes/middleware.ts must export a middleware function (default export is not a callable middleware)']);
+  expect(() => createApp(input)).toThrow('must export a middleware function');
+});

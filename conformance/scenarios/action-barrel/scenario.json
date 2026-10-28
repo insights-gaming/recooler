@@ -36,7 +36,10 @@
           }
         }
       ],
-      "form": {}
+      "form": {},
+      "requires": [
+        "htmx"
+      ]
     }
   ]
 }

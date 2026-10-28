@@ -67,7 +67,10 @@
       "mount": {
         "type": "route",
         "prefix": "/"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "public action under mount",
@@ -88,7 +91,10 @@
         "page": "/about",
         "attribute": "hx-post",
         "oraclePath": "/about"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "foreign admin action under mount",
@@ -134,7 +140,10 @@
       "mount": {
         "type": "route",
         "prefix": "/"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     }
   ]
 }
