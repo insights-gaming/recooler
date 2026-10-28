@@ -308,6 +308,16 @@ method registrations (including the legacy router catch-all's extra GET).
 Only the root middleware spelling `/*` becomes `*`; other prefixes are retained.
 A catalog mismatch fails the run even if every response difference is allowed.
 
+Saved captures can be compared again without rebuilding them:
+
+```sh
+node scripts/consumer-equivalence/compare.mjs BEFORE.json AFTER.json \
+  --expect-diff /private/tmp/expected-differences.json
+```
+
+The same value-pin and catalog checks apply; the command exits nonzero for any
+unexplained difference, stale field or catalog mismatch.
+
 ## Reproducible HTML audit and browser smoke
 
 ```sh
