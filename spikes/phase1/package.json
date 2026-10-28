@@ -1,0 +1,24 @@
+{
+  "name": "@recooler-spikes/phase1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "graph": "node graph-check.mjs",
+    "context": "node context-check.mjs",
+    "bench": "node bench.mjs",
+    "integration": "node integration.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.65.0",
+    "cloudflare-vite-beta": "npm:@cloudflare/vite-plugin@2.0.0-beta.v.5",
+    "@jridgewell/trace-mapping": "0.3.31",
+    "easy-jsx-html-engine": "0.1.13",
+    "hono": "4.13.14",
+    "hono5": "npm:hono@5.0.0-rc.1",
+    "magic-string": "1.4.5",
+    "rolldown": "1.2.15",
+    "vite": "8.3.5",
+    "wrangler": "4.154.0",
+    "ws": "8.18.3"
+  }
+}
