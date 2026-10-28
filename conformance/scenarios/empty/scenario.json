@@ -1,0 +1,28 @@
+{
+  "name": "empty: empty scan builds and every request falls through to 404",
+  "source": "src/routes.rs scan_without_route_files_or_root_component",
+  "requests": [
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /missing",
+      "path": "/missing",
+      "method": "POST",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    }
+  ]
+}

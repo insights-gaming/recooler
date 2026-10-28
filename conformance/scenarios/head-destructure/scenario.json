@@ -1,0 +1,22 @@
+{
+  "name": "head-destructure: head export destructure resolved through root/layout/leaf chain",
+  "source": "docs/reviews/0.0.27.md 4dbfd5b/b8d7085; agent-a784d86e55641ca41.jsonl rv8 heads probe",
+  "requests": [
+    {
+      "name": "GET /leaf",
+      "path": "/leaf",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<title>Destructured</title>",
+          "<section data-layout=\"yes\"><p>leaf</p></section>"
+        ],
+        "trace": [],
+        "counts": {
+          "<meta charset=": 1
+        }
+      }
+    }
+  ]
+}

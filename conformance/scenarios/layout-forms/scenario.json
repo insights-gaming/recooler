@@ -1,0 +1,18 @@
+{
+  "name": "layout-forms: layout aliases/reexports wrap innermost outward",
+  "source": "docs/plans/typescript-rewrite.md reference pages; docs/reviews/0.0.27.md layout without HOC",
+  "requests": [
+    {
+      "name": "GET /inner",
+      "path": "/inner",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<main><article><p>nested</p></article></main>"
+        ],
+        "trace": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "head-isolation: head-only layout and per-request shallow head isolation",
+  "source": "docs/reviews/0.0.27.md a513d8b/f58865e; src/routes.rs layout_without_hoc_does_not_wrap_page",
+  "changes": [
+    {
+      "decision": "head-isolation",
+      "reason": "TS additionally deep-copies element props; the separate known-issues reproduction documents the 0.0.27 deep mutation leak."
+    }
+  ],
+  "requests": [
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<title>Layout|page</title>",
+          "<body><p>bare page</p></body>"
+        ],
+        "trace": [],
+        "counts": {
+          "name=\"added\"": 1,
+          "name=\"stable\"": 1,
+          "<meta charset=": 1
+        }
+      },
+      "repeat": 3
+    }
+  ]
+}
