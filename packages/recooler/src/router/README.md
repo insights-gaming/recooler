@@ -52,8 +52,9 @@ method, and GET includes HEAD. Handlers follow scoped middleware and precede onR
 and method dispatch. Extensions with array handlers must declare a nonempty `methods` list, otherwise
 startup throws `RouteValidationError`. HEAD declarations register as GET for Hono routing;
 their handlers run only for HEAD requests, alongside any GET handlers.
-Whether selected handlers should precede scoped middleware remains an open question tied
-to htmx D5 (guard-rendered forms).
+All extension middleware runs in extension order after scoped guards and before any
+extension handlers, regardless of each extension's position in the list. Actions
+therefore remain after guards; guard-rendered forms need an unguarded route.
 Action handlers should return their response for a matching action and call `next()` when
 the request should reach another handler. Supply all methods that should run the extension,
 including methods for which the route has no native handler.

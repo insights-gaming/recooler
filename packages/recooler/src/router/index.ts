@@ -94,11 +94,11 @@ export function createApp<E extends Env = Env>(manifest: Manifest, options: Crea
     };
     const handlers: Handler[] = [
       ...route.middleware.map((mw, i) => once(mw, route.middlewareModules[i])),
-      ...scopedAdditions.map(({ methods, middleware, handlers, byMethod }): Handler => (c, next) => {
+      ...scopedAdditions.flatMap(addition => addition.middleware),
+      ...scopedAdditions.map(({ methods, handlers, byMethod }): Handler => (c, next) => {
         const method = c.req.method;
         const matches = (declared: string) => declared === 'ALL' || declared === method || (method === 'HEAD' && declared === 'GET');
         return dispatch([
-          ...middleware,
           ...(handlers && [...methods].some(matches) ? handlers : []),
           ...byMethod.flatMap(([declared, chain]) => matches(declared) ? chain : []),
         ], c, next);

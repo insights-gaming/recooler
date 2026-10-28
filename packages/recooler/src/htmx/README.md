@@ -98,7 +98,8 @@ production builds** when it detects this marker or the equivalent option.
 
 Actions run after directory/group middleware but **before `onRequest`**, as in
 0.0.27. Authorization in `onRequest` does not protect actions; use directory or
-group middleware instead.
+group middleware instead. All extension middleware runs before extension handlers,
+so `htmx()` need not be the first extension.
 
 `base: '/app'` adds an external prefix hidden by `app.mount()` or a prefix-stripping
 proxy. `route()` and `basePath()` expose the prefix in the pathname already, so

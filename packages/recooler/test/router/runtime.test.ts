@@ -358,3 +358,22 @@ it('runs extension middleware only on existing registrations and reserves fall-t
   expect((await app.request('/api', { method: 'DELETE' })).status).toBe(404);
   expect(calls).toEqual(['routes/x/index.tsx', 'routes/x/index.tsx', 'routes/(later)/[[rest]]/index.ts']);
 });
+
+
+it('runs every extension middleware before any extension handler in extension order', async () => {
+  const trace: string[] = [];
+  const through = (name: string): Handler => async (_c, next) => {
+    trace.push(name + '>'); await next(); trace.push('<' + name);
+  };
+  const app = createApp(manifest({
+    '(g)/middleware.ts': traceMiddleware(trace, 'group'),
+    '(g)/index.ts': { onGet: text('native') },
+  }), { extensions: [
+    { name: 'first', route: () => ({ middleware: [through('mw-first')], handlers: { GET: [through('handler-first')] } }) },
+    { name: 'last', route: () => ({ methods: ['POST'], middleware: [through('mw-last')], handlers: [through('handler-last')] }) },
+  ] });
+  expect(await (await app.request('/')).text()).toBe('native');
+  expect(trace.splice(0)).toEqual(['group>', 'mw-first>', 'mw-last>', 'handler-first>', '<handler-first', '<mw-last', '<mw-first', '<group']);
+  expect((await app.request('/', { method: 'POST' })).status).toBe(404);
+  expect(trace).toEqual(['group>', 'mw-first>', 'mw-last>', 'handler-last>', '<handler-last', '<mw-last', '<mw-first', '<group']);
+});

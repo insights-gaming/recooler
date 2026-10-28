@@ -89,3 +89,17 @@ it('runs actions after group middleware and before onRequest authorization', asy
   expect(trace).toEqual(['group', 'action']);
   expect((await a.request('/', { method: 'POST', headers })).status).toBe(401);
 });
+
+
+it('binds actionUrl before handlers of extensions listed ahead of htmx', async () => {
+  registerActions('extension-order', { post: { a: () => 'action' } });
+  const a = createApp(manifest({ 'index.tsx': { default: Page } }), {
+    pages: jsxPages(), extensions: [
+      { name: 'renders-url', route: () => ({ handlers: { GET: [(c: Context) => c.text(actionUrl('a', {}))] } }) },
+      htmx({ table: { 'routes/index.tsx': ['extension-order'] }, secret }),
+    ],
+  });
+  const target = await render(a);
+  expect(target).toBe(url('/', 'a'));
+  expect(await (await submit(a, target)).text()).toBe('action');
+});
