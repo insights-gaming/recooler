@@ -1,0 +1,5 @@
+import { config } from "./config";
+const { a, b: [c] } = config;
+export const _handler$0 = (() => c);
+const __recooler_handlers = globalThis.$handlers ??= {};
+__recooler_handlers["src/routes/article/[id]/index.tsx@0"] = _handler$0;

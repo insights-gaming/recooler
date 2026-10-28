@@ -1,0 +1,59 @@
+{
+  "forms": [
+    ["src/lib/db.ts", ["src/lib/db.ts"]],
+    ["src/lib/db.ts?recooler-handlers", ["src/lib/db.ts"]],
+    ["node_modules/faunadb/index.js?raw", ["node_modules/faunadb/index.js", "faunadb/index.js"]],
+    ["../../../Library/pnpm/store/v10/links/faunadb/4.8.0/abc/node_modules/faunadb/index.js", ["../../../Library/pnpm/store/v10/links/faunadb/4.8.0/abc/node_modules/faunadb/index.js", "faunadb/index.js"]],
+    ["node_modules/.pnpm/@scope+pkg@1.0.0/node_modules/@scope/pkg/x.js", ["node_modules/.pnpm/@scope+pkg@1.0.0/node_modules/@scope/pkg/x.js", "@scope/pkg/x.js"]],
+    ["../common/node_modules/faunadb/index.js", ["../common/node_modules/faunadb/index.js", "faunadb/index.js"]],
+    ["../common/src/db.ts", ["../common/src/db.ts"]],
+    ["src/my_node_modules/x.js", ["src/my_node_modules/x.js"]],
+    ["C:\\app\\node_modules\\faunadb\\index.js", ["C:\\app\\node_modules\\faunadb\\index.js", "faunadb\\index.js"]]
+  ],
+  "graphs": [
+    {
+      "name": "lists_banned_modules_with_their_shortest_import_chain",
+      "entry": "recooler:@src/routes/a/index.tsx",
+      "pattern": "fauna",
+      "edges": [
+        ["recooler:@src/routes/a/index.tsx", "src/routes/a/index.tsx?recooler-handlers"],
+        ["recooler:@src/routes/a/index.tsx", "src/components/button.tsx?recooler-handlers"],
+        ["src/routes/a/index.tsx?recooler-handlers", "src/lib/util.ts"],
+        ["src/components/button.tsx?recooler-handlers", "src/lib/db.ts"],
+        ["src/lib/util.ts", "src/lib/db.ts"],
+        ["src/lib/db.ts", "node_modules/faunadb/index.js"],
+        ["node_modules/faunadb/index.js", "node_modules/faunadb/lib.js"],
+        ["@farmfe/runtime/src/index.ts.farm-runtime", "node_modules/fauna-runtime.js"]
+      ],
+      "expected": [
+        "node_modules/fauna-runtime.js",
+        "node_modules/faunadb/index.js via src/components/button.tsx → src/lib/db.ts",
+        "node_modules/faunadb/lib.js via src/components/button.tsx → src/lib/db.ts → node_modules/faunadb/index.js"
+      ]
+    },
+    {
+      "name": "lists_banned_modules_without_query_through_import_cycles",
+      "entry": "recooler:@src/routes/a/index.tsx",
+      "pattern": "fauna|button",
+      "edges": [
+        ["recooler:@src/routes/a/index.tsx", "src/components/button.tsx?recooler-handlers"],
+        ["src/components/button.tsx?recooler-handlers", "src/lib/a.ts"],
+        ["src/lib/a.ts", "src/lib/b.ts"],
+        ["src/lib/b.ts", "src/lib/a.ts"],
+        ["src/lib/b.ts", "recooler:@src/routes/a/index.tsx"],
+        ["src/lib/b.ts", "node_modules/faunadb/index.js"]
+      ],
+      "expected": [
+        "node_modules/faunadb/index.js via src/components/button.tsx → src/lib/a.ts → src/lib/b.ts",
+        "src/components/button.tsx"
+      ]
+    },
+    {
+      "name": "lists_no_banned_modules",
+      "entry": "recooler:@src/routes/a/index.tsx",
+      "pattern": "fauna",
+      "edges": [["recooler:@src/routes/a/index.tsx", "src/lib/db.ts"]],
+      "expected": []
+    }
+  ]
+}

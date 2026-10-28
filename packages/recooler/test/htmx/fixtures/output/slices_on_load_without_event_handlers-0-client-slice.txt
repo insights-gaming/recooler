@@ -1,0 +1,7 @@
+import { fmt } from "./fmt";
+function helper() {
+	return fmt(1);
+}
+export const onLoad = () => {
+	helper();
+};

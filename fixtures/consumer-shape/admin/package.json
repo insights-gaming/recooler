@@ -1,0 +1,19 @@
+{
+  "name": "recooler-consumer-shape-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "farm build",
+    "check": "node ../check.mjs admin"
+  },
+  "dependencies": {
+    "easy-jsx-html-engine": "0.1.13",
+    "farm-plugin-recooler": "0.0.27",
+    "hono": "4.12.29"
+  },
+  "devDependencies": {
+    "@farmfe/cli": "1.0.5",
+    "@farmfe/core": "1.7.11",
+    "@farmfe/plugin-react": "1.2.6"
+  }
+}

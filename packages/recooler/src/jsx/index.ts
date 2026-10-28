@@ -6,7 +6,7 @@ import { renderToStream } from 'easy-jsx-html-engine/stream-webapi';
 import type { Context, Env, Handler } from 'hono';
 import { createElement } from './jsx-runtime.js';
 import type { Children, Component, ErrorBoundaryProps, ResolvedTemplateProps, SuspenseProps } from './types.js';
-import { mergePageExtras, type PageAdapter, type ResolvedRoute } from '../router/index.js';
+import { mergePageExtras, RouteValidationError, type PageAdapter, type ResolvedRoute } from '../router/index.js';
 export { createElement } from './jsx-runtime.js';
 
 /** Augment this interface in recooler/jsx to type route bindings and variables. */
@@ -68,7 +68,8 @@ function isPlainObject(value: unknown): value is RouteHead {
 
 /** Copy only plain containers; promises, URLs, engine elements and instances keep their semantics. */
 function copyContainers(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
-  if (!Array.isArray(value) && !isPlainObject(value)) return value;
+  const plainArray = Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype;
+  if (!plainArray && !isPlainObject(value)) return value;
   if (seen.has(value)) return seen.get(value);
   const copy: Record<string, unknown> | unknown[] = Array.isArray(value) ? new Array(value.length) : Object.create(Object.getPrototypeOf(value));
   seen.set(value, copy);
@@ -79,9 +80,9 @@ function copyContainers(value: unknown, seen = new WeakMap<object, unknown>()): 
   return copy;
 }
 
-function copyHead(value: unknown, source: string): RouteHead {
+function copyHead(value: unknown): RouteHead {
   if (!isPlainObject(value) || typeof (value as { then?: unknown }).then === 'function') {
-    throw new TypeError(`Invalid head in ${source}: expected a function, plain object, or nullish value`);
+    throw new TypeError('Invalid head: expected a plain object or nullish value');
   }
   return copyContainers(value) as RouteHead;
 }
@@ -89,7 +90,9 @@ function copyHead(value: unknown, source: string): RouteHead {
 function throwHeadError(error: unknown, source: string): never {
   if (error instanceof Response) throw error;
   const message = `Head in ${source}: ${error instanceof Error ? error.message : String(error)}`;
-  throw error instanceof TypeError ? new TypeError(message, { cause: error }) : new Error(message, { cause: error });
+  const ErrorType = [TypeError, ReferenceError, RangeError, SyntaxError, URIError, EvalError]
+    .find(Type => error instanceof Type) ?? Error;
+  throw new ErrorType(message, { cause: error });
 }
 
 /** Resolve live namespace exports, starting at the last replacing object. */
@@ -111,7 +114,7 @@ async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<Rou
     if (entry == null) continue;
     try {
       const result: unknown = typeof entry === 'function' ? await (entry as RouteHeadFn)(ctx, head) : entry;
-      head = result == null ? {} : copyHead(result, source);
+      head = result == null ? {} : copyHead(result);
     } catch (error) {
       throwHeadError(error, source);
     }
@@ -126,13 +129,19 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
     handler(route, extras) {
       // The router validates own default exports before invoking the page adapter.
       let Content = route.module.default as Component<RouteProps>;
-      for (const layout of [...route.layouts].reverse()) {
+      for (const [i, layout] of [...route.layouts.entries()].reverse()) {
         if (layout.default == null) continue;
-        if (typeof layout.default !== 'function') throw new TypeError(`Invalid layout for ${route.file}`);
+        if (typeof layout.default !== 'function') {
+          const source = route.layoutFiles[i] ?? `layout ${i + 1} (used by ${route.file})`;
+          throw new RouteValidationError([`Invalid layout in ${source}: default export is not a function`]);
+        }
         Content = (layout.default as LayoutHOC)(Content);
       }
       const Root = (route.root?.default ?? DefaultRootHOC) as RootHOC;
-      if (typeof Root !== 'function') throw new TypeError(`Invalid root for ${route.file}`);
+      if (typeof Root !== 'function') {
+        const source = route.rootFile ?? `root (used by ${route.file})`;
+        throw new RouteValidationError([`Invalid root in ${source}: default export is not a function`]);
+      }
       // Custom roots may render their own body without using renderHeadElements. Put a
       // discoverable meta in the content slot, which works for those roots as well.
       if (Root !== DefaultRootHOC) {
@@ -161,17 +170,23 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         let ctxWaitUntil: ((promise: Promise<unknown>) => void) | undefined;
         try { ctxWaitUntil = ctx.executionCtx.waitUntil?.bind(ctx.executionCtx); } catch { /* Node has no executionCtx. */ }
         let body: string | ReadableStream<Uint8Array> | undefined;
+        let cancelled = false;
+        let shellRejected = false;
         try {
           const head = await page.head(ctx);
           const requestScripts = [...page.scripts];
           let shell: JSX.Element | undefined;
           body = await renderToStream(
-            (rid: RouteProps['rid']) => shell = createElement(page.Root(page.Content, page.clientScript), {
+            (rid: RouteProps['rid']) => shell = Promise.resolve(createElement(page.Root(page.Content, page.clientScript), {
               rid, url: new URL(ctx.req.url), ctx, params, head, route: route.path,
               scripts: requestScripts, clientScript: page.clientScript,
-            }),
+            })).catch(error => { shellRejected = true; throw error; }),
             { waitUntil: promise => {
-              const handled = promise.catch(error => { console.error(error); });
+              // Shell errors are handled by render below (and Hono's onError).
+              // Cancelling the engine stream makes its final writer.close() reject.
+              const handled = promise.catch(error => {
+                if (!cancelled && !shellRejected) console.error(error);
+              });
               ctxWaitUntil?.(handled);
             }, ResolvedTemplate: options.ResolvedTemplate,
               cleanupScriptMiddleware: options.suspenseCleanupScriptMiddleware },
@@ -179,12 +194,29 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
           // The engine already awaits the shell before writing. Await it here too,
           // so async status changes and thrown Responses precede response creation.
           await shell;
+          if (body instanceof ReadableStream) {
+            // Observe reader.cancel() from clients while retaining stream backpressure.
+            const reader = body.getReader();
+            body = new ReadableStream<Uint8Array>({
+              async pull(controller) {
+                const { done, value } = await reader.read();
+                if (cancelled) return;
+                if (done) { controller.close(); reader.releaseLock(); }
+                else controller.enqueue(value);
+              },
+              cancel(reason) {
+                cancelled = true;
+                return reader.cancel(reason).finally(() => reader.releaseLock());
+              },
+            }, { highWaterMark: 0 });
+          }
           if (ctx.req.method === 'HEAD' && body instanceof ReadableStream) {
             await body.cancel();
             body = '';
           }
           return ctx.newResponse(body, { headers: { 'content-type': 'text/html' } });
         } catch (error) {
+          cancelled = true;
           if (body instanceof ReadableStream) await body.cancel().catch(cancelError => { console.error(cancelError); });
           if (error instanceof Response) return error;
           throw error;

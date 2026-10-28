@@ -1,0 +1,5 @@
+import { run } from "./run";
+function load() {
+	run();
+}
+export { load as onLoad };

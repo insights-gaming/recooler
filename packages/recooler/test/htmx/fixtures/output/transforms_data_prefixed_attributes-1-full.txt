@@ -1,0 +1,1 @@
+<a data-data-hx-get={() => 1} data-on:click={() => 2} />;

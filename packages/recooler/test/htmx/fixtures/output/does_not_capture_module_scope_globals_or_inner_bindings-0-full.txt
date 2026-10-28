@@ -1,0 +1,18 @@
+import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
+import { db } from "./db";
+const LIMIT = 10;
+function fmt(n) {
+	return n;
+}
+export default function C(__recooler_props) {
+	let { item, list } = __recooler_props;
+	return <button hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", { "list": list }, __recooler_props.ctx)} />;
+}
+export const _action$post$0 = /*#__PURE__*/ __recooler_wrapActionWithPayload(({ "list": __recooler_capture }) => (() => {
+	if (__recooler_capture) {
+		const item = 1;
+		console.log(item);
+	}
+	return __recooler_capture.map((item) => fmt(item.id)).slice(0, LIMIT).concat(db);
+}), "src/routes/article/[id]/index.tsx@0");
+__recooler_registerActions("src/routes/article/[id]/index.tsx", { post: { "src/routes/article/[id]/index.tsx@0": _action$post$0 } });

@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "oracle": {
+    "package": "farm-plugin-recooler",
+    "version": "0.0.27",
+    "farm": "1.7.11",
+    "persistentCache": false
+  },
+  "requests": [
+    {
+      "name": "home",
+      "path": "/",
+      "expect": {
+        "status": 200,
+        "body": "home",
+        "headers": {
+          "x-trace": "first,second,third,fourth"
+        }
+      }
+    },
+    {
+      "name": "group-denied",
+      "path": "/item/7",
+      "expect": {
+        "status": 401,
+        "body": "denied",
+        "headers": {
+          "x-trace": "first,second,third,fourth,group"
+        }
+      }
+    },
+    {
+      "name": "group-allowed",
+      "path": "/item/7",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "body": "entry:7",
+        "headers": {
+          "x-trace": "first,second,third,fourth,group"
+        }
+      }
+    },
+    {
+      "name": "group-deep-reexport",
+      "path": "/panel/entry/7",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "body": "detail:7"
+      }
+    },
+    {
+      "name": "group-deep-leaf",
+      "path": "/panel/entry/7/detail",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "body": "detail:7"
+      }
+    },
+    {
+      "name": "catchall",
+      "path": "/unknown/a",
+      "expect": {
+        "status": 200,
+        "body": "fallback:unknown/a",
+        "headers": {
+          "x-trace": "first,second,third,fourth,request"
+        }
+      }
+    },
+    {
+      "name": "catchall-method-fallthrough",
+      "path": "/unknown/a",
+      "method": "POST",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found"
+      }
+    },
+    {
+      "name": "asset-catchall",
+      "path": "/assets/a/b",
+      "expect": {
+        "status": 200,
+        "body": "asset:a/b"
+      }
+    },
+    {
+      "name": "asset-static-precedence",
+      "path": "/assets/extra/a/b",
+      "expect": {
+        "status": 200,
+        "body": "extra:a/b"
+      }
+    },
+    {
+      "name": "catchall-requires-segment",
+      "path": "/docs",
+      "expect": {
+        "status": 200,
+        "body": "docs:index"
+      }
+    },
+    {
+      "name": "docs-handler",
+      "path": "/docs/a/b",
+      "expect": {
+        "status": 200,
+        "body": "docs:a/b"
+      }
+    },
+    {
+      "name": "service-root",
+      "path": "/_console",
+      "expect": {
+        "status": 200,
+        "body": "stub-service",
+        "headers": {
+          "x-service": "stub"
+        }
+      }
+    },
+    {
+      "name": "service-rest",
+      "path": "/_console/a/b",
+      "method": "PATCH",
+      "expect": {
+        "status": 200,
+        "body": "stub-service"
+      }
+    },
+    {
+      "name": "plain-underscores",
+      "path": "/_internal/bridge/9/result",
+      "expect": {
+        "status": 200,
+        "body": "result:9"
+      }
+    },
+    {
+      "name": "post-handler",
+      "path": "/_hooks/notify/callback",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "posted:ok"
+      },
+      "body": "ok"
+    },
+    {
+      "name": "asset-parent-fallback",
+      "path": "/assets",
+      "expect": {
+        "status": 200,
+        "body": "fallback:assets"
+      }
+    },
+    {
+      "name": "group-param-required",
+      "path": "/status",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 404,
+        "body": "missing id"
+      }
+    },
+    {
+      "name": "non-response-return",
+      "path": "/non-response",
+      "expect": {
+        "nonResponse": true,
+        "returnedType": "[object Object]"
+      }
+    }
+  ]
+}

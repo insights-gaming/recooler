@@ -1,0 +1,408 @@
+{
+  "schemaVersion": 1,
+  "oracle": {
+    "package": "farm-plugin-recooler",
+    "version": "0.0.27",
+    "farm": "1.7.11",
+    "persistentCache": false
+  },
+  "requests": [
+    {
+      "name": "outside",
+      "path": "/missing",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found"
+      }
+    },
+    {
+      "name": "denied",
+      "path": "/_panel",
+      "expect": {
+        "status": 401,
+        "body": "denied"
+      }
+    },
+    {
+      "name": "home",
+      "path": "/_panel",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "x-trace": "auth,error"
+        },
+        "bodyIncludes": [
+          "<title>Home - Panel</title>",
+          "<main data-layout=\"panel\">",
+          "panel home",
+          "resolved",
+          "window.$handlers="
+        ],
+        "bodyExcludes": [
+          "ctx=\"[object Object]\"",
+          "layoutIgnored"
+        ]
+      }
+    },
+    {
+      "name": "items",
+      "path": "/_panel/items",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "bodyIncludes": [
+          "items",
+          "synthetic-server-marker",
+          "id=\"shared\""
+        ]
+      }
+    },
+    {
+      "name": "detail",
+      "path": "/_panel/items/7",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "bodyIncludes": [
+          "<title>Item - Panel</title>",
+          "item:7",
+          "routeLoaded"
+        ],
+        "bodyExcludes": [
+          "layoutIgnored"
+        ]
+      }
+    },
+    {
+      "name": "script",
+      "path": "/_panel/items/7?script",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "bodyIncludes": [
+          "window.$handlers=",
+          "routeLoaded"
+        ],
+        "bodyExcludes": [
+          "synthetic-server-marker",
+          "layoutIgnored"
+        ]
+      }
+    },
+    {
+      "name": "tool",
+      "path": "/_panel/tools/list",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "bodyIncludes": [
+          "alpha",
+          "beta",
+          "toolLoaded"
+        ]
+      }
+    },
+    {
+      "name": "tool-detail",
+      "path": "/_panel/tools/list/9",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "body": "tool:9"
+      }
+    },
+    {
+      "name": "css",
+      "path": "/_panel/styles.css",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/css",
+          "x-fixture-env": "node-stub"
+        },
+        "bodyIncludes": [
+          "color: rebeccapurple"
+        ]
+      }
+    },
+    {
+      "name": "missing",
+      "path": "/_panel/unknown/a",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 404,
+        "bodyIncludes": [
+          "missing:unknown/a"
+        ]
+      }
+    },
+    {
+      "name": "unknown-action",
+      "path": "/_panel?action=absent",
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "expect": {
+        "status": 404,
+        "body": "unknown action"
+      }
+    },
+    {
+      "name": "save",
+      "actionFrom": {
+        "request": "home",
+        "element": "save",
+        "attribute": "hx-post"
+      },
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "content-type": "application/x-www-form-urlencoded",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "body": "value=neutral",
+      "expect": {
+        "status": 200,
+        "body": "<p>saved:neutral:neutral</p>",
+        "headers": {
+          "x-trace": "auth,error"
+        }
+      }
+    },
+    {
+      "name": "quiet",
+      "actionFrom": {
+        "request": "home",
+        "element": "quiet",
+        "attribute": "hx-post"
+      },
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "content-type": "application/x-www-form-urlencoded",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "body": "value=neutral",
+      "expect": {
+        "status": 204,
+        "body": "",
+        "headers": {
+          "x-trace": "auth,error",
+          "hx-refresh": "true",
+          "hx-push-url": "false"
+        }
+      }
+    },
+    {
+      "name": "delete",
+      "actionFrom": {
+        "request": "home",
+        "element": "remove",
+        "attribute": "hx-delete"
+      },
+      "method": "DELETE",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "content-type": "application/x-www-form-urlencoded",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "body": "value=neutral",
+      "expect": {
+        "status": 202,
+        "body": "removed",
+        "headers": {
+          "x-trace": "auth,error"
+        }
+      }
+    },
+    {
+      "name": "shared-list",
+      "actionFrom": {
+        "request": "items",
+        "element": "shared",
+        "attribute": "hx-post"
+      },
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "content-type": "application/x-www-form-urlencoded",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "body": "value=neutral",
+      "expect": {
+        "status": 200,
+        "body": "<p>shared:list</p>",
+        "headers": {
+          "x-trace": "auth,error"
+        }
+      }
+    },
+    {
+      "name": "shared-param",
+      "actionFrom": {
+        "request": "detail",
+        "element": "shared",
+        "attribute": "hx-post"
+      },
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "content-type": "application/x-www-form-urlencoded",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "body": "value=neutral",
+      "expect": {
+        "status": 200,
+        "body": "<p>shared:7</p>",
+        "headers": {
+          "x-trace": "auth,error"
+        }
+      }
+    },
+    {
+      "name": "loop-capture",
+      "actionFrom": {
+        "request": "tool",
+        "element": "choice-alpha"
+      },
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "content-type": "application/x-www-form-urlencoded",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "expect": {
+        "status": 200,
+        "body": "<p>selected:alpha</p>"
+      },
+      "body": ""
+    },
+    {
+      "name": "denied-action",
+      "path": "/_panel?action=absent",
+      "method": "POST",
+      "headers": {
+        "hx-request": "true",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "expect": {
+        "status": 401,
+        "body": "denied"
+      }
+    },
+    {
+      "name": "denied-catchall",
+      "path": "/_panel/unknown/a",
+      "expect": {
+        "status": 401,
+        "body": "denied"
+      }
+    },
+    {
+      "name": "denied-css",
+      "path": "/_panel/styles.css",
+      "expect": {
+        "status": 401,
+        "body": "denied"
+      }
+    },
+    {
+      "name": "throwing-action",
+      "actionFrom": {
+        "request": "home",
+        "element": "throw"
+      },
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "expect": {
+        "status": 200,
+        "body": "handled:synthetic failure"
+      },
+      "body": ""
+    },
+    {
+      "name": "export-handler",
+      "path": "/_panel/export.csv",
+      "headers": {
+        "x-auth": "yes"
+      },
+      "expect": {
+        "status": 200,
+        "body": "data-page"
+      }
+    },
+    {
+      "name": "export-has-no-actions",
+      "path": "/_panel/export.csv?action=absent",
+      "method": "POST",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true",
+        "origin": "http://fixture",
+        "sec-fetch-site": "same-origin"
+      },
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found"
+      }
+    },
+    {
+      "name": "fragment-layout",
+      "path": "/_panel",
+      "headers": {
+        "x-auth": "yes",
+        "hx-request": "true"
+      },
+      "expect": {
+        "status": 200,
+        "bodyIncludes": [
+          "panel home"
+        ],
+        "bodyExcludes": [
+          "<main data-layout=\"panel\">"
+        ]
+      }
+    }
+  ]
+}
