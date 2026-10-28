@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createElement as h, dangerouslyPreventEscaping, Fragment, type Component, type ResolvedTemplateProps } from 'easy-jsx-html-engine';
 import { Hono, type Context } from 'hono';
-import { createApp, type DirNode, type Manifest, type ModuleNs, type RouterExtension, type ResolvedRoute } from '../../src/router/index.js';
+import { createApp, type DirNode, type Manifest, type ModuleNs, type RouterExtension, RouteValidationError } from '../../src/router/index.js';
 import { createElement, DefaultRootHOC, ErrorBoundary, jsxPages, renderHeadElements, Suspense, type JSXPagesOptions, type RouteHead, type RouteProps } from '../../src/jsx/index.js';
 import { jsx, jsxs } from '../../src/jsx/jsx-runtime.js';
 import { SpreadWrapper, NestedSpreadWrapper } from './fixtures/runtime-wrapper.js';
@@ -26,6 +26,13 @@ async function html(a: Hono, path = '/') {
   expect(res.headers.get('content-type')).toBe('text/html');
   return res.text();
 }
+function onPageError(a: Hono, handler: (error: Error) => Response) {
+  a.onError((first, second) => {
+    // Same compatibility rule as the router tests: Hono 5 uses Context, Next.
+    const error = typeof second === 'function' ? (first as unknown as Context).error! : first;
+    return handler(error);
+  });
+}
 const hoc = (name: string) => (Content: Component<RouteProps>) => (props: RouteProps) => h(name, {}, h(Content, props));
 
 describe('jsxPages', () => {
@@ -44,10 +51,18 @@ describe('jsxPages', () => {
     expect(result).toBe('<!DOCTYPE html><html><head><meta charset="utf-8"/><title>head-only root</title></head><body data-recooler-route="/"><p>page</p></body></html>');
   });
 
-  it('returns no page handler for an API-only module', () => {
+  it('leaves API-only modules to the router without calling the page adapter', () => {
     const manifest: Manifest = { version: 1, tree: node({ onGet: (c: Context) => c.text('api') }) };
-    const a = createApp(manifest, { pages: jsxPages() });
+    const pages = jsxPages();
+    const handler = vi.spyOn(pages, 'handler');
+    const a = createApp(manifest, { pages });
+    expect(handler).not.toHaveBeenCalled();
     return expect(Promise.resolve(a.request('/')).then(r => r.text())).resolves.toBe('api');
+  });
+
+  it.each([undefined, null, 42, {}])('rejects an own non-function page default %s at router startup', value => {
+    expect(() => app({ default: value })).toThrow(RouteValidationError);
+    expect(() => app({ default: value })).toThrow('page default export in routes/index.tsx is not a function');
   });
 
   it('objects replace prior heads, nullish entries skip, function nullish results reset', async () => {
@@ -60,7 +75,7 @@ describe('jsxPages', () => {
 
   it.each([Promise.resolve({}), [], new Date(), 'bad', 7, true, { then() {} }])('rejects invalid head exports (%s)', async head => {
     const a = app({ default: Page, head });
-    a.onError((err, c) => { expect(err).toBeInstanceOf(TypeError); return c.text(err.message, 500); });
+    onPageError(a, err => { expect(err).toBeInstanceOf(TypeError); return new Response(err.message, { status: 500 }); });
     const res = await a.request('/');
     expect(res.status).toBe(500);
     expect(await res.text()).toContain('Invalid head in routes/index.tsx');
@@ -69,8 +84,10 @@ describe('jsxPages', () => {
   it('rejects invalid head function results', async () => {
     for (const head of [() => 'bad']) {
       const a = app({ default: Page, head });
-      a.onError((err, c) => c.text(err.name, 500));
-      expect((await a.request('/')).status).toBe(500);
+      onPageError(a, err => new Response(err.name, { status: 500 }));
+      const response = await a.request('/');
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe('TypeError');
     }
   });
 
@@ -131,9 +148,9 @@ describe('jsxPages', () => {
       [{ default: Page }, undefined, [{ head: () => { throw new Error('function failed'); } }], 'layout 1 (used by routes/index.tsx)'],
     ] as const) {
       const a = app(module, root, [...layouts]);
-      a.onError((error, ctx) => {
+      onPageError(a, error => {
         expect(error.cause).toBeInstanceOf(Error);
-        return ctx.text(error.message, 500);
+        return new Response(error.message, { status: 500 });
       });
       const response = await a.request('/');
       expect(response.status).toBe(500);
@@ -141,21 +158,31 @@ describe('jsxPages', () => {
     }
   });
 
-  it('uses supplied root/layout filenames, including errors reading the head export itself', async () => {
+  it('uses router-provided root/layout filenames for head access and validation errors', async () => {
     for (const source of ['src/root.tsx', 'src/routes/layout.tsx']) {
-      const module = { get head() { throw new Error('export getter'); } };
-      const route: ResolvedRoute & { rootFile: string; layoutFiles: string[] } = {
-        path: '/', file: 'src/routes/index.tsx', module: { default: Page },
-        root: source === 'src/root.tsx' ? module : undefined,
-        layouts: source === 'src/routes/layout.tsx' ? [module] : [],
-        rootFile: 'src/root.tsx', layoutFiles: ['src/routes/layout.tsx'],
-        middleware: [], middlewareModules: [], directory: 'src/routes',
-      };
-      const a = new Hono().get('/', jsxPages().handler(route, [])!);
-      a.onError((error, ctx) => ctx.text(error.message, 500));
-      const response = await a.request('/');
-      expect(response.status).toBe(500);
-      expect(await response.text()).toBe(`Head in ${source}: export getter`);
+      for (const entry of [
+        { get head() { throw new Error('export getter'); } },
+        { head: 42 },
+        { head: () => { throw new Error('head function'); } },
+      ]) {
+        const tree = node({ default: Page });
+        if (source === 'src/routes/layout.tsx') {
+          tree.layout = entry;
+          tree.layoutFile = source;
+        }
+        const a = createApp({ version: 1, tree,
+          root: source === 'src/root.tsx' ? entry : undefined, rootFile: 'src/root.tsx',
+        }, { pages: jsxPages({ handlerFactory(page, render) {
+          expect(Object.isFrozen(page.route)).toBe(true);
+          expect(Object.isFrozen(page.route.layouts)).toBe(true);
+          expect(Object.isFrozen(page.route.layoutFiles)).toBe(true);
+          return render;
+        } }) });
+        onPageError(a, error => new Response(error.message, { status: 500 }));
+        const response = await a.request('/');
+        expect(response.status).toBe(500);
+        expect(await response.text()).toContain(`Head in ${source}:`);
+      }
     }
   });
 
@@ -353,6 +380,41 @@ describe('ErrorBoundary and Responses', () => {
 });
 
 describe('Suspense streaming', () => {
+  it('keeps params available to a Suspense child after the page handler returns', async ({ task }) => {
+    let release!: () => void;
+    const deferred = new Promise<void>(resolve => { release = resolve; });
+    let childFinished = false;
+    const Child = async (props: RouteProps) => {
+      await deferred;
+      childFinished = true;
+      expect(props.params).toEqual({ id: '42' });
+      expect(Object.isFrozen(props.params)).toBe(true);
+      // Hono 5 loses the active route match after dispatch. The snapshot survives.
+      expect(props.ctx.req.param()).toEqual(task.file.projectName === 'hono-5' ? {} : { id: '42' });
+      return h('p', {}, props.params.id);
+    };
+    const manifest: Manifest = { version: 1, tree: node({ default: (props: RouteProps) =>
+      h(Suspense, { rid: props.rid, fallback: 'loading' }, h(Child, props)) }, [], '/:id') };
+    const a = new Hono().use('*', async (_ctx, next) => { await next(); })
+      .route('/mount', createApp(manifest, { pages: jsxPages() }));
+    const response = await a.request('/mount/42');
+    expect(response.status).toBe(200);
+    expect(childFinished).toBe(false);
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let result = decoder.decode((await reader.read()).value);
+    expect(result).toContain('loading');
+    release();
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      result += decoder.decode(chunk.value);
+    }
+    expect(childFinished).toBe(true);
+    expect(result).toContain('<p>42</p>');
+    expect(result).not.toContain('Internal Server Error');
+  });
+
   it('renders synchronous Suspense children without a fallback or streaming scripts', async () => {
     const result = await html(app({ default: ({ rid }: RouteProps) => h(Suspense, { rid, fallback: 'loading' }, 'ready') }));
     expect(result).toContain('<body data-recooler-route="/">ready</body>');

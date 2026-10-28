@@ -9,10 +9,16 @@ export default createApp(manifest, { pages: jsxPages() });
 ```
 
 `jsxPages()` supplies the router's `PageAdapter`. It depends only on the router's
-public exports. Routes without a default component remain ordinary Hono handlers.
+public exports. The router calls the adapter only for routes with an own function
+`default` export; API-only routes remain ordinary Hono handlers. An own non-function
+`default` is a startup validation error. Route data and its arrays are frozen; the
+adapter copies layout arrays before reversing them.
 Layouts are HOCs: `(Page) => (props) => <main><Page {...props} /></main>`.
 The adapter applies them from the innermost directory outward. Head-only layouts
 participate in the head chain without wrapping the page.
+
+Head errors name the route, root or layout source using router metadata.
+Handwritten manifests without source metadata receive a descriptive root/layout label.
 
 Head exports are read from module namespaces on each request, in this order:
 root, layouts from root to leaf, route. A function receives `(ctx, prev)` and its
@@ -28,8 +34,11 @@ shared by reference so their rendering behavior is preserved. Copies isolate
 mutations made by later head functions through `prev`; a function that mutates
 its own module constant or a shared non-plain value can still leak state.
 
-`RouteProps<TContext = RouteContext>` supplies `rid`, `url`, `ctx`, `head`, `route`
+`RouteProps<TContext = RouteContext>` supplies `rid`, `url`, `ctx`, `params`, `head`, `route`
 (the manifest pattern), `scripts`, and the deprecated `clientScript`.
+`params` is a readonly copy of `ctx.req.param()` captured when the page handler
+runs, before awaiting head resolution. Use `props.params` in deferred Suspense
+children: Hono 5 clears the active params once the handler has returned.
 `RouteHead` and `RouteHeadFn<TContext>` are exported types; import these types
 explicitly rather than depending on the old ambient declarations. The old global
 `RouteProps`, `RouteHead`, and `RouteHeadFn` declarations are no longer installed.
@@ -109,7 +118,11 @@ The root is `manifest.root?.default ?? DefaultRootHOC`. Root HOCs receive
 `(Content, clientScript?: string)` for 0.1.x compatibility with 0.0.27 roots.
 The second argument is always a legacy source string or `undefined`, never a URL
 array. Extensions supply URLs via `page: { scripts }`; roots read `props.scripts`.
-Arrays concatenate in extension order using the router's public merge rule.
+Arrays concatenate in extension order using the router's public merge rule
+(`mergePageExtras(extras)`). The router also supplies named
+`{ extension, page }` contributions as the adapter's third argument. JSX does not
+use those names or apply an extension-specific collision policy; it reads scripts
+and the legacy clientScript from the merged extras.
 Each request gets its own script array. The default root emits external module
 scripts after content, adds `<body data-recooler-route="/pattern/:id">`, and adds
 UTF-8 charset only when head metas declare no rendered charset attribute.

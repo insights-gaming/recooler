@@ -49,7 +49,7 @@ router manifest. It compares complete strings after exactly these intended chang
 6. A Response thrown inside ErrorBoundary returns its status (for example 303),
    instead of 200 with `<pre>[object Response]</pre>`. See
    [the migration guide](../../../../../docs/migration-0.1.md).
-7. `RouteProps` gains `route`, `scripts`, and `clientScript`. They are visible if a
+7. `RouteProps` gains `params`, `route`, `scripts`, and `clientScript`. They are visible if a
    page spreads all its props onto an HTML element.
 
 There is no whitespace normalization or broad script/attribute stripping.

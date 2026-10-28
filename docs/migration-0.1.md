@@ -63,7 +63,9 @@ ESM bundling requirements.
 
 Import `RouteProps`, `RouteHead`, and `RouteHeadFn` explicitly from `recooler/jsx`;
 these are no longer ambient global types. Augment `RouteEnv` in that module to
-type the default route context's bindings and variables.
+type the default route context's bindings and variables. `RouteProps.params` is a
+readonly snapshot captured when the page handler runs. Use it in deferred
+Suspense children, where Hono 5's `ctx.req.param()` is empty.
 
 A custom root's second argument remains `clientScript?: string` in 0.1.x. Read
 external module URLs from `props.scripts`; URL arrays never occupy the legacy

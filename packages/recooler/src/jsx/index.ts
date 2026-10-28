@@ -17,6 +17,8 @@ export interface RouteProps<TContext = RouteContext> {
   rid: string | number;
   url: URL;
   ctx: TContext;
+  /** Request-time snapshot; remains available in deferred Hono 5 Suspense children. */
+  params: Readonly<Record<string, string>>;
   head: RouteHead;
   /** Matched manifest pattern, with route groups removed. */
   route: string;
@@ -92,11 +94,9 @@ function throwHeadError(error: unknown, source: string): never {
 
 /** Resolve live namespace exports, starting at the last replacing object. */
 async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<RouteHead> {
-  // TODO: use required router source metadata once the router branch lands.
-  const files = route as ResolvedRoute & { rootFile?: string; layoutFiles?: (string | undefined)[] };
   const entries = [
-    { module: route.root, source: files.rootFile ?? `root (used by ${route.file})` },
-    ...route.layouts.map((module, i) => ({ module, source: files.layoutFiles?.[i] ?? `layout ${i + 1} (used by ${route.file})` })),
+    { module: route.root, source: route.rootFile ?? `root (used by ${route.file})` },
+    ...route.layouts.map((module, i) => ({ module, source: route.layoutFiles[i] ?? `layout ${i + 1} (used by ${route.file})` })),
     { module: route.module, source: route.file },
   ].map(({ module, source }) => {
     try { return { entry: module?.head, source }; }
@@ -124,7 +124,7 @@ const markedRequests = new WeakSet<object>();
 export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
   return {
     handler(route, extras) {
-      if (typeof route.module.default !== 'function') return undefined;
+      // The router validates own default exports before invoking the page adapter.
       let Content = route.module.default as Component<RouteProps>;
       for (const layout of [...route.layouts].reverse()) {
         if (layout.default == null) continue;
@@ -141,6 +141,8 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
           !markedRequests.has(props.ctx) && createElement('meta', { name: 'recooler-route', content: props.route }),
           createElement(Page, props));
       }
+      // Named contributions are available to adapters for collision policies. JSX
+      // uses the standard ordered extras merge and needs no extension-specific policy.
       const extra = mergePageExtras(extras);
       const scripts = extra.scripts ?? [];
       if (!Array.isArray(scripts) || scripts.some(script => typeof script !== 'string')) {
@@ -155,6 +157,7 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         head: ctx => resolveHead(route, ctx),
       };
       const render: Handler = async ctx => {
+        const params = Object.freeze({ ...ctx.req.param() });
         let ctxWaitUntil: ((promise: Promise<unknown>) => void) | undefined;
         try { ctxWaitUntil = ctx.executionCtx.waitUntil?.bind(ctx.executionCtx); } catch { /* Node has no executionCtx. */ }
         let body: string | ReadableStream<Uint8Array> | undefined;
@@ -164,7 +167,7 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
           let shell: JSX.Element | undefined;
           body = await renderToStream(
             (rid: RouteProps['rid']) => shell = createElement(page.Root(page.Content, page.clientScript), {
-              rid, url: new URL(ctx.req.url), ctx, head, route: route.path,
+              rid, url: new URL(ctx.req.url), ctx, params, head, route: route.path,
               scripts: requestScripts, clientScript: page.clientScript,
             }),
             { waitUntil: promise => {

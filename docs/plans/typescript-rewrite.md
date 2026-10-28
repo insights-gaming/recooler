@@ -234,10 +234,10 @@ The router logs a warning at startup for near-miss exports, e.g. `onget` or `OnP
 ```ts
 interface ResolvedRoute {
   path: string; file: string;
-  module: ModuleNs; layouts: ModuleNs[]; root?: ModuleNs;
-  layoutFiles: (string | undefined)[]; rootFile?: string;
-  middleware: MiddlewareHandler[];
-  middlewareModules: ModuleNs[]; middlewareFiles: (string | undefined)[];
+  module: ModuleNs; layouts: readonly ModuleNs[]; root?: ModuleNs;
+  layoutFiles: readonly (string | undefined)[]; rootFile?: string;
+  middleware: readonly MiddlewareHandler[];
+  middlewareModules: readonly ModuleNs[]; middlewareFiles: readonly (string | undefined)[];
   directory: string;
 }
 
@@ -263,7 +263,7 @@ interface CreateAppOptions<E extends Env = Env> {
 ```
 
 `createApp<E extends Env = Env>` returns `Hono<E>`. Extension and adapter hooks receive
-frozen route copies with frozen array containers. Adapters run only for own default exports
+frozen route copies with frozen array containers. Adapters run only for own function default exports
 and their returned handlers are validated. The original ordered extras argument is retained;
 named contributions let adapters decide collisions. `mergePageExtras` concatenates arrays
 and replaces scalar/object values in extension order without mutating inputs.
@@ -409,7 +409,7 @@ Either way:
 - **Never emit an origin-relative URL.** A root catch-all matches `//evil.example/x`, so the emitted URL must never start with `//` (or `/\`); prefix `/.` in that case. Add a conformance case.
 - **Mounts.** `route()` and `basePath()` are covered, because the pathname already contains the prefix. Hono 4's `app.mount()` and prefix-stripping proxies hide the prefix, so `htmx({ base })` supplies it. Without `base`, `mount` is documented as unsupported for actions.
 - **Owner route.** Actions post to the *rendering* route, not the module that defines them. 0.0.27 posted actions defined in a route module to that module's own path, so its middleware ran. A public page that renders a component exported from an `(admin)` route module now runs that action under the public chain. Document this in the migration guide, and add a conformance scenario.
-- **Hono 5 params.** The page adapter passes a params snapshot in `RouteProps`, because `c.req.param()` is empty in deferred Suspense children on Hono 5.
+- **Hono 5 params.** The page adapter passes a readonly `params` snapshot in `RouteProps`, captured at handler entry before awaiting the head, because `c.req.param()` is empty in deferred Suspense children on Hono 5.
 
 ### 3.4 Client scripts (D4)
 

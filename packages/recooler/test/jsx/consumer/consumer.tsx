@@ -15,10 +15,13 @@ declare module 'recooler/jsx' {
   interface RouteEnv { Bindings: { DB: string }; Variables: { user: string } }
 }
 export const bindings = (props: RouteProps) => {
+  const params: Readonly<Record<string, string>> = props.params;
+  // @ts-expect-error params are a readonly request-time snapshot
+  props.params.id = 'changed';
   const db: string = props.ctx.env.DB;
   const user: string = props.ctx.get('user');
   // @ts-expect-error bindings are typed, not any
   const invalid: number = props.ctx.env.DB;
-  return <div ctx="user data">{db}{user}{invalid}</div>;
+  return <div ctx="user data">{db}{user}{invalid}{params.id}</div>;
 };
 export const keyed = (props: RouteProps) => <li {...{ title: 'item' }} ctx={props.ctx} key="id">item</li>;
