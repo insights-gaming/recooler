@@ -124,7 +124,7 @@ Arrays concatenate in extension order using the router's public merge rule
 `{ extension, page }` contributions as the adapter's third argument. JSX does not
 use those names or apply an extension-specific collision policy; it reads scripts
 and the legacy clientScript from the merged extras.
-Each request gets its own script array. The default root emits external module
+Each request gets its own script array. The adapter emits Recooler's static module scripts in Content; the default root emits other external module
 scripts after content, adds `<body data-recooler-route="/pattern/:id">`, and adds
 UTF-8 charset only when head metas declare no rendered charset attribute.
 Custom roots should render those URLs themselves, for example:
@@ -141,25 +141,44 @@ export default function Root(Content: Component<RouteProps>) {
 }
 ```
 
-For a custom root, the adapter puts `<meta name="recooler-route" content="…">`
-at the beginning of the Content slot. This remains discoverable even if the root
-renders its own body and does not call `renderHeadElements`. The value is the
-manifest pattern, not the concrete request URL or mount prefix. Roots wrapping
-`DefaultRootHOC` use its body attribute and do not get a second meta marker.
+For full pages with client code, Content starts async/deferred copies of identical
+client and route module URLs. The module map evaluates each URL once; async
+registration works during streaming and the deferred copy guarantees registration
+before DOMContentLoaded. Custom roots also get dependency modulepreloads. For
+non-boosted htmx fragments, module scripts follow Content and preloads are omitted
+so htmx 1 preserves table-row parsing. There is no blocking gate request. Keep
+Content intact.
+
+A trailing template[data-recooler-marker] carries route/version metadata only on
+client-bearing routes. It survives tables and htmx 1's DOMParser history restore.
+Handler-free pages emit no marker. Route values are manifest patterns without mount
+prefixes. Initialization reads every marker, never a stale body attribute; it runs
+the owning route's onLoad once per marker, including cross-route fragments.
 
 For one release an extension may still provide `page.clientScript: string`.
 It is passed to legacy custom roots as the second argument, and is available as
 `props.clientScript`; `props.scripts` contains only URL strings. The default root
 accepts the legacy string but emits only external URLs from `props.scripts`.
-Migrate custom roots to `props.scripts`; adapter-generated client code is never inlined. A custom root that inlines the legacy source must
+Migrate custom roots to `props.scripts`; client entry scripts stay external. Generated
+hx-on dispatch attributes remain inline and use htmx's existing eval permission. A custom root that inlines the legacy source must
 be updated by its owner. The old `?script` endpoint is gone; URLs belong to the
 extension. Suspense's engine-generated inline scripts are separate from client
 entry scripts. The resolved template and cleanup script are configurable through
 the options below; the engine loader script is fixed.
 
-Phase 5 concern: external module scripts run only after the entire Suspense
-stream finishes, whereas the 0.0.27 inline onLoad script could run immediately.
-Client entry loading and onLoad timing must account for this during Phase 5.
+Handlers become usable as soon as their slice registers. Route onLoad waits until
+DOMContentLoaded (or runs immediately if parsing has finished) and sees the full
+DOM. Its promise is not awaited; errors reach reportError. Root/layout handlers
+already registered remain usable during body swaps. Only confirm can safely defer
+its request while modules load. Generated hx-on attributes have a small inline
+fallback that holds unavailable confirms and drops other events without canceling
+defaults. A legacy hx-on alias for generated confirms handles htmx 1's synchronous
+load-listener ordering; htmx 2 ignores the alias. This alias requires the
+`recooler/jsx` runtime. Consumers retaining `jsxImportSource: easy-jsx-html-engine`
+lack it and their htmx 1 generated load guards remain unprotected until normal
+listener installation (the plugin warns). Native guards may be bypassed before registration;
+see the migration guide. Enable htmx.legacyClientScript explicitly for roots that
+inline the second argument.
 
 ## Rendering options
 

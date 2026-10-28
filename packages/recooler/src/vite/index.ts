@@ -98,7 +98,7 @@ export interface RecoolerOptions {
   routes?: GenerateOptions;
   /** Restrict virtual app imports to this configured server environment. */
   serverEnvironment?: string;
-  /** Enabled automatically by hx- source attributes. Client delivery is Phase 5. */
+  /** Enabled automatically by hx- source attributes or route onLoad exports. */
   htmx?: false | {
     /** Request env binding, then process.env on Node. Never a build-time secret. */
     secretBinding?: string;
@@ -107,6 +107,8 @@ export interface RecoolerOptions {
     base?: string;
     trustedOrigins?: readonly string[];
     clientBannedImports?: readonly (RegExp | string)[];
+    /** One-release custom-root shim: pass inline import(entry) as clientScript. */
+    legacyClientScript?: boolean;
     /** Additional action packages without a declared recooler peer/dependency. */
     actionDependencies?: readonly string[];
   };
@@ -185,8 +187,8 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
       if (generationError) throw generationError;
       const settings = options.htmx || {};
       const binding = JSON.stringify(settings.secretBinding ?? 'RECOOLER_SECRET');
-      const imports = options.htmx === false ? '' : `import { htmx } from 'recooler/htmx';\nimport { table, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
-      const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, namespace, secret: env => { const value = env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined); if (typeof value !== 'string' || !value) throw new Error(${JSON.stringify('recooler: htmx actions require a nonempty ' + (settings.secretBinding ?? 'RECOOLER_SECRET') + ' binding; set it in .dev.vars for local Workers, a deployed Worker secret, or process.env on Node')}); return value; }, base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
+      const imports = options.htmx === false ? '' : `import { htmx } from 'recooler/htmx';\nimport { table, clients, clientEntry, clientPreloads, clientModules, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
+      const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, clients, clientEntry, clientPreloads, clientModules, legacyClientScript: ${JSON.stringify(settings.legacyClientScript === true)}, namespace, secret: env => { const value = env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined); if (typeof value !== 'string' || !value) throw new Error(${JSON.stringify('recooler: htmx actions require a nonempty ' + (settings.secretBinding ?? 'RECOOLER_SECRET') + ' binding; set it in .dev.vars for local Workers, a deployed Worker secret, or process.env on Node')}); return value; }, base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
       // Loading the table first pretransforms route closures in parallel. The
       // module runner otherwise lowers/evaluates manifest imports serially.
       // All registrations still evaluate before createApp consumes the table.
@@ -195,5 +197,8 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
   };
   // Wire invalidation before configureServer's initial generation can fail.
   const generator = routePlugin(options.routes ?? {}, generated);
-  return [app, generator, ...htmx.plugins, jsxDefaults()];
+  // CLI config files are re-evaluated for each environment. Share only our
+  // plugins so the server discovery table reaches the client without imposing
+  // builder.sharedPlugins on Cloudflare or other plugins.
+  return [app, generator, ...htmx.plugins, jsxDefaults()].map(plugin => ({ ...plugin, sharedDuringBuild: true }));
 }

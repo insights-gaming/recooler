@@ -28,7 +28,7 @@ export function parseAndAnalyze(code: string, id: string, rawTransfer = true): A
   const scopes = analyze(program as unknown as Parameters<typeof analyze>[0], {
     sourceType: "module", lib: [], jsxPragma: null, childVisitorKeys: visitorKeys,
   });
-  return new Analysis(program, scopes);
+  return new Analysis(program, scopes, parsed.comments);
 }
 
 export function children(node: Node): Node[] {
@@ -87,7 +87,7 @@ export class Analysis {
   readonly parents = new Map<Node, Node>();
   readonly variables: Variable[];
   readonly referenceAt = new Map<number, Reference>();
-  constructor(readonly program: Program, readonly scopes: ScopeManager) {
+  constructor(readonly program: Program, readonly scopes: ScopeManager, readonly comments: readonly Span[] = []) {
     this.references = scopes.scopes.flatMap(scope => scope.references)
       .sort((a, b) => a.identifier.range[0] - b.identifier.range[0]);
     this.variables = scopes.scopes.flatMap(scope => scope.variables);

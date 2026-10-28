@@ -54,7 +54,7 @@ let importGeneration = 0;
 
 /** Feature tags apply to requests, so mixed scenarios still exercise routing. */
 export function tsRequestSkipReason(request: ScenarioRequest): string | undefined {
-  if (request.requires?.includes("client")) return "client chunks and script delivery are Phase 5 (not implemented yet)";
+  return undefined;
 }
 
 const buildMode = "production";
@@ -134,7 +134,7 @@ export const tsTarget: Target = {
       await mkdir(cache, { recursive: true });
       await cp(src, path.join(cache, "src"), { recursive: true });
       await symlink(path.join(packageDir, "node_modules"), path.join(cache, "node_modules"), "dir");
-      await writeFile(path.join(cache, "package.json"), '{"type":"module"}\n');
+      await writeFile(path.join(cache, "package.json"), '{"name":"recooler-conformance-app","type":"module"}\n');
       await writeFile(path.join(cache, "htmx-options.json"), JSON.stringify(scenario.ts?.htmxOptions ?? {}));
       let logs: string;
       try {
@@ -161,6 +161,7 @@ export const tsTarget: Target = {
     } catch (error) { return { kind: "buildError", error: String((error as Error).stack ?? error) }; }
     if (typeof app?.fetch !== "function") throw new Error(`Vite output has no default fetch(): ${cache}`);
     const env = { RECOOLER_SECRET: scenario.ts?.htmxOptions?.secret ?? 'conformance-test-secret' };
-    return { kind: "app", fetch: request => app.fetch(request, env), hono: app, env };
+    const clientChunks = JSON.parse(await readFile(path.join(cache, "client-chunks.json"), "utf8")) as Record<string, string>;
+    return { kind: "app", clientChunks, fetch: request => app.fetch(request, env), hono: app, env };
   },
 };

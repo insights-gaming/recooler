@@ -21,6 +21,16 @@ function isContext(value: unknown): boolean {
 }
 
 function filterAttributes(attrs: Record<string, unknown>): Record<string, unknown> {
+  const confirm = Object.keys(attrs).find(key => /^(?:data-)?hx-on(?:::|--|:htmx:|-htmx-)confirm$/.test(key)
+    && typeof attrs[key] === 'string' && (attrs[key] as string).startsWith('(self.$rc||'));
+  if (confirm) {
+    // htmx 1 installs legacy hx-on before synchronous load triggers, then
+    // replaces it with the wildcard listener. htmx 2 ignores this alias.
+    const early = 'htmx:confirm:eval(this.getAttribute(' + JSON.stringify(confirm) + '))';
+    if (!(String(attrs['hx-on'] ?? '').split('\n').includes(early))) {
+      attrs = { ...attrs, 'hx-on': (attrs['hx-on'] ? attrs['hx-on'] + '\n' : '') + early };
+    }
+  }
   return Object.fromEntries(Object.entries(attrs).filter(([attribute, value]) => {
     if (typeof value === 'function' && /^(?:data-)?hx-(?:(?:get|post|put|patch|delete)$|on)/i.test(attribute)) {
       throw new TypeError(`recooler: function-valued ${attribute} cannot be rendered; module was not transformed`);

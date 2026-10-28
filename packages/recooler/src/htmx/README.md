@@ -30,7 +30,11 @@ surviving static dependencies. IDs must match the transform's supplied
 actions. Only routes with their own function `default` export register actions;
 handler-only routes ignore table entries.
 
-The Vite plugin supplies this table through `virtual:recooler/htmx` (Phase 4b).
+The Vite plugin supplies this table through `virtual:recooler/htmx`. That module
+also exports `clients` (route-file → slice ids) and `clientEntry` (the stable URL).
+Pass those to `htmx({ table, clients, clientEntry, namespace, ... })` in a custom
+entry. Set `legacyClientScript: true` only for roots that inline their second
+argument; new roots render props.scripts module URLs.
 Static imports, re-exports (including barrels) and side-effect imports contribute
 graph edges. Dynamic `import()` is not followed in v1. Barrels over-approximate
 reachability; signing prevents a foreign URL from authorizing an unused action.
@@ -143,10 +147,12 @@ and includes the complete D6 signature. There is no global `configureActions`.
 Renderable action results are rendered as JSX children. Returned/thrown Responses
 pass through, including render-time Responses; nullish results produce 204.
 
-Client slices already write their own functions to `globalThis.$handlers` and do
-not import the server runtime. Phase 5 owns client entry loading, onLoad and lazy
-chunks. This extension contributes `page.scripts: []` for now. Middleware-rendered
-login forms need an unguarded route; actions are never registered before guards.
+Client slices write their own functions to `globalThis.$handlers` and do not
+import the server runtime. The extension contributes the stable entry URL in
+page.scripts only for routes whose clients table reaches handlers or onLoad.
+The Vite entry loads lazy slices, runs the owning page's onLoad, then replays
+early events. Boosted navigation and history restoration initialize swapped content. Middleware-rendered login forms need an unguarded route; actions are
+never registered before guards.
 
 `recooler/htmx/testing` exports only the test capability helper:
 
@@ -173,3 +179,5 @@ application endpoint.
 `node:crypto`, real transformed modules evaluated through data URLs, and streamed
 Suspense. The Farm conformance target retains seven intentional TS-only skips. Filesystem watcher
 and Vite dev-server tests require local filesystem watching/loopback permissions.
+
+Phase 5 client delivery, event queuing, onLoad timing, navigation initialization and both banned-import checks are documented in [the Vite adapter](../vite/README.md#client-scripts-phase-5).

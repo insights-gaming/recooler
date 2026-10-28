@@ -1,3 +1,4 @@
+import { confirmHold } from "../confirm.js";
 import MagicString from "magic-string";
 import { contains, ParseError, parseAndAnalyze, unwrap, walk } from "./analysis.js";
 import type { Analysis, Node, Span, Variable } from "./analysis.js";
@@ -24,11 +25,25 @@ export const actionTransformVersion = 1;
 export function transform(code: string, options: TransformOptions): TransformResult {
   const ms = new MagicString(code, { filename: options.id });
   const diagnostics: Diagnostic[] = [];
-  const result = (candidates: Candidate[] = []): TransformResult => ({
-    code: ms.toString(), map: ms.generateMap({ hires: true, source: options.id, includeContent: true }),
+  let hasOnLoad = false;
+  const redactions: Span[] = [];
+  const result = (candidates: Candidate[] = []): TransformResult => {
+    const map = ms.generateMap({ hires: true, source: options.id, includeContent: true });
+    if (options.mode === "client-slice") {
+      // Source maps are public assets too. Keep offsets (including UTF-16 code
+      // units and newlines) while disclosing only the surviving client source.
+      const content = code.split("");
+      for (const { start, end } of redactions) for (let i = start; i < end; i++) {
+        if (content[i] !== "\n" && content[i] !== "\r") content[i] = " ";
+      }
+      map.sourcesContent = [content.join("")];
+    }
+    return {
+    code: ms.toString(), map,
     actions: candidates.filter(c => c.kind === "action").map(c => ({ ...metadata(c), method: c.method! })),
-    handlers: candidates.filter(c => c.kind === "handler").map(metadata), diagnostics,
-  });
+    handlers: candidates.filter(c => c.kind === "handler").map(metadata), hasOnLoad, diagnostics,
+    };
+  };
   let analysis: Analysis;
   try { analysis = parseAndAnalyze(code, options.id, options.rawTransfer); }
   catch (error) {
@@ -37,6 +52,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
     diagnostics.push(...errors.map(e => ({ ...e, severity: "error" as const, code: "parse-error" })));
     return result();
   }
+  hasOnLoad = options.moduleKind === "route" && onLoadExports(analysis).size > 0;
   const candidates = collect(analysis, options, diagnostics);
   warnOnLoad(analysis, options, diagnostics);
   const mode = options.mode ?? "full";
@@ -80,12 +96,17 @@ export function transform(code: string, options: TransformOptions): TransformRes
   const drop = (start: number, end: number) => { if (start < end) dropped.push({ start, end }); };
 
   if (mode === "client-slice") {
+    redactions.push(...analysis.comments);
+    for (const comment of analysis.comments) drop(comment.start, comment.end);
     for (const item of analysis.program.body) {
       if (item.type === "ExportAllDeclaration" && slice!.onLoadItems.has(item)) continue;
       if (item.type === "ImportDeclaration") {
         const kept = item.specifiers.filter(s => slice!.kept.has(s));
         if (!kept.length) drop(item.start, item.end);
-        else rewriteImport(ms, code, item, kept);
+        else {
+          rewriteImport(ms, code, item, kept);
+          redactions.push(...item.specifiers.filter(s => !slice!.kept.has(s)));
+        }
         continue;
       }
       if (item.type === "ExportNamedDeclaration" && !item.declaration) {
@@ -153,6 +174,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
   // would also erase the moved handler's original chunks and its mappings.
   const removed: Span[] = [];
   for (const range of dropped) removeExcept(ms, range, owners.within(range), removed);
+  redactions.push(...removed);
   const removedIndex = new SpanIndex(removed);
   const alive = (span: Span) => !removedIndex.owner(span);
   const handlerSites = new Set(candidates.filter(c => c.kind === "handler").map(c => `${c.start}:${c.end}`));
@@ -248,6 +270,19 @@ export function transform(code: string, options: TransformOptions): TransformRes
         replacement = c.variables.length
           ? `\`${escapeTemplate(ref)}(\${${helper("handlerScope")}(${scopeAtSite(c)})}).call(this, event)\``
           : JSON.stringify(`${ref}.call(this, event)`);
+        if (options.queueHandlers) {
+          // Only htmx:confirm exposes a safe continuation. The fallback is
+          // local to this listener and never suppresses native event defaults.
+          const hold = `((${confirmHold})(a[3])&&(self.$rq??=[]).push(a))`;
+          const fallback = options.dev
+            ? `(...a)=>a[3].type=="htmx:confirm"?${hold}:console.warn('recooler: dropped '+a[3].type+' while route handlers load')`
+            : `(...a)=>a[3].type=="htmx:confirm"&&${hold}`;
+          const dispatch = `(self.$rc||(${fallback}))`;
+          const prefix = `${dispatch}(${JSON.stringify(c.id)},`;
+          replacement = c.variables.length
+            ? `\`${escapeTemplate(prefix)}\${${helper("handlerScope")}(${scopeAtSite(c)})},this,event)\``
+            : JSON.stringify(`${prefix}null,this,event)`);
+        }
       }
       ms.appendLeft(c.start, replacement);
     }

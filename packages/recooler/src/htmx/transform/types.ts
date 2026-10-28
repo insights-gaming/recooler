@@ -48,6 +48,10 @@ export interface TransformOptions {
   componentContext?: boolean;
   /** Disable raw transfer for testing or unsupported hosts. Default: capability checked. */
   rawTransfer?: boolean;
+  /** Vite delivery: queue events until the route's lazy slices have loaded. */
+  queueHandlers?: boolean;
+  /** Warn when an unavailable handler cannot safely defer its event. */
+  dev?: boolean;
   codegen?: {
     actionUrl?: (input: ActionUrlEmission) => string;
     registerActions?: (input: RegistrationEmission) => string;
@@ -58,6 +62,7 @@ export interface TransformResult {
   map: SourceMap;
   actions: Action[];
   handlers: Handler[];
+  hasOnLoad: boolean;
   diagnostics: Diagnostic[];
 }
 

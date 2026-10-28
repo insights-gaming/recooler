@@ -39,7 +39,7 @@ let server, builtPreview, auxiliary;
 try {
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
-  await write('package.json', JSON.stringify({ type: 'module', dependencies: { 'fixture-actions': '1.0.0' } }));
+  await write('package.json', JSON.stringify({ name: 'recooler-test-app', type: 'module', dependencies: { 'fixture-actions': '1.0.0' } }));
   await write('node_modules/fixture-actions/package.json', JSON.stringify({ name: 'fixture-actions', type: 'module', exports: './index.tsx', peerDependencies: { recooler: '*' } }));
   await write('node_modules/fixture-actions/index.tsx', `export const Dependency = () => <form hx-post={() => 'dependency'}/>;`);
   await write('tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', verbatimModuleSyntax: true } }));
@@ -64,7 +64,7 @@ try {
   else if (cf) {
     auxiliary = await mkdtemp(path.join(cacheDir, 'htmx-aux-'));
     await mkdir(path.join(auxiliary, 'src'));
-    await writeFile(path.join(auxiliary, 'package.json'), '{"type":"module"}');
+    await writeFile(path.join(auxiliary, 'package.json'), '{"name":"recooler-test-app","type":"module"}');
     await writeFile(path.join(auxiliary, 'src/index.ts'), `export default { fetch: () => new Response('auxiliary worker') };`);
     await writeFile(path.join(auxiliary, 'wrangler.json'), JSON.stringify({ name: 'aux_worker', main: 'src/index.ts', compatibility_date: '2026-10-20' }));
     await write('src/routes/aux/index.ts', `export const onGet = c => c.env.AUX.fetch('http://aux/');`);

@@ -70,7 +70,11 @@ export default defineConfig(({ mode }) => {
 ```
 
 Select the Wrangler environment as well as the matching Vite mode, for example
-`CLOUDFLARE_ENV=production vite build --mode production`. Keep production and local
+`CLOUDFLARE_ENV=production vite build --mode production`. Select `CLOUDFLARE_ENV`
+for development and preview builds too, and use the matching environment when
+running preview (for example `CLOUDFLARE_ENV=staging vite build --mode staging`
+then `CLOUDFLARE_ENV=staging vite preview`, or `CLOUDFLARE_ENV=staging vite dev
+--mode staging`). Vite mode alone does not select a Wrangler environment. Keep production and local
 profiles separate and verify their emitted constants. Upgrade workspace catalog
 entries to the pinned Vite target, and run the existing test suite against the new
 catalog resolution.
@@ -104,9 +108,13 @@ also protect method-only routes, catch-alls and unmatched requests under its
 prefix. After-next middleware must still see `ctx.error` and `ctx.finalized` and
 may throw `HTTPException` with a response returned by `app.onError`.
 
-See the action URL and CSRF migration below for manual action requests. Client
-entry loading remains Phase 5 work; the JSX root compatibility contract is
-documented below.
+Hono's after-next behavior remains observable: if an inner handler returns
+`undefined`, middleware using `return await next()` still yields a Context object
+in 0.1. Return an explicit Response when one is required; this migration does
+not change that Hono behavior.
+
+See the action URL and CSRF migration below for manual action requests, and
+the browser-handler section for client loading and the legacy-root opt-in.
 
 ## JSX pages
 
@@ -169,8 +177,9 @@ content because the HTTP status and headers are already sent. Default catches no
 longer expose errors or stack traces in HTML. Set `showStack` on a boundary or
 Suspense only when that output is desired.
 
-External module scripts execute after the entire Suspense stream finishes. Phase
-5 must account for this onLoad timing difference from the old inline script.
+Async route modules register handlers during Suspense streaming. An identical
+deferred module guarantees registration before DOMContentLoaded. The client waits
+for DOMContentLoaded before onLoad, including legacy dynamic imports. See the browser-handler section for startup and swap-window semantics.
 
 
 ## htmx action URLs and security (D3/D6/D7)
@@ -178,15 +187,16 @@ External module scripts execute after the entire Suspense stream finishes. Phase
 Configure `htmx({ table, secret })` from `recooler/htmx` as a `createApp` extension
 alongside `jsxPages()`. The reachability table maps manifest `route.file` IDs to
 registered action-bearing module IDs, including roots, layouts and shared static
-imports. The table is static; D5 development uses `invalidateAll` and a full SSR
-reload to re-evaluate the virtual table and recreate `createApp`. Getter mode is
+imports. The table is static; development invalidates the virtual table and reloads the
+server runner to recreate `createApp`, retaining unchanged transforms. Getter mode is
 unsupported. Register actions before `createApp`: `actionUrl` throws if an action uses a method
 that was not reserved on the rendering route at app creation. Recreate the app
-after registering a new method. The Vite integration will provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+after registering a new method. The Vite integration generates this table; see the [runtime interface](../packages/recooler/src/htmx/README.md).
 
 **D6: all action URLs are now signed**, including actions without captures. The
-signature covers the receiving route file, exact pathname, HTTP method, action
-ID and serialized scope. Pages cached before this switch contain incompatible
+signature covers the app/environment namespace, external action base, defining
+module's versioned source hash, receiving route file, exact pathname, HTTP method,
+action ID and serialized scope. Pages cached before this switch contain incompatible
 URLs: invalidate those pages and have users refresh them before submitting.
 Unknown, unsigned, tampered and replayed-to-another-path URLs fall through after
 route middleware and normally return 404 without running an action. A guard's
@@ -196,13 +206,20 @@ env.ACTION_SECRET`; env functions are cached per env object identity in a WeakMa
 Use a new env object or recreate the app to rotate a key within the same env. Missing/empty secrets fail startup or the first request
 with actions. `secret: false` now throws; use `secret: { unsafeUnsigned: true }` only for local
 development. This disables D6 replay protection (including unused barrel actions)
-while retaining CSRF and reachability checks. The Phase 4b Vite plugin must reject
-this mode in production using the exported `unsafeUnsignedMarker` on the extension.
-Each `htmx()` creation in this mode logs a runtime warning. The marker is a runtime
-property, so the plugin must evaluate the built server entry to check it.
-The plugin must also provide a stable per-project namespace to both
-`registerActions(moduleId, methods, namespace)` and `htmx({ namespace, ... })`; the
-default namespace remains shared for compatibility with current transform output.
+while retaining CSRF and reachability checks. The Vite production flag enforces
+the startup guard, including custom entries. Each `htmx()` creation in this mode
+logs a runtime warning. The Vite plugin derives app
+identity from the nearest package.json name and package-relative source directory,
+then includes the server environment (plus a per-server nonce in dev). An unnamed
+package must set `recooler({ htmx: { namespace: 'my-app' } })` or add a package name;
+build and dev startup fail otherwise. Use distinct identities for separate apps.
+
+The virtual app's default `RECOOLER_SECRET` must be provisioned like any other
+required secret: set it in `.dev.vars` for local Workers, provision it as a Worker
+secret for deployment, or set `process.env.RECOOLER_SECRET` on Node. Provision the
+configured `htmx.secretBinding` instead if overridden. Cloudflare v2 also needs a
+secret declaration in `worker.env`. Use separate secrets for separate apps and
+deployments; the build does not generate or embed a secret.
 
 **D7: action requests require `HX-Request: true`**, including mutating GET actions.
 They also require acceptable Fetch Metadata or Origin. Manual requests should
@@ -234,6 +251,200 @@ already includes the prefix. URLs preserve exact encoded segments and stay local
 even when a root catch-all matches a path starting with `//`.
 
 The lower-level `actionScope` helper now requires the ambient rendering binding;
-`configureActions` is replaced by per-extension secrets. `page.scripts` is empty
-until Phase 5 supplies the client entry. Client handler slices already register
-their own handlers; loading those slices and invoking onLoad remain Phase 5 work.
+`configureActions` is replaced by per-extension secrets. The Phase 5 client
+extension now supplies `page.scripts`, loads route slices and invokes onLoad as
+described below; each slice registers its own handlers.
+
+## Workers behind a path-prefix proxy
+
+When a front Worker proxies `/_admin/*` to a second Worker through a service
+binding and strips `/_admin`, set Vite `base: '/_admin/'` in the second app:
+
+```ts
+export default defineConfig({
+  base: '/_admin/',
+  plugins: [cloudflare(), ...recooler({ htmx: { base: '/_admin' } })],
+});
+```
+
+Vite `base` controls the public client entry, lazy slice imports, modulepreloads
+and the legacy inline `import()` URL. `htmx.base` separately restores the stripped
+prefix on signed action URLs. Keep the second Worker's own client build output
+attached to its asset binding. The front Worker must forward every `/_admin/*`
+request, including `/_admin/assets/*`, to that Worker before serving its own
+assets. The second Worker then receives `/assets/*` and serves its own entry and
+chunks. Do not copy the second app's files into the front Worker's asset set.
+Use a rooted base with a trailing slash; relative Vite bases are build errors.
+
+## Browser handlers and custom roots (Phase 5)
+
+Use `...recooler()` from `recooler/vite`. One **`vite build`** now builds the
+server followed by the browser environment. Programmatic integrations must use
+`createBuilder(config).buildApp()`; Vite's legacy `build(config)` builds a single
+environment. Recooler uses its own post `buildApp` hook for plain Vite and leaves
+`builder.buildApp` intact. Cloudflare's Worker → client order and asset movement
+remain owned by Cloudflare. Recooler shares only its own plugin state between
+environments. Read the environments' resolved `build.outDir` values: v1 and v2
+use different directories, with v2 under `.cloudflare/output/v0`.
+
+The stable browser entry is `assets/recooler-client.js?v=<buildId>`, relative to
+Vite's configured `base` (use a rooted base for nested routes). Each handler-bearing
+route also has `assets/recooler-route-<sha256(route.file)[0:20]>.js?v=<buildId>`.
+These deterministic entry names come from the server route graph; the server does
+not read a client manifest. Serve client output at that base; ensure deployment
+caches distinguish the version query. Keep old hashed lazy chunks available for
+cached HTML during rolling deployments. The entry's route map and all chunks
+are public; lazy loading is a performance choice, not a confidentiality boundary.
+Route module names hash `route.file`; those names are guessable, not secrets.
+
+The htmx extension contributes `props.scripts: string[]` only for page routes
+reaching function handlers or a route `onLoad`. New roots render these URLs:
+
+```tsx
+export default Content => props => <html>
+  <head>{renderHeadElements(props.head)}</head>
+  <body>
+    <Content {...props} />
+    {props.scripts.map(src => <script type="module" src={src} />)}
+  </body>
+</html>;
+```
+
+The adapter places Recooler's startup scripts in the Content slot for every root,
+including legacy roots. Preserve Content. On full pages each route module and
+client entry appears as an early async module and an identical deferred module URL.
+The browser module map evaluates each URL once: the async copy registers during
+streaming, and the deferred copy guarantees registration before DOMContentLoaded.
+There is no blocking gate script. For non-boosted htmx responses, module scripts
+follow the content and preload links are omitted, preserving htmx 1 table rows.
+DefaultRootHOC avoids adding another copy; other script URLs retain their normal
+rendering. Full-page dependency modulepreloads go in the head with DefaultRootHOC
+and in Content with a custom root.
+
+Only routes with client code get a trailing `<template data-recooler-marker="true"
+data-recooler-route="/users/:id" data-recooler-version="…"></template>` in Content.
+It survives htmx 1's DOMParser history restoration, works inside tables, and leaves
+the page's first child unchanged. Handler-free fragments get no marker or scripts.
+Initialization reads all these markers, never the possibly stale body attribute.
+Routes use manifest patterns, without a mount prefix, rather than request paths.
+
+Legacy roots that inline their second `clientScript?: string` argument must
+explicitly enable `recooler({ htmx: { legacyClientScript: true } })`. That string
+is `import("<entry URL>").then(m=>m.init())`, with HTML-sensitive characters escaped; it is
+undefined on handler-free routes. No function-arity detection is attempted. For a
+custom `createApp` entry, pass `clients`, `clientModules`, `clientPreloads` and `clientEntry` from
+`virtual:recooler/htmx` to `htmx({ table, clients, clientModules, clientPreloads, clientEntry, namespace, ... })`,
+and set `legacyClientScript: true` there if required. Keep the argument a string;
+never pass a URL array into an inline script. A root should use either its legacy
+inline string or `props.scripts`. Default roots always render the external URLs.
+The shim needs your existing inline-script CSP policy. Migrate off it in 0.1.x.
+
+Load the classic htmx script before the module entry (for example, a non-async
+script in the head). Static route modules import only the route's reachable
+handler slices. **A handler runs as soon as its slice has registered**, including
+inside streamed chunks processed with `resolvedScriptMiddleware: s =>
+s + '.forEach(htmx.process)'`. Loaded root/layout handlers remain usable across
+body swaps while destination slices load.
+
+A route's `onLoad()` is called at DOMContentLoaded, or immediately when the document
+is no longer loading. It sees the complete DOM and is never awaited: asynchronous
+or never-resolving onLoad work cannot disable handlers or hold readiness. A rejected
+onLoad promise is sent to `reportError` (console.error where unavailable).
+Root/layout `onLoad` warns and does not run. Do not assume onLoad precedes htmx's
+own DOMContentLoaded listener or processing of streamed chunks.
+
+After swaps, `init()` loads missing slices for **every** marker currently in the
+DOM, then runs each new marker's owning route onLoad once. A fragment from another
+route runs its own onLoad, matching the former inline-script behavior. Duplicate
+module scripts, afterSwap/afterSettle/historyRestore events and explicit init calls
+share initialization. A same-route replacement or history restoration creates a
+new marker and runs onLoad again. HX-Location, push-url, boosts and partial swaps
+use this same path; unchanged markers do not rerun onLoad. Ready handlers on the
+surrounding page continue to run while another fragment loads or fails.
+
+During the short loading window, generated hx-on attributes call a compact inline
+fallback when `$rc` is not available. Only `htmx:confirm` is canceled and held in
+`self.$rq`. After registration, held events always take the deferred path and
+resume through the original `detail.issueRequest()` with no skip argument. This
+preserves htmx's native `hx-confirm` prompt. A handler's cancellation or explicit
+continuation suppresses automatic continuation. Detached targets are skipped.
+
+Held confirms preserve cancellations from other listeners: an already-prevented
+confirm is not held, and later calls to its `preventDefault()` suppress automatic
+continuation. The hold wraps that method on the event. Calls through a previously
+bound original or `Event.prototype.preventDefault.call(event)`, and setting
+`returnValue = false` after the hold, bypass the wrapper and cannot be distinguished
+from recooler's own prevention. Use the event's `preventDefault()` method.
+
+Unavailable `htmx:configRequest` and `htmx:beforeRequest` handlers are dropped;
+there is no safe public continuation for those events.
+
+Other events, including native click/submit/keydown/paste/drop and htmx response,
+swap and settle events, are dropped until their handler registers. They never
+cancel native defaults, re-dispatch native events, or restart an htmx request.
+Development warns for every dropped event, including htmx:load.
+Dropping avoids running stale lifecycle callbacks or late cancellation-dependent
+side effects. Once registered, handlers run normally with the original event. htmx's
+own listeners may ignore defaultPrevented; Recooler adds no replacement requests.
+Already-string hx-on attributes keep their behavior and unsafe-eval CSP needs.
+htmx 1.9.12 installs wildcard hx-on listeners after synchronous load requests, so
+a raw string load-confirm guard can be bypassed, including a cold boost from a
+handler-free page (also true in 0.0.27). Generated confirm listeners now include a
+legacy `hx-on` alias, emitted by the `recooler/jsx` runtime, that runs before
+htmx 1 issues load requests, then is replaced by the normal listener; htmx 2 ignores this alias. This protects generated guards
+even with slow assets and the streamed `.forEach(htmx.process)` pattern, without
+intercepting unrelated confirms. Consumers retaining
+`jsxImportSource: easy-jsx-html-engine` do not receive the alias; the plugin warns,
+and generated htmx 1 load guards remain unprotected until normal listener
+installation, as in 0.0.27. Both forms use hx-on's existing eval permission.
+
+**Native preventDefault guards can be bypassed during the post-swap loading window.**
+This includes non-boosted links/forms, href="#" anchors and key/paste/drop guards.
+Use `htmx:confirm` for request gating. A click/submit guard cannot cancel a default
+if its handler has not arrived; development warnings expose those dropped events.
+
+`globalThis.__recooler_ready` tracks registration and invocation of onLoad for the
+latest init; it does not wait for onLoad promises.
+Import failures are observed, evicted and retried with a fresh module URL (native
+imports cache failures). A second failure attempts one sessionStorage-guarded reload
+per client version; persistent failure reports a console error. Later init calls
+can still recover. Readiness settles after the error is reported, with no unhandled
+rejection. A throwing onLoad or confirm handler is reported without discarding
+other handlers. Dispatch-time properties such as currentTarget are unavailable to
+late handlers. Modules reachable only through server dynamic imports remain outside
+the static route graph.
+
+If the client runtime itself fails to load, its fallback-held confirms remain
+blocked for the tab: no handler or recovery code can drain them. Slice retry and
+reload recovery require a loaded runtime and do not cover this failure. The browser
+reports the failed module fetch; there is no additional recooler error reporter or
+retry for entry load failure. Restore asset delivery and refresh the page to recover.
+
+Client source maps are off by default and minification defaults on. Set
+`environments.client.build.sourcemap: true` to publish maps; these expose only
+the redacted client slices, with removed server source and comments blanked
+without changing positions. This also applies to inline maps. Set minify in
+`environments.client.build` to override it. Unsliced dependencies omit embedded
+source contents. The content-derived version is reproducible, embedded in the
+entry and checked against every page marker before dispatch. A mismatch reloads
+at most once per HTML/client version pair in sessionStorage, then reports a console
+error, refuses handler dispatch and cancels confirms so guarded requests fail
+closed. Non-confirm defaults remain untouched. Unavailable sessionStorage disables automatic reloads.
+
+Rename `client_banned_imports` to
+`recooler({ htmx: { clientBannedImports: [...] } })`. String patterns remain regular
+expressions. The first check matches **raw specifiers** in each retained
+handler/`onLoad` reference chain, including literal dynamic imports and global
+`require`. The second check matches **resolved paths** from every emitted client
+chunk's `moduleIds`, including lazy/shared chunks and transitive side-effect
+imports; it also checks package-relative paths after the last `node_modules`
+segment. Both checks fail the build. Include resolved-path patterns for aliases
+that hide a server-only raw specifier. Raw specifiers are also observed through
+transitive client helpers, and browser-external stubs are always banned. These are explicit application bans;
+Recooler does not classify arbitrary dependencies as server-only automatically.
+
+Server graph edits invalidate the server runner. Recooler invalidates the client
+entry and sends a client reload only when its route-to-slice/onLoad table changes.
+Files outside the server graph retain Vite's normal HMR, including SPA CSS and
+TypeScript entries.
+`playground-vite/` demonstrates this stack alongside the frozen Farm playground.
