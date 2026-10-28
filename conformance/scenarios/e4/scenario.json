@@ -1,0 +1,63 @@
+{
+  "name": "e4: disjoint same-shape methods, page/action ordering and catch-all layout actions",
+  "source": "agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version)",
+  "requests": [
+    {
+      "name": "GET /x/y",
+      "path": "/x/y",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>b page</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /x/y",
+      "path": "/x/y",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "a onPost",
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /x/y",
+      "method": "POST",
+      "action": {
+        "page": "/x/y",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "layout action"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    }
+  ]
+}

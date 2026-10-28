@@ -1,0 +1,5 @@
+{
+  "name": "d6: identical group-stripped paths conflict on terminal methods",
+  "source": "agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh (final version)",
+  "buildError": "match the same requests"
+}

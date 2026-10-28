@@ -1,0 +1,83 @@
+{
+  "name": "q4: page first next to POST-only differently named param route",
+  "source": "agent-ab598d8d56091e5e8.jsonl rv4/mkq.sh",
+  "requests": [
+    {
+      "name": "GET /posts/a",
+      "path": "/posts/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>page slug=a</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /posts/a",
+      "path": "/posts/a",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "admin onPost postId=a",
+        "trace": []
+      }
+    },
+    {
+      "name": "PUT /posts/a",
+      "path": "/posts/a",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /posts/a",
+      "method": "GET",
+      "action": {
+        "page": "/posts/a",
+        "attribute": "hx-get"
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "expect": {
+        "status": 200,
+        "includes": [
+          "layout-get-action"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "GET /posts/a?action=unknown",
+      "path": "/posts/a?action=unknown",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "unknown action",
+        "trace": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "m12: middleware without a runtime default export rejected",
+  "source": "agent-a661255d0075a9714.jsonl rv3 mkcase.sh middleware exports",
+  "buildError": "has no default export"
+}

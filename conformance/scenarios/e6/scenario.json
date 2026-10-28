@@ -1,0 +1,93 @@
+{
+  "name": "e6: guard and directory chains after same-shape form-action fall-through",
+  "source": "agent-a95e42b5d8a531ef8.jsonl rv5/mk.sh",
+  "requests": [
+    {
+      "name": "GET /posts/a",
+      "path": "/posts/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>pub page</p>"
+        ],
+        "trace": [
+          "pub"
+        ]
+      },
+      "headers": {
+        "x-auth": "1"
+      }
+    },
+    {
+      "name": "POST /posts/a",
+      "path": "/posts/a",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "admin onPost",
+        "trace": [
+          "pub",
+          "admin"
+        ]
+      },
+      "headers": {
+        "x-auth": "1"
+      }
+    },
+    {
+      "name": "POST /posts/a (2)",
+      "path": "/posts/a",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED pub",
+        "trace": [
+          "pub"
+        ]
+      }
+    },
+    {
+      "name": "action 0 from /posts/a",
+      "method": "POST",
+      "action": {
+        "page": "/posts/a",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "1"
+        }
+      },
+      "headers": {
+        "HX-Request": "true",
+        "x-auth": "1"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "pub action"
+        ],
+        "trace": [
+          "pub"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    }
+  ]
+}
