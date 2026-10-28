@@ -1,4 +1,4 @@
-import { contains, walk } from "./analysis.js";
+import { contains, isRuntimeVariable, walk } from "./analysis.js";
 import type { Analysis, Node, Span, Variable } from "./analysis.js";
 import { attrName, ownerAt } from "./collect.js";
 import type { Candidate, Diagnostic, TransformOptions } from "./types.js";
@@ -83,6 +83,11 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
     name: c.exportName, description: `event handler ${c.id}`, nodes: [], refs: refs(c.expression), dynamic: dynamic(c.expression), span: c,
   });
   for (const item of analysis.program.body) {
+    if (item.type === "ExportAllDeclaration" && item.exportKind !== "type" && item.exported && attrName(item.exported) === "onLoad") {
+      onLoad(item, { nodes: [add(item, item, item.source.value)] });
+      if (options.moduleKind === "route") onLoadItems.add(item);
+      continue;
+    }
     if (item.type === "ImportDeclaration") {
       if (item.importKind !== "type") for (const spec of item.specifiers) {
         if (spec.type !== "ImportSpecifier" || spec.importKind !== "type") add(item, spec, item.source.value);
@@ -94,7 +99,11 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
         if (spec.type !== "ExportSpecifier" || spec.exportKind !== "type") {
           if (attrName(spec.exported) === "onLoad") {
             if (item.source) onLoad(spec, { nodes: [add(item, spec, item.source.value)] });
-            else if (spec.type === "ExportSpecifier") onLoad(spec, { refs: analysis.refs(spec).flatMap(r => r.resolved ? [r.resolved] : []) });
+            else if (spec.type === "ExportSpecifier") {
+              const variables = analysis.refs(spec).flatMap(r => r.resolved && isRuntimeVariable(r.resolved) ? [r.resolved] : []);
+              if (!variables.length) continue;
+              onLoad(spec, { refs: variables });
+            }
             if (options.moduleKind === "route") onLoadSpecifiers.add(spec);
           }
         }
@@ -159,6 +168,11 @@ export function sliceModule(analysis: Analysis, candidates: Candidate[], options
 export function warnOnLoad(analysis: Analysis, options: TransformOptions, diagnostics: Diagnostic[]): void {
   if (options.moduleKind !== "root" && options.moduleKind !== "layout") return;
   for (const item of analysis.program.body) {
+    if (item.type === "ExportAllDeclaration" && item.exportKind !== "type" && item.exported && attrName(item.exported) === "onLoad") {
+      diagnostics.push({ severity: "warning", code: "ignored-onload", start: item.start, end: item.end,
+        message: `${options.relativePath}: onLoad exported by a ${options.moduleKind} never runs; export it from a route module instead` });
+      continue;
+    }
     if (item.type !== "ExportNamedDeclaration" || item.exportKind === "type") continue;
     const d = item.declaration;
     const exported = (d?.type === "FunctionDeclaration" && !d.declare && d.id?.name === "onLoad")

@@ -1,0 +1,9 @@
+export default function C() {
+	return <div>
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@0\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@1\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@2\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@3\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@4\"].call(this, event)"} />
+            </div>;
+}

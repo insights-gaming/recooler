@@ -79,7 +79,7 @@ export function collect(analysis: Analysis, options: TransformOptions, diagnosti
       const ctx = node.properties.find(p => p.type === "Property" && attrName(p.key) === "ctx");
       const context = ctx?.type === "Property" ? ctx.value : undefined;
       for (const prop of node.properties) {
-        if (prop.type === "Property") {
+        if (prop.type === "Property" && prop.kind === "init" && !prop.method) {
           if (prop.computed && prop.key.type !== "Literal" && isFunction(unwrap(prop.value))) {
             error(prop.key, "computed-handler-key", "computed function property keys must be string literals so htmx attributes can be identified");
           }

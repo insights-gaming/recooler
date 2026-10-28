@@ -57,6 +57,19 @@ export function unwrap(node: Node): Node {
   }
 }
 
+/** scope-manager intentionally treats type-only imports as both namespaces;
+ * emission still needs the importKind/declare flags to decide runtime presence. */
+export function isRuntimeVariable(variable: Variable): boolean {
+  return variable.isValueVariable && variable.defs.some(def => {
+    if (!def.isVariableDefinition || ("declare" in def.node && def.node.declare)) return false;
+    if (def.type === "ImportBinding") {
+      if (def.parent.type === "ImportDeclaration" && def.parent.importKind === "type") return false;
+      if (def.node.type === "ImportSpecifier" && def.node.importKind === "type") return false;
+    }
+    return true;
+  });
+}
+
 export class Analysis {
   readonly references: Reference[];
   readonly parents = new Map<Node, Node>();

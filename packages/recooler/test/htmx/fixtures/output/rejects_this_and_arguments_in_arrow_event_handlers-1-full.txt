@@ -1,0 +1,30 @@
+export default function C() {
+	return <div>
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@0\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@1\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@2\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@3\"].call(this, event)"} />
+              <button hx-on:click={"$handlers[\"src/routes/article/[id]/index.tsx@4\"].call(this, event)"} />
+            </div>;
+}
+export const _handler$0 = (function() {
+	this.classList.toggle(arguments[0].type);
+});
+export const _handler$1 = (() => [1].forEach(function() {
+	console.log(this, arguments);
+}));
+export const _handler$2 = (() => ({
+	m() {
+		return this;
+	},
+	get g() {
+		return this;
+	}
+}));
+export const _handler$3 = (() => class {
+	f = this;
+	m() {
+		return arguments;
+	}
+});
+export const _handler$4 = ((e) => e.currentTarget.arguments);

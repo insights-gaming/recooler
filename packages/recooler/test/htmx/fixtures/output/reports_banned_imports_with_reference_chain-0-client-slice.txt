@@ -1,0 +1,1 @@
+event handler src/routes/article/[id]/index.tsx@1 imports banned module "../lib/fql" via _handler$1 → updateTable → query → faunaClient

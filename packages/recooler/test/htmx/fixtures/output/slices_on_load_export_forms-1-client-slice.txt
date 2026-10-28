@@ -1,0 +1,1 @@
+export { onLoad } from "./client";

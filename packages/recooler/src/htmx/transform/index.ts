@@ -4,6 +4,7 @@ import type { Analysis, Node, Span, Variable } from "./analysis.js";
 import { collect, ownerAt } from "./collect.js";
 import { emitActionUrl, emitRegistration } from "./codegen.js";
 import { sliceModule, warnOnLoad } from "./slice.js";
+import { handlerOnlyDeclarations } from "./server.js";
 import type { Action, Candidate, Diagnostic, FunctionNode, TransformOptions, TransformResult } from "./types.js";
 
 export type { Action, Handler, Diagnostic, TransformOptions, TransformResult, TransformMode,
@@ -67,6 +68,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
 
   if (mode === "client-slice") {
     for (const item of analysis.program.body) {
+      if (item.type === "ExportAllDeclaration" && slice!.onLoadItems.has(item)) continue;
       if (item.type === "ImportDeclaration") {
         const kept = item.specifiers.filter(s => slice!.kept.has(s));
         if (!kept.length) drop(item.start, item.end);
@@ -89,12 +91,23 @@ export function transform(code: string, options: TransformOptions): TransformRes
     }
   }
   if (mode === "server") {
+    const clientOnly = handlerOnlyDeclarations(analysis, candidates);
+    for (const item of analysis.program.body) {
+      const decl = item.type === "ExportNamedDeclaration" || item.type === "ExportDefaultDeclaration" ? item.declaration : item;
+      if (!decl) continue;
+      if (clientOnly.has(decl)) drop(item.start, item.end);
+      else if (decl.type === "VariableDeclaration" && decl.declarations.some(d => clientOnly.has(d))) {
+        if (decl.declarations.every(d => clientOnly.has(d))) drop(item.start, item.end);
+        else trimList(decl.declarations, d => !clientOnly.has(d), drop);
+      }
+    }
     for (const item of analysis.program.body) if (item.type === "ImportDeclaration" && item.specifiers.length) {
       const kept = item.specifiers.filter(spec => {
         const variable = analysis.variables.find(v => v.identifiers.some(id => id.range[0] === spec.local.start));
         const refs = variable?.references.filter(r => r.isValueReference) ?? [];
         return refs.some(r => !candidates.some(c => c.kind === "handler"
-          && contains(c.expression, { start: r.identifier.range[0], end: r.identifier.range[1] })));
+          && contains(c.expression, { start: r.identifier.range[0], end: r.identifier.range[1] }))
+          && ![...clientOnly].some(node => analysis.inside(node, r)));
       });
       if (!kept.length) drop(item.start, item.end);
       else if (kept.length !== item.specifiers.length) rewriteImport(ms, code, item, kept);
@@ -107,8 +120,9 @@ export function transform(code: string, options: TransformOptions): TransformRes
   for (const range of dropped) removeExcept(ms, range, moved);
   const alive = (span: Span) => !dropped.some(d => contains(d, span)
     && !moved.some(c => contains(d, c) && contains(c, span)));
-  const siteAlive = (c: Candidate) => (mode === "server" && c.kind === "handler") || !dropped.some(d => contains(d, c))
-    || moved.some(p => p !== c && contains(p, c));
+  const siteAlive = (c: Candidate) => !dropped.some(d => contains(d, c)
+    && !(mode === "server" && c.kind === "handler" && d.start === c.start && d.end === c.end)
+    && !moved.some(p => p !== c && contains(d, p) && contains(p, c)));
 
   // Rename resolved captures, including shorthand object references, before
   // moving any text. The closest moved function owns a reference.
@@ -132,7 +146,16 @@ export function transform(code: string, options: TransformOptions): TransformRes
   const scopeAtSite = (c: Candidate) => `{ ${c.variables.map(v => `${JSON.stringify(v.name)}: ${valueAtSite(v, c)}`).join(", ")} }`;
   const components = new Map<FunctionNode, string>();
   const contextFor = (c: Candidate): string | undefined => {
-    if (c.explicitContext) return ms.slice(c.explicitContext.start, c.explicitContext.end);
+    if (c.explicitContext) {
+      // Shorthand props are expanded to `ctx: alias` by capture renaming. Only
+      // the value is an expression when it is reused as the URL override.
+      if (c.explicitContext.type === "Identifier") {
+        const ref = analysis.referenceAt.get(c.explicitContext.start);
+        const owner = ownerAt(moved, c.explicitContext);
+        return (ref?.resolved && owner?.aliases.get(ref.resolved)) || c.explicitContext.name;
+      }
+      return ms.slice(c.explicitContext.start, c.explicitContext.end);
+    }
     if (c.parent?.kind === "action") {
       const parent = c.parent;
       const param = firstParam(parent.fn);
@@ -157,7 +180,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
 
   // Inner first: a moved range must never be overwritten by an outer edit.
   // Insertion affinities here intentionally follow the magic-string spike.
-  for (const c of [...candidates].sort((a, b) => (a.end - a.start) - (b.end - b.start))) {
+  for (const c of [...candidates].sort((a, b) => contains(a, b) ? 1 : contains(b, a) ? -1 : a.start - b.start)) {
     if (siteAlive(c)) {
       let replacement: string;
       if (c.kind === "action") replacement = (options.codegen?.actionUrl ?? emitActionUrl)({

@@ -1,0 +1,21 @@
+import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
+export default function C(props) {
+	return <>
+            <a ctx={props.ctx} hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", {}, props.ctx)} />
+            <p hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@3", {}, props.ctx)} />
+          </>;
+}
+export const _action$post$2 = /*#__PURE__*/ __recooler_wrapActionWithPayload((() => 1));
+export const _action$post$1 = /*#__PURE__*/ __recooler_wrapActionWithPayload(((__recooler_ctx$1) => <i hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@2", {}, __recooler_ctx$1)} />));
+export const _action$post$0 = /*#__PURE__*/ __recooler_wrapActionWithPayload(((__recooler_ctx) => <b hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@1", {}, __recooler_ctx)} />));
+export const _action$post$5 = /*#__PURE__*/ __recooler_wrapActionWithPayload((() => 2));
+export const _action$post$4 = /*#__PURE__*/ __recooler_wrapActionWithPayload(((c2) => <s hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@5", {}, c2)} />));
+export const _action$post$3 = /*#__PURE__*/ __recooler_wrapActionWithPayload(((c1) => <u ctx={c1} hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@4", {}, c1)} />));
+__recooler_registerActions("src/routes/article/[id]/index.tsx", { post: {
+	"src/routes/article/[id]/index.tsx@0": _action$post$0,
+	"src/routes/article/[id]/index.tsx@1": _action$post$1,
+	"src/routes/article/[id]/index.tsx@2": _action$post$2,
+	"src/routes/article/[id]/index.tsx@3": _action$post$3,
+	"src/routes/article/[id]/index.tsx@4": _action$post$4,
+	"src/routes/article/[id]/index.tsx@5": _action$post$5
+} });

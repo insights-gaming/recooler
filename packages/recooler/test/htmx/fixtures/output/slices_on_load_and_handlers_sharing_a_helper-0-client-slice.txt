@@ -1,0 +1,9 @@
+function shared(n) {
+	return n * 2;
+}
+export async function onLoad() {
+	shared(1);
+}
+export const _handler$0 = (() => shared(2));
+const __recooler_handlers = globalThis.$handlers ??= {};
+__recooler_handlers["src/routes/article/[id]/index.tsx@0"] = _handler$0;

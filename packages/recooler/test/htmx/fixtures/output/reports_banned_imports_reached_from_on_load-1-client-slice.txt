@@ -1,0 +1,1 @@
+onLoad of src/routes/article/[id]/index.tsx imports banned module "../lib/fql" via onLoad

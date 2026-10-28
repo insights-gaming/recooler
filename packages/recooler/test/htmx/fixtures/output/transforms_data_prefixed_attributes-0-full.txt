@@ -1,0 +1,20 @@
+import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, handlerScope as __recooler_handlerScope, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
+export default function C(__recooler_props) {
+	let { msg } = __recooler_props;
+	return <form data-hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", { "msg": msg }, c)} ctx={c}>
+              <button data-hx-on:click={`$handlers["src/routes/article/[id]/index.tsx@0"](${__recooler_handlerScope({ "msg": msg })}).call(this, event)`} data-hx-on-mouseover={"$handlers[\"src/routes/article/[id]/index.tsx@1\"].call(this, event)"} />
+              <i {...{
+		"data-hx-delete": __recooler_actionUrl("src/routes/article/[id]/index.tsx@1", {}, __recooler_props.ctx),
+		"data-hx-on:load": "$handlers[\"src/routes/article/[id]/index.tsx@2\"].call(this, event)"
+	}} />
+            </form>;
+}
+export const _action$post$0 = /*#__PURE__*/ __recooler_wrapActionWithPayload(({ "msg": __recooler_capture }) => (() => __recooler_capture), "src/routes/article/[id]/index.tsx@0");
+export const _handler$0 = ({ "msg": __recooler_capture$1 }) => (() => alert(__recooler_capture$1));
+export const _handler$1 = (() => 1);
+export const _action$delete$1 = /*#__PURE__*/ __recooler_wrapActionWithPayload((() => 2));
+export const _handler$2 = (() => 3);
+__recooler_registerActions("src/routes/article/[id]/index.tsx", {
+	post: { "src/routes/article/[id]/index.tsx@0": _action$post$0 },
+	delete: { "src/routes/article/[id]/index.tsx@1": _action$delete$1 }
+});
