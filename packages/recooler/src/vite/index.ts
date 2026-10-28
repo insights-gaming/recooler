@@ -171,7 +171,10 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
       const binding = JSON.stringify(settings.secretBinding ?? 'RECOOLER_SECRET');
       const imports = options.htmx === false ? '' : `import { htmx } from 'recooler/htmx';\nimport { table, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
       const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, namespace, secret: env => env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined), base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
-      return { code: `import { createApp } from 'recooler/router';\nimport { jsxPages } from 'recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\n${imports}export default createApp(manifest, { pages: jsxPages()${extensions} });\n`, map: null };
+      // Loading the table first pretransforms route closures in parallel. The
+      // module runner otherwise lowers/evaluates manifest imports serially.
+      // All registrations still evaluate before createApp consumes the table.
+      return { code: `${imports}import { createApp } from 'recooler/router';\nimport { jsxPages } from 'recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\nexport default createApp(manifest, { pages: jsxPages()${extensions} });\n`, map: null };
     },
   };
   // Wire invalidation before configureServer's initial generation can fail.

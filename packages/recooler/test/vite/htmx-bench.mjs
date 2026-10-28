@@ -22,7 +22,8 @@ const write = async (name, code) => { await mkdir(path.dirname(path.join(root, n
 const modes = ['baseline', 'htmx'];
 // Gates are deliberately ratios, allowing noisy shared machines. The edit gate
 // also rejects the spike's multi-second serial-walk failure mode.
-const limits = { buildRatio: 6, linearity100to400: 5.5, editRatio: 6, editFloorMs: 100, editMaxMs: 5000 };
+const limits = { buildRatio: 6, linearity100to400: 5.5, editRatio: 6, editFloorMs: 100,
+  editOverheadMs: 500, editOverheadRatio: 0.5, nodeEditMaxMs: 2500 };
 try {
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
@@ -51,7 +52,17 @@ try {
     await write('src/lib/edit.ts', `export const marker = 'before-edit';`);
     const config = mode => ({
       root, configFile: false, logLevel: 'silent', mode: 'production',
-      plugins: [...(cf ? [cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false })] : []), ...recooler({ htmx: mode === 'baseline' ? false : {}, ...(cf ? { serverEnvironment: 'bench_worker' } : {}) })],
+      plugins: [...(cf ? [cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false })] : []), ...recooler({ htmx: mode === 'baseline' ? false : {}, ...(cf ? { serverEnvironment: 'bench_worker' } : {}) }),
+        // Both dev variants use the mandated full SSR reload. Comparing with
+        // incremental HMR would measure different invalidation policies rather
+        // than htmx overhead. Build baselines remain unmodified no-htmx builds.
+        ...(mode === 'baseline' ? [{ name: 'bench:full-reload-baseline', hotUpdate() {
+          if (this.environment.config.consumer !== 'server') return;
+          this.environment.moduleGraph.invalidateAll();
+          this.environment.hot.send({ type: 'full-reload', path: '*' });
+          return [];
+        } }] : []),
+      ],
       resolve: { alias: { 'farm-plugin-recooler/helpers': 'recooler/jsx' } },
       build: { ssr: 'src/entry.ts', write: false, sourcemap: true, minify: false },
       server: { host: '127.0.0.1', port: 0 },
@@ -119,12 +130,19 @@ try {
     const current = devSamples.filter(sample => sample.count === count && sample.grouped === grouped);
     const baseline = current.find(sample => sample.mode === 'baseline').ms;
     const full = current.find(sample => sample.mode === 'htmx').ms;
-    assert(full < limits.editMaxMs && full / Math.max(baseline, limits.editFloorMs) < limits.editRatio, JSON.stringify(current));
+    // workerd's mandatory full reload itself exceeds the Node cap at 1,000
+    // routes, even without htmx. Gate added overhead against that control.
+    assert((cf || full < limits.nodeEditMaxMs)
+      && full < baseline + Math.max(limits.editOverheadMs, baseline * limits.editOverheadRatio)
+      && full / Math.max(baseline, limits.editFloorMs) < limits.editRatio, JSON.stringify(current));
   }
   for (const grouped of [false, true]) {
     const small = summaries.find(summary => summary.count === 100 && summary.grouped === grouped);
     const large = summaries.find(summary => summary.count === 400 && summary.grouped === grouped);
     if (small && large) assert(large.variants.htmx.ms / small.variants.htmx.ms < limits.linearity100to400, '100-to-400 build linearity');
+    const smallDev = devSamples.find(sample => sample.count === 100 && sample.grouped === grouped && sample.mode === 'htmx');
+    const largeDev = devSamples.find(sample => sample.count === 400 && sample.grouped === grouped && sample.mode === 'htmx');
+    if (smallDev && largeDev) assert(largeDev.ms / smallDev.ms < limits.linearity100to400, '100-to-400 dev linearity');
   }
   const report = { date: new Date().toISOString(), node: process.version, limits, samples, summaries, devSamples, passed: true };
   const output = process.env.RECOOLER_BENCH_OUTPUT ?? path.join(cacheDir, cf ? 'htmx-bench-cloudflare.json' : 'htmx-bench.json');

@@ -8,6 +8,7 @@ import type { GenerateResult } from '../gen/index.js';
 import { locations } from '../gen/locations.js';
 import { emitRegistration, transform } from '../htmx/transform/index.js';
 import type { ActionTable } from '../htmx/index.js';
+import type { TransformResult } from '../htmx/transform/index.js';
 import type { RecoolerOptions } from './index.js';
 
 export const tableId = 'virtual:recooler/htmx';
@@ -30,6 +31,7 @@ interface State {
   cached?: { epoch: number; table: ActionTable; enabled: boolean };
   pending?: Promise<{ table: ActionTable; enabled: boolean }>;
   outputs: Map<string, string>;
+  transforms: Map<string, { source: string; kind: string; result: TransformResult }>;
 }
 
 /** Server graph ownership is separate from the app entry, for Phase 5/custom entries. */
@@ -43,7 +45,7 @@ export function htmxPlugin(options: RecoolerOptions) {
   const states = new Map<string, State>();
   const stateFor = (name: string) => {
     let value = states.get(name);
-    if (!value) states.set(name, value = { epoch: 0, modules: new Map(), outputs: new Map() });
+    if (!value) states.set(name, value = { epoch: 0, modules: new Map(), outputs: new Map(), transforms: new Map() });
     return value;
   };
   const selected = (environment: { name: string; config: { consumer: string } }) =>
@@ -111,22 +113,55 @@ export function htmxPlugin(options: RecoolerOptions) {
           }
           return pending;
         };
-        const table: Record<string, string[]> = Object.create(null);
-        await Promise.all(seeds().map(async ({ file, chain }) => {
-          const page = await edges(file);
-          if (!page?.page) return;
+        // Discover the shared graph once, in parallel. Walking the same runtime
+        // closure independently for every route creates O(routes * shared deps)
+        // promise traffic even with cached adjacency.
+        const nodes = new Map<string, Node>();
+        const discover = async (url: string): Promise<void> => {
+          const node = await edges(url);
+          if (!node || nodes.has(node.id)) return;
+          nodes.set(node.id, node);
+          await Promise.all(node.deps.map(discover));
+        };
+        const routes = seeds();
+        await Promise.all(routes.flatMap(route => route.chain).map(discover));
+        const parents = new Map<string, Set<string>>();
+        await Promise.all([...nodes.values()].map(async node => {
+          await Promise.all(node.deps.map(async url => {
+            const dependency = await edges(url);
+            if (!dependency) return;
+            let importers = parents.get(dependency.id);
+            if (!importers) parents.set(dependency.id, importers = new Set());
+            importers.add(node.id);
+          }));
+        }));
+        // Propagate only action identities through reverse static edges. Each
+        // (action, importer) pair is visited once; cycles need no recursive
+        // promise or special evaluation ordering.
+        const reachable = new Map<string, Set<string>>();
+        for (const id of nodes.keys()) {
+          if (!state.modules.get(id)?.actions) continue;
+          const action = relative(id);
+          const queue = [id];
           const seen = new Set<string>();
+          for (let index = 0; index < queue.length; index++) {
+            const current = queue[index]!;
+            if (seen.has(current)) continue;
+            seen.add(current);
+            let actions = reachable.get(current);
+            if (!actions) reachable.set(current, actions = new Set());
+            actions.add(action);
+            queue.push(...parents.get(current) ?? []);
+          }
+        }
+        const table: Record<string, string[]> = Object.create(null);
+        await Promise.all(routes.map(async ({ file, chain }) => {
+          if (!(await edges(file))?.page) return;
           const actions = new Set<string>();
-          // Share adjacency promises across routes, but never recursive walk
-          // promises: cycles would deadlock while awaiting one another.
-          const visit = async (url: string): Promise<void> => {
-            const node = await edges(url);
-            if (!node || seen.has(node.id)) return;
-            seen.add(node.id);
-            if (state.modules.get(node.id)?.actions) actions.add(relative(node.id));
-            await Promise.all(node.deps.map(visit));
-          };
-          await Promise.all(chain.map(visit));
+          for (const seed of chain) {
+            const node = await edges(seed);
+            for (const action of node && reachable.get(node.id) || []) actions.add(action);
+          }
           table[relative(file)] = [...actions].sort();
         }));
         if (epoch !== state.epoch) continue;
@@ -189,11 +224,16 @@ export function htmxPlugin(options: RecoolerOptions) {
         if (!selected(this.environment) || options.htmx === false || !source(id)) return;
         id = canonicalId(id);
         const moduleKind = kinds.get(id.split('?')[0]!) ?? 'component';
-        const result = transform(code, {
+        const state = stateFor(this.environment.name);
+        const previous = serving ? state.transforms.get(id) : undefined;
+        const result = previous?.source === code && previous.kind === moduleKind ? previous.result : transform(code, {
           id, relativePath: relative(id), mode: 'server', moduleKind,
           clientBannedImports: options.htmx && options.htmx.clientBannedImports,
           codegen: { registerActions: input => emitRegistration(input).replace(/\);$/, `, ${JSON.stringify(namespace)});`) },
         });
+        // invalidateAll must refresh module evaluation, but scope analysis is
+        // pure. Keep one source version per module across full dev reloads.
+        if (serving) state.transforms.set(id, { source: code, kind: moduleKind, result });
         for (const diagnostic of result.diagnostics) {
           const before = code.slice(0, diagnostic.start);
           const line = before.split('\n').length;
@@ -203,11 +243,11 @@ export function htmxPlugin(options: RecoolerOptions) {
           if (diagnostic.severity === 'error') this.error(log);
           else this.warn(log);
         }
-        const state = stateFor(this.environment.name);
         state.modules.set(id, { actions: result.actions.length > 0, htmx: true });
         if (serving) state.outputs.set(id, result.code);
         state.epoch++;
-        return { code: result.code, map: result.map };
+        // Give Vite a fresh map object; normalization must not mutate a cached map.
+        return { code: result.code, map: result.map.toString() };
       },
     },
     renderChunk(code) {

@@ -178,8 +178,17 @@ try {
   assert.equal((await submit(request, oldUrl)).status, 404);
   const graph = await (await request('/table')).json();
   assert(!graph.table['routes/index.tsx'].includes('components/Button.tsx'));
-  // A fresh server must overwrite a persistent registration with {}, too.
   await server.close(); server = undefined;
+  if (!cf) {
+    // Simulate an action removed while the server was stopped. Its persistent
+    // registration must be cleared when the now-plain module transforms again.
+    const registry = globalThis[Symbol.for('recooler.htmx.actions.v2')].get(graph.namespace);
+    registry.set('components/Button.tsx', { POST: { 'components/Button.tsx@0': () => 'stale' } });
+    server = await createServer({ ...make(), server: { middlewareMode: true, ws: false } });
+    const restarted = (await server.environments.ssr.runner.import('/src/entry.ts')).default;
+    assert.equal((await restarted.fetch(new Request('http://test/'), { RECOOLER_SECRET: secret })).status, 200);
+    assert.deepEqual(Object.keys(registry.get('components/Button.tsx')), []);
+  }
   console.log(JSON.stringify({ kind, build: true, devRequest: true, actionRemoval: true, editResponseMs, sourceMap: cf ? undefined : 'src/routes/index.tsx:10' }));
 } finally {
   await server?.close();

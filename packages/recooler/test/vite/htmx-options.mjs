@@ -46,5 +46,23 @@ try {
   customLogger.warn = message => warnings.push(message);
   await compile({ customLogger });
   assert(warnings.some(message => message.includes('onLoad') && message.includes('root.tsx') && /1:|1 \u2502|1\s*\|/.test(message)), warnings.join('\n'));
+  await write('src/entry.ts', `export { namespace as default } from 'virtual:recooler/htmx';`);
+  const originalNamespace = (await (await compile()).load()).default;
+  await write('other-src/routes/index.tsx', `export default () => <p>other project source</p>;`);
+  const otherNamespace = (await (await compile({}, { routes: { srcDir: 'other-src' } })).load()).default;
+  assert.notEqual(originalNamespace, otherNamespace);
+  assert.equal((await (await compile()).load()).default, originalNamespace);
+  // Raw action packages can opt in without declaring a framework dependency.
+  await write('node_modules/explicit-actions/package.json', '{"name":"explicit-actions","type":"module","exports":"./index.tsx"}');
+  await write('node_modules/explicit-actions/index.tsx', `export const Form = () => <form hx-post={() => 'explicit package'}/>;`);
+  await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
+  await write('src/routes/index.tsx', `import { Form } from 'explicit-actions'; export default Form;`);
+  const configured = await compile({ ssr: { external: ['explicit-actions'] } }, { htmx: { actionDependencies: ['explicit-actions'] } });
+  const app = (await configured.load()).default;
+  const html = await (await app.fetch(new Request('http://test/'), { RECOOLER_SECRET: 'runtime-key' })).text();
+  const url = [...html.matchAll(/hx-post="([^"]+)"/g)].map(match => match[1].replaceAll('&amp;', '&'))
+    .find(url => new URL(url, 'http://test').searchParams.get('action')?.includes('explicit-actions'));
+  assert(url?.includes('sig='), html);
+  assert.equal(await (await app.fetch(new Request(new URL(url, 'http://test'), { method: 'POST', headers: { 'HX-Request': 'true', 'Sec-Fetch-Site': 'same-origin' }, body: new URLSearchParams() }), { RECOOLER_SECRET: 'runtime-key' })).text(), 'explicit package');
   console.log(JSON.stringify({ productionGuard: true, explicitOverride: true, diagnosticsLocated: true }));
 } finally { await rm(root, { recursive: true, force: true }); }

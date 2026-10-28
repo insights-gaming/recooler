@@ -3,7 +3,7 @@
  * dependency module state across scenarios (for example a Vite SSR build with
  * ssr.noExternal: true into a per-scenario directory). A query on only the entry
  * module does not isolate its unbundled dependencies.
- * The TS adapter must build both server and client with Vite for htmx/D4 probes.
+ * D4 client probes need both server and client Vite builds (Phase 5).
  * Remote runtimes (including workerd) cannot implement this trace contract. */
 export interface BuiltApp {
   kind: "app";

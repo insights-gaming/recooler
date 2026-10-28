@@ -24,8 +24,8 @@ The virtual module exports **only default**, equivalent to
 `createApp(manifest, { pages: jsxPages(), extensions })`. The server htmx extension
 is installed as described below. For custom adapters or extensions,
 use your own `createApp` entry and the generated manifest. The plugin array
-keeps route generation separate from app wiring; future htmx integration can
-add plugins and extensions without replacing the platform's app builder.
+keeps route generation separate from app wiring, so extension plugins can evolve
+without replacing the platform's app builder.
 The plugin wires server htmx transforms and action dispatch; client entry delivery
 remains Phase 5.
 
@@ -140,8 +140,10 @@ Dynamic imports are not action roots. Barrels intentionally over-approximate at
 module precision; D6 signatures prevent foreign-route/path authorization. Routes
 without a page never receive table entries. Build adjacency is cached once per
 `renderChunk` pass; table replacement returns a source map. Dev uses the selected
-server environment's lowered `transformResult.deps`, parallel walks with cached
-adjacency, stable graph epochs and deduped concurrent computations. Every source
+server environment's lowered `transformResult.deps`, parallel discovery with cached
+adjacency, reverse-edge action propagation, stable graph epochs and deduped
+concurrent computations. Unchanged pure htmx transforms are cached across full
+reloads; source changes still re-evaluate every registration. Every source
 transform registers, including `{}` when actions are absent. Changes use
 `invalidateAll` and an SSR full reload. Route generation runs before platform
 startup hooks, so eager workerd imports see the initial graph.

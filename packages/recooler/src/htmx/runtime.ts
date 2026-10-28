@@ -7,7 +7,7 @@ export type Action = (context: Context) => unknown;
 export type ActionMethods = Record<string, Record<string, Action>>;
 
 // Symbol.for survives server-runtime reloads while cached modules retain registrations.
-// Phase 4b must emit a stable per-project namespace in both registration and htmx().
+// Vite emits a stable per-project namespace in both registration and htmx().
 const registryKey = Symbol.for('recooler.htmx.actions.v2');
 const persistent = globalThis as typeof globalThis & { [registryKey]?: Map<string, Map<string, ActionMethods>> };
 const registries = persistent[registryKey] ??= new Map<string, Map<string, ActionMethods>>();

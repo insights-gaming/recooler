@@ -14,7 +14,7 @@ export interface HtmxOptions<E extends Env = Env> {
   table: ActionTable;
   /** Env functions are resolved synchronously and cached by env object identity. */
   secret?: string | { unsafeUnsigned: true } | ((env: E['Bindings']) => string);
-  /** Per-project registry namespace; Phase 4b must supply the same value to registerActions. */
+  /** Per-project registry namespace; must match registerActions (supplied by Vite). */
   namespace?: string;
   /** Additional origins (or a predicate) accepted regardless of Sec-Fetch-Site. */
   trustedOrigins?: readonly string[] | ((origin: string, context: Context<E>) => boolean | Promise<boolean>);
@@ -24,7 +24,7 @@ export interface HtmxOptions<E extends Env = Env> {
   allowUnsignedInProduction?: boolean;
 }
 declare const __RECOOLER_PRODUCTION__: boolean;
-/** Phase 4b production-build hook: reject an extension whose marker is true. */
+/** Runtime tooling marker; the Vite production flag enforces the startup guard. */
 export const unsafeUnsignedMarker = Symbol.for('recooler.htmx.unsafeUnsigned.v1');
 export interface HtmxExtension extends RouterExtension {
   readonly [unsafeUnsignedMarker]: boolean;
