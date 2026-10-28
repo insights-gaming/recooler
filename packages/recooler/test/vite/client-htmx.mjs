@@ -63,7 +63,7 @@ try {
     <button id="late-after" hx-post="/m/late-after" hx-swap="none" hx-on--after-request={() => inc('lateAfters')}>after</button>
     <button id="late-before" hx-post="/m/late-before" hx-swap="none" hx-on--before-swap={() => inc('lateBefores')}>before</button>
     <button id="handler" hx-on:click={() => inc('destinationClicks')}>handler</button>
-    <button id="gate" hx-post="/m/gate" hx-swap="none" hx-on--confirm={event => { event.preventDefault(); inc('gateConfirms'); if (globalThis.accept) event.detail.issueRequest(true); }}>gate</button>
+    <button id="gate" hx-post="/m/gate" hx-swap="none" hx-on--confirm={event => { event.preventDefault(); inc('gateConfirms'); if (globalThis.accept) event.detail.issueRequest(); }}>gate</button>
     <button id="config" hx-post="/m/config" hx-swap="none" hx-on--config-request={() => inc('configs')}>config</button>
     <button id="request" hx-post="/m/request" hx-swap="none" hx-on--before-request={() => inc('befores')}>before</button>
     </>;`);
@@ -164,8 +164,8 @@ try {
     release(); await page.waitForFunction(() => globalThis.loadsB === 1); await sleep(300);
     assert.equal(count('/b'), 1); assert.equal(await page.evaluate(() => globalThis.loadsB), 1);
     assert.equal(count('/m/config'), 1, JSON.stringify({ requests, errors: page.errors, state: await page.evaluate(() => ({ configs: globalThis.configs, rootConfirms: globalThis.rootConfirms, befores: globalThis.befores, html: document.body.innerHTML })) })); assert.equal(count('/m/request'), 1);
-    assert.equal(await page.evaluate(() => globalThis.configs), 1);
-    assert.equal(await page.evaluate(() => globalThis.befores), 1);
+    assert.equal(await page.evaluate(() => globalThis.configs ?? 0), 0);
+    assert.equal(await page.evaluate(() => globalThis.befores ?? 0), 0);
     if (legacy) {
       assert.equal(await page.evaluate(() => globalThis.bodySwaps), 3);
       assert.equal(await page.evaluate(() => globalThis.bodySettles), 3);

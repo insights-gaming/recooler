@@ -131,18 +131,15 @@ export default {
   server = await createServer({ root, configFile }); await server.listen();
   const devOrigin = `http://127.0.0.1:${server.httpServer.address().port}`;
   const devHtml = await (await fetch(devOrigin + '/')).text();
-  const devGate = await fetch(devOrigin + '/assets/recooler-gate.js');
-  assert.equal(devGate.status, 200);
-  assert.match(devGate.headers.get('content-type'), /javascript/);
-  const gateCode = await devGate.text();
-  assert(gateCode.includes('recooler: dropped '));
-  // Exercise the shipped dev gate before registration: missing native handlers
-  // leave defaults alone and make the loading window visible to developers.
+  assert(!devHtml.includes('recooler-gate'));
+  // Exercise the generated inline fallback with no client entry installed.
+  const fallbackCode = devHtml.match(/hx-on:click="([^"]+)"/)[1].replaceAll('&quot;', '"').replaceAll('&#39;', "'").replaceAll('&gt;', '>').replaceAll('&lt;', '<').replaceAll('&amp;', '&');
   const warnings = [];
-  const gateWindow = { document: { addEventListener() {} }, console: { warn: text => warnings.push(text) } };
-  vm.runInNewContext(gateCode, gateWindow);
+  const fallbackWindow = { console: { warn: text => warnings.push(text) } };
+  fallbackWindow.self = fallbackWindow;
   let prevented = false;
-  gateWindow.$rc('missing', null, {}, { type: 'click', preventDefault() { prevented = true; } });
+  fallbackWindow.event = { type: 'click', preventDefault() { prevented = true; } };
+  vm.runInNewContext(fallbackCode, fallbackWindow);
   assert.equal(prevented, false);
   assert.deepEqual(warnings, ['recooler: dropped click while route handlers load']);
   const devEntry = devHtml.match(/<script[^>]*src="([^"]*virtual:recooler\/client[^"]*)"/)[1];

@@ -448,12 +448,12 @@ for (const [name, result] of Object.entries(results)) {
   if (result.errors) assert.deepEqual(result.errors, [], name);
   if (name === 'consumer-suspense') {
     assert.equal(result.beforeDCL.dcl, false);
-    assert.equal(result.beforeDCL.rc, 'function');
+    assert.equal(result.beforeDCL.rc, 'undefined');
     assert.equal(result.duringStream.susClicks, 1);
     assert.equal(result.duringStream.susPostConfirms, 1);
     assert.equal(result.after.susClicks, 2);
     assert.equal(result.after.susConfirms, 1);
-    assert.equal(result.after.susCfgs, 1);
+    assert.equal(result.after.susCfgs, 0);
     assert.equal(result.after.loads, 1);
     assert.equal(result.after.onLoadDOM.late, true);
     assert.notEqual(result.after.onLoadDOM.state, 'loading');
@@ -461,7 +461,7 @@ for (const [name, result] of Object.entries(results)) {
     assert.equal(result.suspostRequests, 0);
     assert.equal(result.suscfgRequests.length, 1);
   } else if (name === 'consumer-modern') {
-    assert.equal(result.beforeDCL.rc, 'function');
+    assert.equal(result.beforeDCL.rc, 'undefined');
     assert.equal(result.beforeDCL.loads, 0);
     assert.equal(result.susConfirms, 1);
     assert.equal(result.susloadRequests, 0);
@@ -508,8 +508,8 @@ for (const [name, result] of Object.entries(results)) {
     assert.equal(result.sliceRequestsAfter20Keys, result.sliceRequestsBefore);
     assert(result.reloads <= 2);
   } else if (name === 'late-config') {
-    assert.deepEqual(result.duringWindowThenReady, { configs: 1, befores: 1 });
-    assert.deepEqual(result.afterReady, { configs: 2, befores: 2, cfgType: 'htmx:config-request', brType: 'htmx:before-request' });
+    assert.deepEqual(result.duringWindowThenReady, { configs: 0, befores: 0 });
+    assert.deepEqual(result.afterReady, { configs: 1, befores: 1, cfgType: 'htmx:config-request', brType: 'htmx:before-request' });
     assert.equal(result.cfgRequests, 2);
     assert.equal(result.brRequests, 2);
   } else assert.fail('Unasserted scenario: ' + name);

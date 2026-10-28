@@ -176,8 +176,8 @@ function dispatch(id, scope, element, event, deferred = false) {
 globalThis.$rc = dispatch;
 // A static slice can register before this wrapper: held events must still
 // take the deferred path, even when their handler is already available.
-for (const args of globalThis.__recooler_pending ?? []) dispatch(...args, true);
-delete globalThis.__recooler_pending;
+for (const args of globalThis.$rq ?? []) dispatch(...args, true);
+delete globalThis.$rq;
 for (const name of ['htmx:afterSwap', 'htmx:afterSettle', 'htmx:historyRestore']) document.addEventListener(name, init);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
 else queueMicrotask(init);

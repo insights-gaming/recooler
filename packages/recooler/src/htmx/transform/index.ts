@@ -272,8 +272,11 @@ export function transform(code: string, options: TransformOptions): TransformRes
         if (options.queueHandlers) {
           // Only htmx:confirm exposes a safe continuation. The fallback is
           // local to this listener and never suppresses native event defaults.
-          const warning = options.dev ? `console.warn('recooler: dropped '+e.type+' while route handlers load')` : '0';
-          const dispatch = `(self.$rc||((...a)=>{let e=a[3];e.type=="htmx:confirm"?(e.preventDefault(),(self.__recooler_pending??=[]).push(a)):${warning}}))`;
+          const hold = `(a[3].preventDefault(),(self.$rq??=[]).push(a))`;
+          const fallback = options.dev
+            ? `(...a)=>a[3].type=="htmx:confirm"?${hold}:console.warn('recooler: dropped '+a[3].type+' while route handlers load')`
+            : `(...a)=>a[3].type=="htmx:confirm"&&${hold}`;
+          const dispatch = `(self.$rc||(${fallback}))`;
           const prefix = `${dispatch}(${JSON.stringify(c.id)},`;
           replacement = c.variables.length
             ? `\`${escapeTemplate(prefix)}\${${helper("handlerScope")}(${scopeAtSite(c)})},this,event)\``

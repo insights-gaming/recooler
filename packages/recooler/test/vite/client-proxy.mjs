@@ -58,12 +58,7 @@ try {
     assert.match(await (await fetch(origin + '/assets/recooler-client.js')).text(), /WRONG_FRONT_ENTRY/);
     const html = await (await fetch(origin + '/_admin/')).text();
     assert.match(html, legacy ? /import\("\/_admin\/assets\/recooler-client.js\?v=/ : /src="\/_admin\/assets\/recooler-client.js\?v=/);
-    const gate = html.match(/<script src="([^"]*recooler-gate\.js[^"]*)"/)[1];
-    assert(gate.startsWith('/_admin/assets/'));
-    const gateResponse = await fetch(origin + gate);
-    assert.equal(gateResponse.status, 200);
-    assert.match(gateResponse.headers.get('content-type'), /javascript/);
-    assert((await gateResponse.text()).includes('__recooler_gate'));
+    assert(!html.includes('recooler-gate'), 'no blocking gate through the admin proxy');
     const preloads = [...html.matchAll(/rel="modulepreload" href="([^"]+)"/g)].map(m => m[1]);
     assert(preloads.length);
     for (const url of preloads) { assert(url.startsWith('/_admin/assets/')); const response = await fetch(origin + url); assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /javascript/); }

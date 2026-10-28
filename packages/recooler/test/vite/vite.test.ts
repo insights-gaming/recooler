@@ -145,7 +145,7 @@ for (const version of ['2', '1']) {
 }
 
 for (const version of ['1', '2']) for (const root of ['legacy', 'modern']) {
-  test(`Chromium htmx ${version} ${root}: streamed registration, confirm gate, body handlers and row fragments`, async () => {
+  test(`Chromium htmx ${version} ${root}: streamed registration, inline confirms, body handlers and row fragments`, async () => {
     const result = await execute(process.execPath, [fileURLToPath(new URL('./client-streaming.mjs', import.meta.url)), version, root], {
       timeout: 120000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
     });
@@ -153,9 +153,18 @@ for (const version of ['1', '2']) for (const root of ['legacy', 'modern']) {
   }, 125000);
 }
 
-test('Cloudflare v2 client entry and confirm gate behind /_admin service binding', async () => {
+test('Cloudflare v2 client entry and inline confirms behind /_admin service binding', async () => {
   const result = await execute(process.execPath, ['--experimental-vm-modules', fileURLToPath(new URL('./client-proxy.mjs', import.meta.url)), 'beta'], {
     timeout: 60000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production', WRANGLER_SEND_METRICS: 'false' },
   });
   expect(result.stdout).toContain('"clientProxy":true');
 }, 65000);
+
+for (const version of ['1', '2']) {
+  test(`Chromium htmx ${version}: native confirm, held continuations, ajax promises, scripts and table rows`, async () => {
+    const result = await execute(process.execPath, [fileURLToPath(new URL('./client-confirm.mjs', import.meta.url)), version], {
+      timeout: 120000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+    });
+    expect(result.stdout).toContain('"clientConfirm": true');
+  }, 125000);
+}
