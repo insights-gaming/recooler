@@ -18,7 +18,7 @@ The Farm plugin ends at 0.0.27, which is the reference implementation. The TypeS
 
 ### Build time was dominated by nested compiles, not the transform
 
-Synthetic app: N routes, each with 3 form actions and 1 event handler (`fixtures/bench/gen-app.mjs`). Farm 1.7.11, `persistentCache: false`, "Build completed in", medians of 3 interleaved runs at load average 7–14 (re-measured 2026-10-16):
+Synthetic app: N routes, each with 3 form actions and 1 event handler (`docs/plans/fixtures/bench/gen-app.mjs`). Farm 1.7.11, `persistentCache: false`, "Build completed in", medians of 3 interleaved runs at load average 7–14 (re-measured 2026-10-16):
 
 | Farm 1.7.11, with event handlers | 100 routes | 400 routes |
 |---|---|---|
@@ -386,7 +386,7 @@ Each route must accept exactly the actions reachable from its module, its layout
 - **Type-only imports.** `import { type T }` under `verbatimModuleSyntax` leaves an empty import that the graph follows; `import type` disappears.
 - **Which routes get registrations.** Only routes with a page, as in 0.0.27. Handler-only routes that import page modules don't get action registrations.
 
-**Fallback (not needed): appended aggregators**, as in `fixtures/aggregator`, validated on Rolldown 1.2.14 and Farm 1.7.11. Use them only if the graph approach fails in dev or under the Cloudflare plugin. If used, they must be:
+**Fallback (not needed): appended aggregators**, as in `docs/plans/fixtures/aggregator`, validated on Rolldown 1.2.14 and Farm 1.7.11. Use them only if the graph approach fails in dev or under the Cloudflare plugin. If used, they must be:
 - emitted only in the SSR environment and never in client slices; an aggregator in a client module pulls server modules into the browser, and Rolldown keeps and evaluates side-effectful modules even after tree-shaking (`clientOnlyEvaluated: true` in the fixture)
 - computed after TS/JSX lowering, from the surviving `ImportDeclaration`, `ExportAllDeclaration` and `ExportNamedDeclaration`-with-source nodes, including side-effect imports
 - left out of the entry module, `routes.gen.ts` and middleware modules, with the reserved export names documented
@@ -488,9 +488,9 @@ Ported from `src/helpers.ts`:
   - the 0.0.27 gaps fixed in §3.1
 
   The Farm-only tests (export-name replay in `validate.rs`, trace stubs, `SharedHostPlugin`, nested compiles) aren't ported. Differential-test the scope analysis on a corpus if it is ever hand-written.
-- **Action registration:** keep `fixtures/aggregator` for the fallback, and add a Vite fixture for the graph approach, in build and dev.
+- **Action registration:** keep `docs/plans/fixtures/aggregator` for the fallback, and add a Vite fixture for the graph approach, in build and dev.
 - **End-to-end:** the Cloudflare Workers template under Vite and workerd. Use `app.request()` to assert pages, signed and unsigned actions, CSRF rejection, client script delivery and middleware.
-- **Performance:** `fixtures/bench/gen-app.mjs` at 400 and 1,000 routes, with the full plugin (scope analysis and action registration) and a grouped variant (4 groups, each with group and directory middleware).
+- **Performance:** `docs/plans/fixtures/bench/gen-app.mjs` at 400 and 1,000 routes, with the full plugin (scope analysis and action registration) and a grouped variant (4 groups, each with group and directory middleware).
   - Gate on the ratio to a no-htmx build in the same job, plus 100-vs-400 linearity, rather than absolute times, which flaked on loaded machines.
   - Also track gzipped SSR output size.
 - **CI:** typecheck, vitest, conformance and e2e on pull requests. Publishing is gated on CI and the OIDC token is granted to the publish job only, as in 0.0.27.

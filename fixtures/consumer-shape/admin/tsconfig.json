@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "easy-jsx-html-engine",
+    "strict": true
+  },
+  "include": [
+    "src",
+    "node_modules/farm-plugin-recooler/global.d.ts"
+  ]
+}
