@@ -41,6 +41,7 @@ export interface ActionBinding {
   readonly pathname: string;
   readonly base: string;
   readonly modules: readonly string[];
+  readonly methods: readonly string[];
   readonly sign: ActionSigner;
   readonly namespace?: string;
 }
@@ -64,6 +65,9 @@ export function actionUrl(id: string, scope: Record<string, unknown>, context?: 
   const binding = getActionBinding(context ?? getContext());
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
     if (findAction(binding.modules, method, id, binding.namespace)) {
+      if (!binding.methods.includes(method)) {
+        throw new Error(`Action ${id} uses ${method}, which was not reserved on ${binding.routeId} at app creation; register actions before createApp and recreate the app after an SSR reload`);
+      }
       return signedUrl({ routeId: binding.routeId, pathname: binding.pathname, method, actionId: id, scope },
         binding.sign, binding.base);
     }

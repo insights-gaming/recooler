@@ -16,7 +16,7 @@ export interface HtmxOptions<E extends Env = Env> {
   secret?: string | { unsafeUnsigned: true } | ((env: E['Bindings']) => string);
   /** Per-project registry namespace; Phase 4b must supply the same value to registerActions. */
   namespace?: string;
-  /** Additional exact origins (or a predicate) accepted alongside the request URL's origin. */
+  /** Additional origins (or a predicate) accepted regardless of Sec-Fetch-Site. */
   trustedOrigins?: readonly string[] | ((origin: string, context: Context<E>) => boolean | Promise<boolean>);
   /** External prefix hidden by mount() or a prefix-stripping proxy, e.g. /app. */
   base?: string;
@@ -42,6 +42,7 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
     throw new TypeError('htmx base must be a local path prefix without query, hash or dot segments');
   }
   const unsafeUnsigned = typeof options.secret === 'object' && options.secret?.unsafeUnsigned === true;
+  if (unsafeUnsigned) console.warn('htmx: unsafeUnsigned disables action signing and replay protection; use only for local development');
   const envSigners = new WeakMap<object, ActionSigner>();
   let fallbackSigner: ActionSigner | undefined;
   const signer = (context?: Context): ActionSigner => {
@@ -68,14 +69,16 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
     route(route) {
       const hasPage = Object.hasOwn(route.module, 'default') && typeof route.module.default === 'function';
       const modules = Object.freeze([...(hasPage ? modulesFor(route.file) : [])]);
-      const methods = methodsFor(modules);
+      const methods = Object.freeze(methodsFor(modules));
       if (methods.length && typeof options.secret !== 'function') signer();
       const reservedRequests = new WeakSet<Context>();
       const reserves = (c: Context) => reservedRequests.has(c);
       const binding: Handler = async (c, next) => {
         if (c.req.query('action') !== undefined && methods.includes(c.req.method)) reservedRequests.add(c);
         c.set(bindingKey, Object.freeze({ routeId: route.file, pathname: new URL(c.req.url).pathname,
-          modules, base, namespace: options.namespace, sign: methods.length ? signer(c) : () => undefined }));
+          modules, methods, base, namespace: options.namespace, sign: methods.length ? signer(c) : () => {
+            throw new Error('No htmx action methods were reserved; recreate createApp after registering actions');
+          } }));
         return storage(c, next);
       };
       const dispatch: Handler = async (c, next) => {
@@ -83,8 +86,8 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
         if (c.req.header('HX-Request') !== 'true') return c.text('Forbidden', 403);
         const site = c.req.header('Sec-Fetch-Site');
         const origin = c.req.header('Origin');
-        const allowed = site === 'same-origin' || (site === undefined && origin !== undefined
-          && (origin === new URL(c.req.url).origin || (typeof options.trustedOrigins === 'function'
+        const allowed = site === 'same-origin' || (origin !== undefined
+          && ((site === undefined && origin === new URL(c.req.url).origin) || (typeof options.trustedOrigins === 'function'
             ? await options.trustedOrigins(origin, c as Context<E>) : options.trustedOrigins?.includes(origin) ?? false)));
         if (!allowed) return c.text('Forbidden', 403);
         const bound = getActionBinding(c);
@@ -110,7 +113,7 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
         }
       };
       return {
-        methods,
+        methods: [...methods],
         middleware: [binding, dispatch], reserved: reserves, page: { scripts: [] },
       };
     },

@@ -121,6 +121,8 @@ it.each(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])('enforces CSRF for %s, includ
     { 'HX-Request': 'true', 'Sec-Fetch-Site': 'same-site' },
     { 'HX-Request': 'true', Origin: 'null' },
     { 'HX-Request': 'true', 'Sec-Fetch-Site': 'invalid' },
+    { 'HX-Request': 'true', 'Sec-Fetch-Site': 'cross-site', Origin: 'http://localhost' },
+    { 'HX-Request': 'true', 'Sec-Fetch-Site': '', Origin: 'http://localhost' },
   ]) {
     const response = await a.request(url('/', 'test-result@0', method), { method, headers: { 'content-type': 'application/json', ...bad } as Record<string, string> });
     expect(response.status).toBe(403);
@@ -131,13 +133,24 @@ it.each(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])('enforces CSRF for %s, includ
   expect(calls).toBe(3);
 });
 
-it('accepts trusted origins only when Fetch Metadata is absent without bypassing HX-Request', async () => {
+it('accepts trusted origins regardless of Fetch Metadata without bypassing HX-Request', async () => {
   register('trusted', { get: { a: () => 'trusted' } });
-  for (const trustedOrigins of [['https://friend.example'], async (origin: string, c: Context) => origin === 'https://friend.example' && c.req.method === 'GET']) {
+  for (const trustedOrigins of [
+    ['https://friend.example'],
+    (origin: string, c: Context) => origin === 'https://friend.example' && c.req.method === 'GET',
+    async (origin: string, c: Context) => origin === 'https://friend.example' && c.req.method === 'GET',
+  ]) {
     const a = app(manifest({ 'index.tsx': { default: Page } }), { 'routes/index.tsx': ['trusted'] }, { trustedOrigins });
-    expect((await a.request(url('/', 'a', 'GET'), { headers: { 'HX-Request': 'true', Origin: 'https://friend.example' } })).status).toBe(200);
-    expect((await a.request(url('/', 'a', 'GET'), { headers: { 'HX-Request': 'true', Origin: 'https://friend.example', 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(403);
-    expect((await a.request(url('/', 'a', 'GET'), { headers: { Origin: 'https://friend.example' } })).status).toBe(403);
+    for (const site of [undefined, 'same-origin', 'same-site', 'cross-site', 'none', '']) {
+      const metadata: Record<string, string> = site === undefined ? {} : { 'Sec-Fetch-Site': site };
+      for (const [origin, accepted] of [['https://friend.example', true], ['https://evil.example', false], ['https://api.example', site === undefined]] as const) {
+        const requestHeaders = { ...metadata, Origin: origin };
+        const target = 'https://api.example' + url('/', 'a', 'GET');
+        expect((await a.request(target, { headers: { ...requestHeaders, 'HX-Request': 'true' } })).status)
+          .toBe(accepted || site === 'same-origin' ? 200 : 403);
+        expect((await a.request(target, { headers: requestHeaders })).status).toBe(403);
+      }
+    }
   }
 });
 
@@ -206,6 +219,30 @@ it('recreates static tables and method registrations on full SSR reload', async 
   expect(() => htmx({ table: () => table, secret })).toThrow('static ActionTable');
 });
 
+it.each([false, true])('rejects late action methods even with unsafeUnsigned=%s', async unsafeUnsigned => {
+  for (const earlyMethod of [undefined, 'POST', 'GET']) {
+    const moduleId = `late-${unsafeUnsigned}-${earlyMethod}`;
+    register(moduleId, earlyMethod ? { [earlyMethod]: { early: () => 'early' } } : {});
+    const a = errors(app(manifest({
+      'index.tsx': { default: () => h('form', { 'hx-get': actionUrl('late', {}) }) },
+    }), { 'routes/index.tsx': [moduleId] }, { secret: unsafeUnsigned ? { unsafeUnsigned: true } : secret }));
+    register(moduleId, { ...(earlyMethod ? { [earlyMethod]: { early: () => 'early' } } : {}), get: { late: () => 'late action' } });
+    const response = await a.request('/');
+    const body = await response.text();
+    if (earlyMethod === 'GET') {
+      expect(response.status).toBe(200);
+      const target = extract(body, 'hx-get');
+      expect(target.includes('sig=')).toBe(!unsafeUnsigned);
+      expect(await (await submit(a, target, 'GET')).text()).toBe('late action');
+    } else {
+      expect(response.status).toBe(500);
+      expect(body).toContain('Action late uses GET, which was not reserved on routes/index.tsx at app creation');
+      expect(body).toContain('register actions before createApp');
+      expect(body).not.toContain('hx-get=');
+    }
+  }
+});
+
 it.each(['POST', 'DELETE'])('does not add %s to guarded pages without actions', async method => {
   const a = app(manifest({
     '(auth)/middleware.ts': { default: (c: Context) => c.text('guard', 401) },
@@ -225,6 +262,7 @@ it('persists registrations across runtime module reloads', async () => {
 });
 
 it('makes unsafeUnsigned explicit while retaining CSRF and reachability', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   register('unsigned', { post: { a: () => 'dev' } });
   const a = app(manifest({ 'index.tsx': { default: () => h('form', { 'hx-post': actionUrl('a', {}) }) } }),
     { 'routes/index.tsx': ['unsigned'] }, { secret: { unsafeUnsigned: true } });
@@ -233,8 +271,12 @@ it('makes unsafeUnsigned explicit while retaining CSRF and reachability', async 
   expect(await (await submit(a, target)).text()).toBe('dev');
   expect((await a.request(target, { method: 'POST' })).status).toBe(403);
   expect((await submit(a, '/?action=foreign')).status).toBe(404);
+  expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('unsafeUnsigned disables action signing and replay protection'));
   expect(htmx({ table: {}, secret: { unsafeUnsigned: true } })[unsafeUnsignedMarker]).toBe(true);
+  expect(warn).toHaveBeenCalledTimes(2);
   expect(htmx({ table: {}, secret })[unsafeUnsignedMarker]).toBe(false);
+  expect(warn).toHaveBeenCalledTimes(2);
+  warn.mockRestore();
   // @ts-expect-error false was removed in favor of an explicit unsafe option.
   expect(() => htmx({ table: {}, secret: false })).toThrow('replaced by secret: { unsafeUnsigned: true }');
 });

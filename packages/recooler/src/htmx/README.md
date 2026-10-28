@@ -61,12 +61,14 @@ The Worker needs AsyncLocalStorage support (`nodejs_als` or `nodejs_compat`).
 
 Only `?action=` on a method with reachable actions is reserved. Ordinary requests
 continue through `onRequest`, method handlers and pages. Action requests require
-`HX-Request: true` and `Sec-Fetch-Site: same-origin`, or an allowed `Origin`
+`HX-Request: true` plus either `Sec-Fetch-Site: same-origin`, an `Origin` accepted
+by `trustedOrigins` regardless of Fetch Metadata, or the request URL's own origin
 when `Sec-Fetch-Site` is absent. This inline check applies even to GET, bodyless
 and non-form requests and returns 403 directly, without invoking `onError`.
-Same-site alone does not suffice. The
-request URL's origin is always allowed; `trustedOrigins` adds exact origins via
-an array or `(origin, context) => boolean | Promise<boolean>`.
+`trustedOrigins` accepts an array of exact origins or
+`(origin, context) => boolean | Promise<boolean>`. Same-site alone does not suffice.
+An untrusted request with `cross-site` or an empty `Sec-Fetch-Site` is rejected
+even if its Origin equals the request URL's origin.
 
 A synchronous HMAC-SHA256 caches the keyed inner/outer pad compression states
 per resolved secret and signs a versioned JSON tuple of route file, exact
@@ -93,9 +95,12 @@ function and route metadata, so serializing it does not reveal the key.
 `secret: { unsafeUnsigned: true }`, explicitly disables signing and verification.
 URLs are unsigned; CSRF and module reachability still apply, but **D6 route/path
 replay protection is disabled**, including protection against unused barrel actions.
-Use it only for local development. The exported `unsafeUnsignedMarker` symbol is
+Use it only for local development. Each `htmx()` creation logs one runtime warning
+for this mode. The exported `unsafeUnsignedMarker` symbol is
 true on the returned extension in this mode. Phase 4b's Vite plugin **must fail
-production builds** when it detects this marker or the equivalent option.
+production builds** when it detects this marker. Because the marker is a runtime
+property on the extension, the plugin must evaluate the built server entry to
+check it; source inspection alone cannot enforce this requirement.
 
 Actions run after directory/group middleware but **before `onRequest`**, as in
 0.0.27. Authorization in `onRequest` does not protect actions; use directory or
@@ -118,6 +123,9 @@ scope retains the legacy 400 response; invalid signatures fall through before a
 factory runs. GET receives `{}`; other methods receive last-value form fields
 plus `__formData` with all fields/files. Serialization retains 0.0.27 checks and
 undefined behavior; unsupported nested values and cycles throw with their path.
+`actionUrl` throws if an action uses a method that was not reserved on the route
+at app creation. Register actions before `createApp` and recreate the app after
+a full SSR reload; late actions on an already reserved method remain usable.
 `actionScope` retains the query-fragment API but now needs an ambient route binding
 and includes the complete D6 signature. There is no global `configureActions`.
 

@@ -182,7 +182,9 @@ alongside `jsxPages()`. The reachability table maps manifest `route.file` IDs to
 registered action-bearing module IDs, including roots, layouts and shared static
 imports. The table is static; D5 development uses `invalidateAll` and a full SSR
 reload to re-evaluate the virtual table and recreate `createApp`. Getter mode is
-unsupported. The Vite integration will provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+unsupported. Register actions before `createApp`: `actionUrl` throws if an action uses a method
+that was not reserved on the rendering route at app creation. Recreate the app
+after registering a new method. The Vite integration will provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
 
 **D6: all action URLs are now signed**, including actions without captures. The
 signature covers the receiving route file, exact pathname, HTTP method, action
@@ -198,6 +200,8 @@ with actions. `secret: false` now throws; use `secret: { unsafeUnsigned: true }`
 development. This disables D6 replay protection (including unused barrel actions)
 while retaining CSRF and reachability checks. The Phase 4b Vite plugin must reject
 this mode in production using the exported `unsafeUnsignedMarker` on the extension.
+Each `htmx()` creation in this mode logs a runtime warning. The marker is a runtime
+property, so the plugin must evaluate the built server entry to check it.
 The plugin must also provide a stable per-project namespace to both
 `registerActions(moduleId, methods, namespace)` and `htmx({ namespace, ... })`; the
 default namespace remains shared for compatibility with current transform output.
@@ -205,9 +209,12 @@ default namespace remains shared for compatibility with current transform output
 **D7: action requests require `HX-Request: true`**, including mutating GET actions.
 They also require acceptable Fetch Metadata or Origin. Manual requests should
 send `HX-Request: true`, `Origin` equal to the destination origin, and
-`Sec-Fetch-Site: same-origin`. An allowed Origin is accepted only when
-`Sec-Fetch-Site` is absent; `same-site` alone is insufficient. Configure
-`trustedOrigins` for additional exact origins or an origin predicate. Missing or
+`Sec-Fetch-Site: same-origin`. The request URL's own Origin is accepted when
+`Sec-Fetch-Site` is absent. Configure `trustedOrigins` for additional exact origins
+or an origin predicate: these are accepted regardless of Fetch Metadata, including
+`same-site` and `cross-site`. Same-site alone is insufficient. An untrusted request
+with `cross-site` or an empty `Sec-Fetch-Site` is rejected even if its Origin equals
+the request URL's origin. Missing or
 invalid provenance and missing HX headers return 403 before action execution.
 These checks also apply to bodyless, JSON and other non-form requests. Rejections
 return 403 directly without entering the application's `onError`.
