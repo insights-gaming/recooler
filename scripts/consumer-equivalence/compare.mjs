@@ -11,9 +11,10 @@ if (!Array.isArray(entries) || entries.some(entry => !['router','admin'].include
 const packages={};
 for (const name of ['router','admin']) {
   const b=before.packages[name],a=after.packages[name];
-  const result=compareTraces(comparisonRecord(b),comparisonRecord(a),entries.filter(entry => entry.package===name));
+  const expected=comparisonRecord(b),actual=comparisonRecord(a);
+  const result=compareTraces(expected,actual,entries.filter(entry => entry.package===name));
   const catalogEqual=isDeepStrictEqual(canonicalCatalog(b.catalog),canonicalCatalog(a.catalog));
-  packages[name]={cases:b.traces.length,identical:b.traces.filter((trace,index)=>isDeepStrictEqual(comparisonRecord({traces:[trace]})[0],comparisonRecord({traces:[a.traces[index]]})[0])).length,
+  packages[name]={cases:b.traces.length,identical:expected.filter((trace,index)=>isDeepStrictEqual(trace,actual[index])).length,
     acceptedCases:new Set(result.accepted.map(field=>field.index)).size,acceptedFields:result.accepted.length,
     unexplained:result.differences.length,stale:result.unused.length,catalogEqual};
   if (!result.equal || !catalogEqual) process.exitCode=1;
