@@ -1,0 +1,13 @@
+{
+  "name": "recooler-conformance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "hono": "^4.13.14",
+    "recooler": "workspace:*",
+    "vitest": "^5.0.5"
+  }
+}
