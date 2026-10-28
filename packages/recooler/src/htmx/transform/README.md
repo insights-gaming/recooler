@@ -88,6 +88,12 @@ is deliberately treated as an ordinary directory, unlike Rust's substring match.
 order and reports shortest module chains, including disconnected banned modules.
 The adapter still has to supply the actual bundle graph and reject the results.
 
+Dynamic computed function keys produce `computed-handler-key` only in JSX
+spread/attribute-value objects on intrinsic (lowercase) elements, or in objects
+with explicit `hx-`/`data-hx-` keys. Parentheses, TS expression wrappers and
+conditional/logical branches preserve that position. Component prop maps such
+as `<Table fmt={{ [Col.A]: v => v }} />` remain ordinary data.
+
 ## Context, factories, and runtime boundary
 
 The D3 default is emitted in `codegen.ts`:
@@ -130,7 +136,8 @@ build errors. Parenthesized, `as`, and `satisfies` functions are recognized too,
 unlike Rust's bare-function matching. Local TS enums may be captured and serialized
 as plain data (including their emitted numeric reverse mappings), fixing Rust's
 missing enum captures. Type-only references, including `typeof` type queries,
-never create captures or client dependencies. Arrow actions and handlers using
+never create captures or client dependencies. Qualified runtime import aliases
+(`import X = ns.Thing`) retain the namespace as a value dependency. Arrow actions and handlers using
 lexical `this` or `arguments` produce build errors rather than changing meaning
 when hoisted. `wrapAction` is used for GET; other methods use
 `wrapActionWithPayload`. Captured actions pass their ID as the second wrapper
