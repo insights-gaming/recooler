@@ -2,7 +2,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { generateRoutes, renderRoutes, routes, StaleRoutesError, watchRoutes } from '../../src/gen/index.js';
+import { generateRoutes, renderRoutes, StaleRoutesError, watchRoutes } from '../../src/gen/index.js';
+import { routes } from '../../src/vite/index.js';
 import { main } from '../../src/gen/cli.js';
 const temporary: string[] = [];
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(temporary.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
@@ -50,10 +51,10 @@ it('does not change output when exports, handlers or page bodies change', async 
   expect(second.changed).toBe(false); expect(second.code).toBe(first.code);
 });
 
-it.each(['', '.js', '.tsx'] as const)('supports importExtension %j', async extension => {
+it.each(['', '.js', 'source'] as const)('supports importExtension %j', async extension => {
   const cwd = await fixture({ 'src/routes/index.jsx': page });
   const result = await renderRoutes({ cwd, importExtension: extension });
-  expect(result.code).toContain(`from "./routes/index${extension}";`);
+  expect(result.code).toContain(`from "./routes/index${extension === '' ? '' : '.jsx'}";`);
 });
 
 it('supports custom paths outside src and optional route types', async () => {
@@ -172,7 +173,7 @@ it('watches additions, removals and root changes using fs.watch', async () => {
     await rm(path.join(cwd, 'src/routes/hello'), { recursive: true });
     await vi.waitFor(() => expect(results.at(-1)).not.toContain('routes/hello/index'), { timeout: 3000 });
     expect(errors).toEqual([]);
-  } finally { watcher.close(); }
+  } finally { await watcher.close(); }
 });
 
 it('regenerates in watch mode without callbacks', async () => {
@@ -182,7 +183,7 @@ it('regenerates in watch mode without callbacks', async () => {
     await new Promise(resolve => setTimeout(resolve, 100));
     await put(cwd, 'src/routes/index.ts', handler);
     await vi.waitFor(async () => expect(await readFile(path.join(cwd, 'src/routes.gen.ts'), 'utf8')).toContain('routes/index'), { timeout: 3000 });
-  } finally { watcher.close(); }
+  } finally { await watcher.close(); }
 });
 
 it('provides a thin Vite plugin that regenerates before build and on add/unlink', async () => {
@@ -202,8 +203,8 @@ it('provides a thin Vite plugin that regenerates before build and on add/unlink'
   await rm(path.join(cwd, 'src/routes/added'), { recursive: true });
   events.get('unlink')!(path.join(cwd, 'src/routes/added/index.ts'));
   await vi.waitFor(async () => expect(await readFile(path.join(cwd, 'src/routes.gen.ts'), 'utf8')).not.toContain('routes/added/index'));
-  (plugin.closeBundle as () => void)();
-  expect(off).toHaveBeenCalledTimes(4);
+  await (plugin.closeBundle as () => Promise<void>)();
+  expect(off).toHaveBeenCalledTimes(5);
 });
 
 it('keeps RoutePath output stable when same-shaped routes swap page exports', async () => {
@@ -214,11 +215,16 @@ it('keeps RoutePath output stable when same-shaped routes swap page exports', as
   expect((await generateRoutes({ cwd })).code).toBe(first.code);
 });
 
-it('emits relative ESM imports for hidden siblings and escapes URL delimiters', async () => {
-  const cwd = await fixture({ 'src/routes/.well-known/index.ts': handler, 'src/routes/a#b?c%/index.ts': handler });
+it('emits relative ESM imports for hidden siblings', async () => {
+  const cwd = await fixture({ 'src/routes/.well-known/index.ts': handler });
   const result = await renderRoutes({ cwd, out: 'src/routes/routes.gen.ts', importExtension: '.js' });
   expect(result.code).toContain('from "./.well-known/index.js"');
-  expect(result.code).toContain('from "./a%23b%3Fc%25/index.js"');
+});
+
+it.each(['a#b', 'a?b', '100%', '[n{\\d+}]', '[]', '[a]]', '[n{a]', '[n{a}x]'])('rejects non-portable or unconvertible directory %s', async name => {
+  const cwd = await fixture({ [`src/routes/${name}/index.ts`]: handler });
+  await expect(generateRoutes({ cwd })).rejects.toThrow(/invalid (route directory|bracket parameter directory)/);
+  await expect(stat(path.join(cwd, 'src/routes.gen.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
 it('generates the missing manifest before a real Vite SSR build resolves the entry', async () => {
@@ -235,4 +241,114 @@ it('generates the missing manifest before a real Vite SSR build resolves the ent
   });
   expect(await readFile(path.join(cwd, 'src/routes.gen.ts'), 'utf8')).toContain('routes/index.js');
   expect(result).toHaveProperty('output');
+});
+
+
+it('accepts CRLF manifests without a rewrite or stale failure', async () => {
+  const cwd = await fixture({ 'src/routes/index.ts': handler });
+  const first = await generateRoutes({ cwd });
+  const crlf = first.code.replace(/\n/g, '\r\n');
+  await writeFile(first.out, crlf);
+  expect((await generateRoutes({ cwd, check: true })).changed).toBe(false);
+  expect((await generateRoutes({ cwd })).changed).toBe(false);
+  expect(await readFile(first.out, 'utf8')).toBe(crlf);
+});
+
+it('recognizes Unicode middleware names and warns about skipped middleware files', async () => {
+  const cwd = await fixture({
+    'src/routes/middleware@café.ts': middleware,
+    'src/routes/middleware@नमस्ते.ts': middleware,
+    'src/routes/middleware@a\u200cb.ts': middleware,
+    'src/routes/middleware@bad!.ts': middleware,
+    'src/routes/middleware-typo.ts': middleware,
+  });
+  const result = await renderRoutes({ cwd });
+  expect(result.files.map(file => path.basename(file)).sort()).toEqual(['middleware@a\u200cb.ts', 'middleware@café.ts', 'middleware@नमस्ते.ts'].sort());
+  expect(result.warnings).toHaveLength(2);
+  expect(result.warnings.join('\n')).toContain('middleware@bad!.ts');
+  expect(result.warnings.join('\n')).toContain('middleware-typo.ts');
+});
+
+it('keeps existing import identifiers stable across insertion and sanitized-name collisions', async () => {
+  const cwd = await fixture({ 'src/routes/a-b/index.ts': handler, 'src/routes/z/index.ts': handler });
+  const first = await renderRoutes({ cwd });
+  await put(cwd, 'src/routes/a_b/index.ts', handler);
+  await put(cwd, 'src/routes/0/index.ts', handler);
+  const second = await renderRoutes({ cwd });
+  const imports = (code: string) => code.split('\n').filter(line => line.startsWith('import *'));
+  for (const line of imports(first.code)) expect(imports(second.code)).toContain(line);
+  const ids = imports(second.code).map(line => line.split(' ')[3]);
+  expect(new Set(ids).size).toBe(ids.length);
+});
+
+it.each(['', '.js', 'source'] as const)('resolves generated %j imports with the real Vite 8 bundler', async importExtension => {
+  const { build } = await import('vite');
+  const cwd = await fixture(Object.fromEntries(['ts', 'tsx', 'js', 'jsx'].map(extension =>
+    [`src/routes/${extension}/index.${extension}`, 'export const onGet = () => new Response("ok");'])));
+  await put(cwd, 'src/routes/[n{[0-9]+}]/index.ts', 'export const onGet = () => new Response("numeric");');
+  const result = await build({
+    root: cwd, configFile: false, logLevel: 'silent', plugins: [routes({ importExtension })],
+    build: { ssr: 'src/routes.gen.ts', write: false },
+  });
+  expect(result).toHaveProperty('output');
+});
+
+it('watches routes outside a missing srcDir and notices a later root', async () => {
+  const cwd = await fixture({ 'api/index.ts': handler });
+  await rm(path.join(cwd, 'src'), { recursive: true });
+  const results: string[] = [];
+  const watcher = await watchRoutes({ cwd, routesDir: 'api', out: 'generated/routes.ts', onResult: result => results.push(result.code) });
+  try {
+    // macOS fs.watch enrolls asynchronously and has no ready event.
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await put(cwd, 'src/root.tsx', 'export const head = {};');
+    await vi.waitFor(() => expect(results.at(-1)).toContain('rootFile: "root.tsx"'), { timeout: 3000 });
+    await put(cwd, 'api/added/index.ts', handler);
+    await vi.waitFor(() => expect(results.at(-1)).toContain('api/added/index'), { timeout: 3000 });
+  } finally { await watcher.close(); }
+});
+
+it('revalidates content edits and recovers without rewriting valid namespaces', async () => {
+  const cwd = await fixture({ 'src/routes/middleware.ts': middleware });
+  const errors: unknown[] = [], results: boolean[] = [];
+  const watcher = await watchRoutes({ cwd, onError: error => errors.push(error), onResult: result => results.push(result.changed) });
+  try {
+    await put(cwd, 'src/routes/middleware.ts', 'export const guard = () => {};');
+    await vi.waitFor(() => expect(String(errors.at(-1))).toContain('has no default export'), { timeout: 3000 });
+    await put(cwd, 'src/routes/middleware.ts', middleware);
+    await vi.waitFor(() => expect(results).toContain(false), { timeout: 3000 });
+  } finally { await watcher.close(); }
+});
+
+it('starts a real Vite 8 dev server with invalid routes, revalidates edits, and detaches listeners', async () => {
+  const { createServer, createLogger } = await import('vite');
+  const { fileURLToPath } = await import('node:url');
+  const cwd = await fixture({
+    'src/routes/index.ts': 'export const onGet = (c: any) => c.text("get");',
+    'src/routes/middleware.ts': middleware,
+    'src/entry.ts': 'import { createApp } from "recooler/router"; import { manifest } from "./routes.gen.js"; export default createApp(manifest);',
+  });
+  // Keep a generated manifest so actual namespaces can report startup errors at runtime.
+  await generateRoutes({ cwd, importExtension: '.js' });
+  await put(cwd, 'src/routes/middleware.ts', 'export const guard = () => {};');
+  const logger = createLogger('silent');
+  const errors = vi.spyOn(logger, 'error');
+  const server = await createServer({
+    root: cwd, configFile: false, customLogger: logger, plugins: [routes({ importExtension: '.js' })],
+    resolve: { alias: { 'recooler/router': fileURLToPath(new URL('../../src/router/index.ts', import.meta.url)) } },
+    server: { port: 0, host: '127.0.0.1', watch: { usePolling: true, interval: 30 } },
+  });
+  try {
+    await server.listen();
+    expect(server.httpServer?.listening).toBe(true);
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('has no default export'));
+    await expect(server.ssrLoadModule('/src/entry.ts')).rejects.toThrow('has no default export');
+    errors.mockClear();
+    await put(cwd, 'src/routes/middleware.ts', middleware);
+    const loaded = await vi.waitFor(async () => server.ssrLoadModule('/src/entry.ts'), { timeout: 5000 });
+    expect((await loaded.default.request('/')).status).toBe(200);
+    await put(cwd, 'src/routes/middleware.ts', 'export const guard = () => {};');
+    await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('has no default export')), { timeout: 5000 });
+  } finally { await server.close(); }
+  expect(server.watcher.listeners('change')).toHaveLength(0);
 });

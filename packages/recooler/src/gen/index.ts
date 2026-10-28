@@ -1,10 +1,11 @@
+import { createHash } from 'node:crypto';
 import { watch as fsWatch } from 'node:fs';
 import type { FSWatcher } from 'node:fs';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseSync } from 'oxc-parser';
-import type { Plugin } from 'vite';
 import { compareRoutePaths, isGroupSegment, lexical, resolveRoutes, RouteValidationError, routePathWithoutGroups, routeSegment } from '../router/resolve.js';
+import { locations } from './locations.js';
 import type { DirNode, Manifest, ModuleNs } from '../router/types.js';
 
 export interface GenerateOptions {
@@ -13,7 +14,7 @@ export interface GenerateOptions {
   srcDir?: string;
   routesDir?: string;
   out?: string;
-  importExtension?: '' | '.js' | '.tsx';
+  importExtension?: '' | '.js' | 'source';
   routeTypes?: boolean;
   /** Compare without writing; throw StaleRoutesError if missing or stale. */
   check?: boolean;
@@ -31,12 +32,7 @@ export class StaleRoutesError extends Error {
 const slash = (s: string) => s.split(path.sep).join('/');
 const routeFile = /^index\.[jt]sx?$/;
 const layoutFile = /^layout\.[jt]sx?$/;
-const middlewareFile = /^middleware(?:@[\p{L}\p{N}_-]+)?\.[jt]sx?$/u;
-function locations(options: GenerateOptions) {
-  const cwd = path.resolve(options.cwd ?? process.cwd());
-  const srcDir = path.resolve(cwd, options.srcDir ?? 'src');
-  return { cwd, srcDir, routesDir: path.resolve(cwd, options.routesDir ?? path.join(srcDir, 'routes')), out: path.resolve(cwd, options.out ?? path.join(srcDir, 'routes.gen.ts')) };
-}
+const middlewareFile = /^middleware(?:@[\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}-]+)?\.[jt]sx?$/u;
 const marker = () => undefined;
 interface SourceModule { file: string; namespace: ModuleNs; }
 
@@ -44,6 +40,7 @@ interface SourceModule { file: string; namespace: ModuleNs; }
 export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<GenerateResult, 'changed'>> {
   const { srcDir, routesDir, out } = locations(options);
   const errors: string[] = [];
+  const warnings: string[] = [];
   const modules: SourceModule[] = [];
   const namespaceFile = new Map<ModuleNs, string>();
   async function readModule(file: string): Promise<ModuleNs> {
@@ -72,8 +69,12 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
     }
     for (const entry of entries) {
       const file = path.join(dir, entry.name);
-      if (entry.isDirectory()) node.children.push(await walk(file, [...segments, entry.name]));
-      else if (entry.isFile()) {
+      if (entry.isDirectory()) {
+        if (/[\\%#?]/.test(entry.name)) errors.push(`invalid route directory ${display(file)}: names containing \\, %, # or ? are not portable; use [0-9] instead of \\d in digit patterns`);
+        if (entry.name.startsWith('[') && entry.name.endsWith(']') && routeSegment(entry.name) === entry.name)
+          errors.push(`invalid bracket parameter directory ${display(file)}: could not convert ${JSON.stringify(entry.name)}; use a name and a balanced pattern, e.g. [n{[0-9]+}]`);
+        node.children.push(await walk(file, [...segments, entry.name]));
+      } else if (entry.isFile()) {
         if (routeFile.test(entry.name)) {
           const module = await readModule(file);
           node.route ??= { file: display(file), module };
@@ -82,6 +83,8 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
           if (!node.layout) { node.layout = module; node.layoutFile = display(file); }
         } else if (middlewareFile.test(entry.name)) {
           node.middleware.push(await readModule(file)); node.middlewareFiles!.push(display(file));
+        } else if (entry.name.startsWith('middleware')) {
+          warnings.push(`WARNING: ignored unrecognized middleware file ${display(file)}; expected middleware[@name].[jt]sx?`);
         }
       }
     }
@@ -94,16 +97,31 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
   const rootFile = path.join(srcDir, 'root.tsx');
   try { await stat(rootFile); root = await readModule(rootFile); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-  const manifest: Manifest = { version: 1, root, tree };
+  const manifest: Manifest = { version: 1, root, rootFile: root ? display(rootFile) : undefined, tree };
   const plan = resolveRoutes(manifest);
   errors.push(...plan.errors);
   if (errors.length) throw new RouteValidationError(errors);
   modules.sort((a, b) => lexical(a.file, b.file));
-  const ids = new Map(modules.map((m, i) => [m.namespace, `m${i}`]));
+  // Path-derived ids stay stable across insertions. Extend a hash on the unlikely collision.
+  const used = new Set<string>();
+  const ids = new Map(modules.map(m => {
+    const file = display(m.file);
+    const prefix = routeFile.test(path.basename(file)) ? 'r' : layoutFile.test(path.basename(file)) ? 'l' : middlewareFile.test(path.basename(file)) ? 'mw' : 'root';
+    const readable = file.replace(/\.[jt]sx?$/, '').replace(/[^a-zA-Z0-9]+/g, '_');
+    const hash = createHash('sha256').update(file).digest('hex');
+    let length = 12;
+    let id = `${prefix}_${readable}_${hash.slice(0, length)}`;
+    while (used.has(id)) id = `${prefix}_${readable}_${hash.slice(0, ++length)}`;
+    used.add(id);
+    return [m.namespace, id] as const;
+  }));
   const imports = modules.map(m => {
-    let specifier = slash(path.relative(path.dirname(out), m.file)).replace(/\.[jt]sx?$/, options.importExtension ?? '');
+    let specifier = slash(path.relative(path.dirname(out), m.file));
+    if (options.importExtension !== 'source') {
+      // Vite resolves .js to .ts/.tsx, but does not resolve .js to .jsx.
+      specifier = specifier.replace(/\.[jt]sx?$/, extension => options.importExtension === '.js' && extension === '.jsx' ? '.jsx' : options.importExtension ?? '');
+    }
     if (!specifier.startsWith('./') && !specifier.startsWith('../')) specifier = './' + specifier;
-    specifier = specifier.replace(/%/g, '%25').replace(/#/g, '%23').replace(/\?/g, '%3F');
     return `import * as ${ids.get(m.namespace)} from ${JSON.stringify(specifier)};`;
   });
   function emitNode(node: DirNode, depth: number): string {
@@ -114,9 +132,9 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
     fields.push(node.children.length ? `children: [\n${node.children.map(n => '  '.repeat(depth + 2) + emitNode(n, depth + 2)).join(',\n')}\n${indent}  ]` : 'children: []');
     return `{\n${fields.map(f => `${indent}  ${f}`).join(',\n')}\n${indent}}`;
   }
-  let code = `// generated by recooler-routes; do not edit\nimport type { Manifest } from "recooler/router";\n${imports.join('\n')}\n\nexport const manifest = {\n  version: 1,\n${root ? `  root: ${ids.get(root)},\n` : ''}  tree: ${emitNode(tree, 1)},\n} satisfies Manifest;\n`;
+  let code = `// generated by recooler-routes; do not edit\nimport type { Manifest } from "recooler/router";\n${imports.join('\n')}\n\nexport const manifest = {\n  version: 1,\n${root ? `  root: ${ids.get(root)},\n  rootFile: ${JSON.stringify(manifest.rootFile)},\n` : ''}  tree: ${emitNode(tree, 1)},\n} satisfies Manifest;\n`;
   if (options.routeTypes !== false) code += `\nexport type RoutePath = ${[...new Set(plan.routes.map(r => r.path))].sort(compareRoutePaths).map(p => JSON.stringify(p)).join(' | ') || 'never'};\n`;
-  return { code, out, files: [...namespaceFile.values()].sort(lexical), warnings: plan.warnings };
+  return { code, out, files: [...namespaceFile.values()].sort(lexical), warnings: [...warnings, ...plan.warnings] };
 }
 
 export async function generateRoutes(options: GenerateOptions = {}): Promise<GenerateResult> {
@@ -124,7 +142,7 @@ export async function generateRoutes(options: GenerateOptions = {}): Promise<Gen
   let old: string | undefined;
   try { old = await readFile(result.out, 'utf8'); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-  const changed = old !== result.code;
+  const changed = old?.replace(/\r\n/g, '\n') !== result.code;
   if (options.check && changed) throw new StaleRoutesError(result.out);
   if (!options.check && changed) { await mkdir(path.dirname(result.out), { recursive: true }); await writeFile(result.out, result.code); }
   return { ...result, changed };
@@ -135,63 +153,53 @@ export interface WatchOptions extends GenerateOptions {
   onError?: (error: unknown) => void;
 }
 /** Watches content too, so validation and --check remain useful after export edits. */
-export async function watchRoutes(options: WatchOptions = {}): Promise<{ close(): void }> {
+export async function watchRoutes(options: WatchOptions = {}): Promise<{ close(): Promise<void> }> {
   const { routesDir, srcDir, out } = locations(options);
   let closed = false;
   let queue = Promise.resolve();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const watchers: FSWatcher[] = [];
-  const close = () => { closed = true; clearTimeout(timer); watchers.forEach(w => w.close()); };
+  const close = async () => {
+    closed = true;
+    clearTimeout(timer);
+    watchers.forEach(w => w.close());
+    await queue.catch(() => {});
+  };
   const report = (error: unknown) => (options.onError ?? console.error)(error);
+  const generate = async () => {
+    if (closed) return;
+    const result = await generateRoutes(options);
+    options.onResult?.(result);
+  };
   const run = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      queue = queue.then(async () => {
-        if (closed) return;
-        try { const result = await generateRoutes(options); options.onResult?.(result); }
-        catch (error) { report(error); }
-      });
-    }, 20);
+    timer = setTimeout(() => { queue = queue.then(generate).catch(report); }, 20);
   };
   const attach = (watcher: FSWatcher) => {
     watchers.push(watcher);
-    watcher.on('error', error => { close(); report(error); });
+    watcher.on('error', error => { void close(); report(error); });
   };
   try {
+    // Watch the nearest existing parent when srcDir has not been created yet.
+    let sourceWatchDir = srcDir;
+    while (true) {
+      try { await stat(sourceWatchDir); break; }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        sourceWatchDir = path.dirname(sourceWatchDir);
+      }
+    }
     attach(fsWatch(routesDir, { recursive: true }, (_event, filename) => {
       if (filename && path.resolve(routesDir, String(filename)) === out) return;
       run();
     }));
-    attach(fsWatch(srcDir, (_event, filename) => { if (String(filename) === 'root.tsx') run(); }));
-    const result = await generateRoutes(options);
-    options.onResult?.(result);
-  } catch (error) { close(); throw error; }
+    attach(fsWatch(sourceWatchDir, { recursive: true }, (_event, filename) => {
+      const file = path.resolve(sourceWatchDir, String(filename));
+      if (file === path.join(srcDir, 'root.tsx') || file === srcDir) run();
+    }));
+    // Initial generation uses the same queue as debounced events and close().
+    queue = queue.then(generate);
+    await queue;
+  } catch (error) { await close(); throw error; }
   return { close };
-}
-
-/** Thin Vite integration; runtime apps and generated manifests need no Vite dependency. */
-export function routes(options: GenerateOptions = {}): Plugin {
-  let cwd = options.cwd;
-  let stop: (() => void) | undefined;
-  const generate = () => generateRoutes({ ...options, cwd });
-  return {
-    name: 'recooler:routes',
-    configResolved(config) { cwd ??= config.root; },
-    async buildStart() { await generate(); },
-    async configureServer(server) {
-      const roots = locations({ ...options, cwd });
-      server.watcher.add([roots.routesDir, path.join(roots.srcDir, 'root.tsx')]);
-      let queue = Promise.resolve();
-      const update = (file: string) => {
-        const relative = path.relative(roots.routesDir, file);
-        if (file !== path.join(roots.srcDir, 'root.tsx') && (relative.startsWith('..' + path.sep) || path.isAbsolute(relative))) return;
-        queue = queue.then(async () => { try { await generate(); } catch (error) { server.config.logger.error(String(error)); } });
-      };
-      server.watcher.on('add', update).on('unlink', update).on('addDir', update).on('unlinkDir', update);
-      stop = () => { for (const event of ['add', 'unlink', 'addDir', 'unlinkDir']) server.watcher.off(event, update); };
-      server.httpServer?.once('close', () => stop?.());
-      await generate();
-    },
-    closeBundle() { stop?.(); },
-  };
 }

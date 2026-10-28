@@ -39,7 +39,7 @@ export interface ResolvedRoute {
   middleware: MiddlewareHandler[];
   /** Parallel to middleware; identity is the namespace, never the default function. */
   middlewareModules: ModuleNs[];
-  middlewareFiles: string[];
+  middlewareFiles: (string | undefined)[];
   directory: string;
 }
 export interface RoutePlan {

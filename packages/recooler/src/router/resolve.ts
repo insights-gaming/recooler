@@ -131,7 +131,7 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
     const scoped = allMiddleware.filter(m => { const dir = m.dir; return dir.inside && ancestor(dir.canonical, route.directory); });
     route.middleware = scoped.map(m => m.handler);
     route.middlewareModules = scoped.map(m => m.module);
-    route.middlewareFiles = scoped.map(m => m.file);
+    route.middlewareFiles = scoped.map(m => m.dir.node.middlewareFiles?.[m.index]);
   }
   plan.middlewares.sort(compareMiddleware);
   plan.lateMiddlewares.sort(compareMiddleware);

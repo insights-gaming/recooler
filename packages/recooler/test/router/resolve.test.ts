@@ -34,7 +34,7 @@ describe('reference path ordering', () => {
   it.each([
     ['[n{[0-9]+}]', ':n{[0-9]+}'], ['[n{a{2}}]', ':n{a{2}}'], ['[n{a]', '[n{a]'], ['[n{a}x]', '[n{a}x]'], ['[id]', ':id'], ['[p{regex}]', ':p{regex}'], ['[[rest]]', ':rest{.+}'],
     ['[]', '[]'], ['[[]]', '[[]]'], ['[id', '[id'], ['[a]]', '[a]]'], ['[post-id]', ':post-id'], ['[[a[b]]', ':a[b{.+}'],
-  ])('converts %s exactly like the reference', (input, output) => expect(routeSegment(input)).toBe(output));
+  ])('converts supported parameter %s', (input, output) => expect(routeSegment(input)).toBe(output));
   it.each(['(a.b)', '(v2.0)', '(a(b)', '(日本語)'])('recognizes group %s', s => expect(isGroupSegment(s)).toBe(true));
   it.each(['()', '(', '(a)b)', 'plain'])('preserves literal directory %s', s => expect(isGroupSegment(s)).toBe(false));
 });
@@ -135,4 +135,15 @@ it('preserves source ids alongside root, layouts and scoped middleware', () => {
   expect(route.layoutFiles).toEqual(['routes/layout.ts', 'routes/(g)/layout.ts']);
   expect(route.rootFile).toBe('root.tsx');
   expect(route.middlewareFiles).toEqual(['routes/(g)/middleware.ts']);
+});
+
+
+it('leaves missing source ids undefined instead of inventing module ids', () => {
+  const input = manifest({ '(g)/layout.ts': {}, '(g)/middleware.ts': mw(), '(g)/index.tsx': page });
+  delete input.tree.children[0]!.layoutFile;
+  delete input.tree.children[0]!.middlewareFiles;
+  const route = resolveRoutes(input).routes[0]!;
+  expect(route.layoutFiles).toEqual([undefined]);
+  expect(route.middlewareFiles).toEqual([undefined]);
+  expect(route.rootFile).toBeUndefined();
 });

@@ -22,13 +22,13 @@ app's `onError`/`notFound` using the API of your Hono version.
 re-exports. Manifest version is 1; `layoutFile` and parallel `middlewareFiles` are optional
 source ids relative to srcDir in POSIX form; they never determine middleware identity or scope.
 `Manifest.rootFile` is optional. Resolved routes expose `layoutFiles` (parallel to layouts,
-undefined where metadata was omitted), `rootFile`, and scoped `middlewareFiles`. Middleware arrays are in filename order. Generated
+undefined where metadata was omitted), `rootFile`, and scoped `middlewareFiles` (also
+parallel, with undefined for omitted metadata). Middleware arrays are in filename order. Generated
 `segment` values retain filesystem names; `path` values have converted params and no groups.
 
 Ordering follows 0.0.27 except that custom regex params always precede plain params.
 The segment order is static, custom pattern, plain param, catch-all; `{.+}` and `{.*}` count
-as catch-alls. Same-shaped routes put pages
-first, followed by path and group directory. Pages count as terminal GET handlers in
+as catch-alls. Same-shaped routes put pages first, followed by path and group directory. Pages count as terminal GET handlers in
 validation even without an installed page adapter. Extensions' handlers do not count as
 terminal conflicts because their fall-through is intentional.
 
@@ -53,8 +53,8 @@ Action handlers should return their response for a matching action and call `nex
 the request should reach another handler. Supply all methods that should run the extension,
 including methods for which the route has no native handler.
 
-A `PageAdapter` has `handler(route, extras, contributions)`, returning a Hono handler or undefined. The
-adapter is called only for routes with an own default export, and its return value is
+A `PageAdapter` has `handler(route, extras, contributions)`, returning a Hono handler or
+undefined. The adapter is called only for routes with an own default export, and its return value is
 validated. The route includes namespaces for the page, layouts in **root-to-leaf order** (including
 head-only layouts), and optional root. Extras are passed as an array in extension order;
 entries without page extras are omitted. The additive third argument contains matching
