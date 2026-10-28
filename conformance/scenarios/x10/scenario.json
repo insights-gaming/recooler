@@ -244,6 +244,94 @@
         ]
       },
       "repeat": 2
+    },
+    {
+      "name": "hook no auth",
+      "path": "/admin/hook",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/admin/hook"
+        ]
+      }
+    },
+    {
+      "name": "double mount /a no auth",
+      "path": "/a/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/a/admin"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/a",
+        "also": "/b"
+      }
+    },
+    {
+      "name": "double mount /b auth",
+      "path": "/b/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "trace": [
+          "auth@/b/admin",
+          "admin-dir user=alice"
+        ],
+        "includes": [
+          "admin user=alice"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/a",
+        "also": "/b"
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "outer route retry rechecks guard",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/admin",
+          "RETRY-outer",
+          "auth@/admin"
+        ]
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/",
+        "retry": true
+      }
+    },
+    {
+      "name": "same Request through outer route twice",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/admin"
+        ]
+      },
+      "repeat": 2,
+      "mount": {
+        "type": "route",
+        "prefix": "/"
+      }
     }
   ]
 }

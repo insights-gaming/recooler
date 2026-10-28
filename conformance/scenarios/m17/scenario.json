@@ -1,0 +1,17 @@
+{
+  "name": "m17: TS fixes the oracle discrepancy",
+  "source": "conformance/known-issues/README.md; recovered review probes",
+  "targets": [
+    "ts"
+  ],
+  "buildError": [
+    "middleware",
+    "function"
+  ],
+  "buildErrors": {
+    "ts": [
+      "middleware",
+      "function"
+    ]
+  }
+}

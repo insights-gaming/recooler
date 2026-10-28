@@ -1,5 +1,11 @@
 {
   "name": "error-param-alias: reject ambiguous file tree",
   "source": "src/routes.rs scan_rejects_two_layout_or_route_files_in_a_dir / scan_rejects_two_layouts_or_routes_for_a_path",
-  "buildError": "only one route may be used per path"
+  "buildError": "only one route may be used per path",
+  "buildErrors": {
+    "ts": [
+      "src/routes/:id/index.tsx",
+      "src/routes/[id]/index.tsx"
+    ]
+  }
 }

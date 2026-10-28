@@ -1,0 +1,20 @@
+{
+  "name": "root-head-only: TS fixes the oracle discrepancy",
+  "source": "conformance/known-issues/README.md; recovered review probes",
+  "targets": [
+    "ts"
+  ],
+  "requests": [
+    {
+      "name": "default root fallback",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<title>Root</title>"
+        ]
+      }
+    }
+  ]
+}

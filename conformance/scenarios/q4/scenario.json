@@ -64,7 +64,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -76,6 +76,39 @@
         "status": 404,
         "includes": [],
         "body": "unknown action",
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "ts": {
+            "status": 404
+          }
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies valid same-origin action headers so this tests lookup, not CSRF."
+        }
+      ]
+    },
+    {
+      "name": "HEAD /posts/a",
+      "path": "/posts/a",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "body": "",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /posts/a",
+      "path": "/posts/a",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
         "trace": []
       }
     }

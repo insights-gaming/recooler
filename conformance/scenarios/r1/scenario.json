@@ -1,0 +1,36 @@
+{
+  "name": "r1: blocking auth re-exported by group and directory runs per module",
+  "source": "agent-a95e42b5d8a531ef8.jsonl rv5 L300-L301 r1",
+  "requests": [
+    {
+      "name": "no auth",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/admin"
+        ]
+      }
+    },
+    {
+      "name": "auth runs both modules",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "trace": [
+          "auth@/admin",
+          "auth@/admin"
+        ],
+        "includes": [
+          "admin user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    }
+  ]
+}

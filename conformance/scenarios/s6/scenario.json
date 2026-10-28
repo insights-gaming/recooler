@@ -48,7 +48,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -94,7 +94,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -140,7 +140,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -186,7 +186,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -232,7 +232,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -278,7 +278,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },

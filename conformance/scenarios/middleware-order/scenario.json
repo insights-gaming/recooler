@@ -14,10 +14,10 @@
         "trace": [
           "plain-base",
           "plain-10",
-          "plain-20",
+          "plain-2",
           "group-base",
           "group-10",
-          "group-20",
+          "group-2",
           "deep"
         ]
       }
@@ -33,7 +33,7 @@
         "trace": [
           "plain-base",
           "plain-10",
-          "plain-20",
+          "plain-2",
           "deep"
         ]
       }

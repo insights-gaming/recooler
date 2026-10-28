@@ -71,7 +71,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -111,7 +111,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -151,7 +151,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -191,7 +191,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -225,7 +225,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -262,7 +262,89 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
+        }
+      ]
+    },
+    {
+      "name": "b action on public /p",
+      "method": "POST",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": [],
+        "excludes": [
+          "b-action"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/b",
+        "attribute": "hx-post",
+        "path": "/p",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "A route action cannot execute on the public root-action chain.",
+          "ts": {
+            "status": 404,
+            "trace": [],
+            "excludes": [
+              "b-action"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "public root action",
+      "method": "POST",
+      "expect": {
+        "status": 200,
+        "body": "root-action user=undefined",
+        "trace": []
+      },
+      "form": {},
+      "action": {
+        "page": "/p",
+        "attribute": "hx-post"
+      }
+    },
+    {
+      "name": "protected root action without auth",
+      "method": "POST",
+      "action": {
+        "page": "/a",
+        "attribute": "hx-post",
+        "index": 0,
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "form": {},
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED",
+        "trace": [
+          "admin"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     }

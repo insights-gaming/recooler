@@ -109,11 +109,7 @@ export function observe(app: BuiltApp): (request: Request, mount?: ScenarioReque
         if (mount.type === "mount") outer.mount(mount.prefix, dispatch);
         else if (mount.type === "basePath") outer.basePath(mount.prefix).route("/", routed!);
         else outer.route(mount.prefix, routed!);
-        if (mount.outerPrefix) {
-          const twice = new Hono({ strict: true });
-          twice.route(mount.outerPrefix, outer);
-          outer = twice;
-        }
+        if (mount.also) outer.route(mount.also, routed!);
         mounts.set(key, outer);
       }
       response = await outer.fetch(request);
@@ -125,18 +121,23 @@ export function observe(app: BuiltApp): (request: Request, mount?: ScenarioReque
   };
 }
 
+// A leading double slash is a request path, not a protocol-relative hostname.
+function requestUrl(value: string): URL {
+  return new URL(value.startsWith("/") ? "http://localhost" + value : value, "http://localhost");
+}
+
 export async function performRequest(
   request: ScenarioRequest,
   fetch: ReturnType<typeof observe>,
   responses: Map<string, { body: string; url: string }>,
 ): Promise<Observation[]> {
-  let url = new URL(request.path ?? "/", "http://localhost").href;
+  let url = requestUrl(request.path ?? "/").href;
   if (request.action) {
     const action = request.action;
     let rendered = action.response ? responses.get(action.response) : undefined;
     if (action.response && !rendered) throw new Error(`No previous response named ${action.response}`);
     if (!rendered) {
-      const page = new URL(action.page, "http://localhost").href;
+      const page = requestUrl(action.page).href;
       const response = await fetch(new Request(page, { headers: action.headers }), request.mount);
       if (response.status !== 200) throw new Error(`Action page ${page} returned ${response.status}`);
       rendered = { body: response.body, url: page };

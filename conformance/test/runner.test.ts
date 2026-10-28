@@ -78,6 +78,15 @@ describe("portable request contract", () => {
     expect(seen[1]!.headers.has("HX-Request")).toBe(false);
   });
 
+  test("preserves leading double slashes as a local request path", async () => {
+    let sent: Request | undefined;
+    await performRequest({ name: "path", path: "//admin", expect: { status: 404 } }, async (req) => {
+      sent = req;
+      return { status: 404, body: "", headers: new Headers(), trace: [] };
+    }, new Map());
+    expect(sent!.url).toBe("http://localhost//admin");
+  });
+
   test("selects versioned TS target and independent build diagnostics", () => {
     const target = { name: "ts-0.1.0", expectationFamily: "ts" as const, build: async () => { throw new Error(); } };
     const scenario: Scenario = { name: "error", source: "test", buildError: "Rust wording", buildErrors: { ts: ["route A", "route B"] } };

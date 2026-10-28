@@ -32,6 +32,7 @@ export interface Expectation {
   traceExcludes?: string[];
   /** Inspect all emitted browser chunks (requires BuiltApp.clientChunks). */
   clientExcludes?: string[];
+  clientIncludes?: string[];
 }
 
 export interface IntentionalChange {
@@ -61,7 +62,7 @@ export interface ScenarioRequest {
     /** Extract from a previous request's response (for actions returning nested forms). */
     response?: string;
   };
-  mount?: { type: "route" | "basePath" | "mount"; prefix: string; outerPrefix?: string; retry?: boolean };
+  mount?: { type: "route" | "basePath" | "mount"; prefix: string; also?: string; retry?: boolean };
   /** Dispatch the exact same Request instance repeatedly. */
   repeat?: number;
   /** Expected results after the first dispatch, when retry outcomes differ. */

@@ -41,7 +41,20 @@
         "trace": [
           "public-group"
         ]
-      }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "ts": {
+            "status": 404
+          }
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies valid same-origin action headers so this tests lookup, not CSRF."
+        }
+      ]
     },
     {
       "name": "PUT /about",
@@ -231,9 +244,175 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
+    },
+    {
+      "name": "admin action submitted to /about",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/about",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The admin catch-all action must not execute through a public route. TS rejects the route-signature mismatch with 404.",
+          "ts": {
+            "status": 404,
+            "excludes": [
+              "action admin-rest"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin action submitted to /hook",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "onRequest public-hook",
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/hook",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The admin catch-all action must not execute through a public route. TS rejects the route-signature mismatch with 404.",
+          "ts": {
+            "status": 404,
+            "excludes": [
+              "action admin-rest"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin action submitted to /plainpage",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/plainpage",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "The admin catch-all action must not execute through a public route. TS rejects the route-signature mismatch with 404.",
+          "ts": {
+            "status": 404,
+            "excludes": [
+              "action admin-rest"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin action submitted to /x",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ],
+        "traceExcludes": [
+          "action admin-rest"
+        ]
+      },
+      "form": {},
+      "action": {
+        "page": "/admin-secret",
+        "attribute": "hx-post",
+        "path": "/x",
+        "headers": {
+          "x-auth": "yes"
+        }
+      },
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Both URLs match the admin catch-all pattern; its guard must still reject the unauthenticated request."
+        }
+      ]
+    },
+    {
+      "name": "DELETE /about",
+      "path": "/about",
+      "method": "DELETE",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /x",
+      "path": "/x",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
     }
   ]
 }

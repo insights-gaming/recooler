@@ -1,5 +1,16 @@
 {
   "name": "p8: identical route shapes conflict",
   "source": "agent-a661255d0075a9714.jsonl rv3 mkcase.sh param shapes",
-  "buildError": "match the same requests"
+  "buildError": [
+    "src/routes/(a)/u/[id]/index.tsx",
+    "src/routes/(b)/u/[id]/index.tsx",
+    "respond to GET"
+  ],
+  "buildErrors": {
+    "ts": [
+      "src/routes/(a)/u/[id]/index.tsx",
+      "src/routes/(b)/u/[id]/index.tsx",
+      "GET"
+    ]
+  }
 }

@@ -11,7 +11,9 @@
         "includes": [
           "<p>x</p>"
         ],
-        "trace": []
+        "trace": [
+          "mw"
+        ]
       }
     }
   ]

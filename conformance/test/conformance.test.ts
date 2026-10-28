@@ -55,10 +55,11 @@ for (const name of selected) {
                 for (const [pattern, count] of Object.entries(expected.counts ?? {})) expect([...actual.body.matchAll(new RegExp(pattern, "g"))]).toHaveLength(count);
                 for (const [header, value] of Object.entries(expected.headers ?? {})) expect(actual.headers.get(header)).toBe(value);
                 for (const part of expected.traceExcludes ?? []) expect(actual.trace).not.toContain(part);
-                if (expected.clientExcludes) {
+                if (expected.clientExcludes || expected.clientIncludes) {
                   expect(actual.clientChunks, "Target must expose every emitted client chunk").toBeDefined();
                   const chunks = Object.values(actual.clientChunks!).join("\n");
-                  for (const part of expected.clientExcludes) expect(chunks).not.toContain(part);
+                  for (const part of expected.clientExcludes ?? []) expect(chunks).not.toContain(part);
+                  for (const part of expected.clientIncludes ?? []) expect(chunks).toContain(part);
                 }
                 if (expected.trace) expect(actual.trace).toEqual(expected.trace);
               }

@@ -11,7 +11,12 @@
         "includes": [
           "<p>page slug=a</p>"
         ],
-        "trace": []
+        "trace": [],
+        "excludes": [
+          "layout-post-action",
+          "hx-post=",
+          "<form"
+        ]
       }
     },
     {
@@ -32,6 +37,26 @@
       "expect": {
         "status": 404,
         "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "HEAD /posts/a",
+      "path": "/posts/a",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "body": "",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /posts/a",
+      "path": "/posts/a",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
         "body": "404 Not Found",
         "trace": []
       }

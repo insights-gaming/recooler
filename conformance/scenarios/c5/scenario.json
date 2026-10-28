@@ -24,6 +24,26 @@
         "body": "admin onOptions",
         "trace": []
       }
+    },
+    {
+      "name": "HEAD /posts/a",
+      "path": "/posts/a",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "body": "",
+        "trace": []
+      }
+    },
+    {
+      "name": "PUT /posts/a",
+      "path": "/posts/a",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
     }
   ]
 }

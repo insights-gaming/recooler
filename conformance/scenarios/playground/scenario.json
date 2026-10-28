@@ -137,7 +137,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -170,7 +170,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -289,7 +289,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -301,7 +301,20 @@
         "body": "unknown action"
       },
       "method": "POST",
-      "form": {}
+      "form": {},
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "ts": {
+            "status": 404
+          }
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies valid same-origin action headers so this tests lookup, not CSRF."
+        }
+      ]
     },
     {
       "name": "unknown form actions are rejected: constructor",
@@ -311,7 +324,20 @@
         "body": "unknown action"
       },
       "method": "POST",
-      "form": {}
+      "form": {},
+      "changes": [
+        {
+          "decision": "D6",
+          "reason": "Unsigned or unknown reserved action parameters return 404, including before lookup.",
+          "ts": {
+            "status": 404
+          }
+        },
+        {
+          "decision": "D7",
+          "reason": "Runner supplies valid same-origin action headers so this tests lookup, not CSRF."
+        }
+      ]
     },
     {
       "name": "form action returning nothing responds 204",
@@ -340,7 +366,7 @@
         },
         {
           "decision": "D7",
-          "reason": "Valid action requests include HX-Request for the TS target."
+          "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
       ]
     },
@@ -371,8 +397,11 @@
               "hx-on:click=",
               "<script type=\"module\""
             ],
-            "excludes": [
+            "clientExcludes": [
               "server-only-db-module"
+            ],
+            "clientIncludes": [
+              "clicked"
             ]
           }
         }
@@ -384,8 +413,24 @@
       "expect": {
         "status": 200,
         "excludes": [
-          "<script>"
+          "<script"
         ]
+      }
+    },
+    {
+      "name": "authorized playground mount",
+      "path": "/app/posts/7",
+      "expect": {
+        "status": 200,
+        "body": "staff post 7"
+      },
+      "method": "POST",
+      "mount": {
+        "type": "route",
+        "prefix": "/app"
+      },
+      "headers": {
+        "x-staff": "yes"
       }
     }
   ]

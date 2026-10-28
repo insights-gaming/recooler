@@ -35,6 +35,36 @@
         "body": "404 Not Found",
         "trace": []
       }
+    },
+    {
+      "name": "HEAD /x/y",
+      "path": "/x/y",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "body": "",
+        "trace": []
+      }
+    },
+    {
+      "name": "OPTIONS /x/y",
+      "path": "/x/y",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "PUT /x/y",
+      "path": "/x/y",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "body": "404 Not Found",
+        "trace": []
+      }
     }
   ]
 }
