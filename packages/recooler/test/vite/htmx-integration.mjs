@@ -56,6 +56,7 @@ try {
   await write('src/routes/layout.tsx', `export default Content => props => <><form hx-post={() => 'layout'}/><Content {...props}/></>;`);
   await write('src/root.tsx', `import { DefaultRootHOC } from 'recooler/jsx'; export default Content => DefaultRootHOC(props => <><form hx-post={() => 'root'}/><Content {...props}/></>);`);
   await write('src/routes/handler/index.ts', `import { Button } from '../../components/Button'; export const onGet = c => c.text(typeof Button);`);
+  await write('src/routes/:id/index.ts', `export const onGet = c => c.text('colon route ' + c.req.param('id'));`);
   await write('src/routes/table/index.ts', `import { table, namespace } from 'virtual:recooler/htmx'; export const onGet = c => c.json({ table, namespace });`);
   await write('src/entry.ts', `import app from 'virtual:recooler/app'; app.onError(error => Response.json({ stack: error.stack }, { status: 500 })); export default app;`);
   await write('.dev.vars', `RECOOLER_SECRET=${secret}\n`);
@@ -83,6 +84,7 @@ try {
     server: { host: '127.0.0.1', port: 0 },
   });
   const inspectGraph = async request => {
+    assert.equal(await (await request('/colon')).text(), 'colon route colon');
     const { table, namespace } = await (await request('/table')).json();
     const ids = table['routes/index.tsx'];
     assert(ids, JSON.stringify(table));
@@ -158,6 +160,7 @@ try {
     });
   } });
   server = await createServer(dev);
+  assert.equal(server.config.server.fs.strict, true);
   await server.listen();
   const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
   const request = (url, init) => fetch(new URL(url, origin), init);

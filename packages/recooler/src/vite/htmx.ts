@@ -8,7 +8,7 @@ import { normalizePath } from 'vite';
 import type { DevEnvironment, Plugin } from 'vite';
 import type { GenerateResult } from '../gen/index.js';
 import { locations } from '../gen/locations.js';
-import { emitRegistration, transform } from '../htmx/transform/index.js';
+import { actionTransformVersion, emitRegistration, transform } from '../htmx/transform/index.js';
 import type { ActionTable } from '../htmx/index.js';
 import type { TransformResult } from '../htmx/transform/index.js';
 import type { RecoolerOptions } from './index.js';
@@ -18,6 +18,22 @@ const internalTable = '\0' + tableId;
 const token = '__RECOOLER_ACTION_TABLE_6d32ad94__';
 const framework = normalizePath(fileURLToPath(new URL('../../', import.meta.url)));
 const sourcePattern = /\.[cm]?[jt]sx?(?:\?|$)/;
+
+/** Package identity must survive moving a checkout or rebuilding it in Docker. */
+function appIdentity(srcDir: string): readonly string[] {
+  let directory = srcDir;
+  for (;;) {
+    try {
+      const pkg = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
+      return [typeof pkg.name === 'string' ? pkg.name : '', normalizePath(path.relative(directory, srcDir))];
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) return ['', normalizePath(path.relative(directory, srcDir))];
+    directory = parent;
+  }
+}
 
 /** Strip only Vite transport queries. Meaningful plugin variants remain distinct. */
 export function canonicalId(id: string): string {
@@ -182,7 +198,9 @@ export function htmxPlugin(options: RecoolerOptions) {
       states.clear();
       roots = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root });
       serving = config.command === 'serve';
-      projectNamespace = 'recooler:' + createHash('sha256').update(normalizePath(roots.srcDir)).digest('hex').slice(0, 24)
+      const identity = options.htmx && options.htmx.namespace !== undefined ? options.htmx.namespace : appIdentity(roots.srcDir);
+      if (identity === '') throw new Error('recooler: htmx.namespace must be nonempty');
+      projectNamespace = 'recooler:' + createHash('sha256').update(JSON.stringify(identity)).digest('hex').slice(0, 24)
         + (serving ? ':' + randomUUID() : '');
     },
     watchChange(file) {
@@ -231,14 +249,13 @@ export function htmxPlugin(options: RecoolerOptions) {
         id = canonicalId(id);
         const moduleKind = kinds.get(id.split('?')[0]!) ?? 'component';
         const state = stateFor(this.environment.name);
-        if (serving && !state.tableLoaded) return;
         const namespace = namespaceFor(this.environment.name);
         const previous = serving ? state.transforms.get(id) : undefined;
         const result = previous?.source === code && previous.kind === moduleKind ? previous.result : transform(code, {
           id, relativePath: relative(id), mode: 'server', moduleKind,
           clientBannedImports: options.htmx && options.htmx.clientBannedImports,
           codegen: { registerActions: input => emitRegistration({ ...input, namespace,
-            moduleHash: createHash('sha256').update(code).digest('hex') }) },
+            moduleHash: createHash('sha256').update(JSON.stringify([actionTransformVersion, code])).digest('hex') }) },
         });
         // Full runner reloads refresh module evaluation, but scope analysis is
         // pure. Keep one source version per module across full dev reloads.

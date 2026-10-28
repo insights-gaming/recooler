@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { normalizePath, searchForWorkspaceRoot } from 'vite';
 import type { Plugin, ViteDevServer } from 'vite';
 import { crawlFrameworkPkgs } from 'vitefu';
@@ -25,14 +26,18 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error, result?
   let timer: ReturnType<typeof setTimeout> | undefined;
   let queue = Promise.resolve();
   let lastError: string | undefined;
+  const colonFiles = new Set<string>();
   const enqueue = (server?: ViteDevServer) => {
     const pending = queue.then(async () => {
       try {
         const result = await generateRoutes({ ...options, cwd });
+        colonFiles.clear();
+        for (const file of result.files) if (file.slice(path.parse(file).root.length).includes(':')) colonFiles.add(normalizePath(file));
         changed?.(undefined, result);
         lastError = undefined;
       } catch (cause) {
         const error = cause instanceof Error ? cause : new Error(String(cause));
+        colonFiles.clear();
         changed?.(error);
         if (!server) throw error;
         if (lastError !== error.message) {
@@ -49,6 +54,14 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error, result?
     name: 'recooler:routes',
     configResolved(config) { cwd ??= config.root; serve = config.command === 'serve'; },
     async buildStart() { if (!serve) await enqueue(); },
+    async load(id) {
+      // Vite's default filesystem loader rejects ':' even in explicitly allowed
+      // paths on workerd's transport. Read only exact manifest inputs, leaving
+      // strict fs and every other file/query under Vite's normal policy.
+      if (!colonFiles.has(id)) return;
+      this.addWatchFile(id);
+      return { code: await readFile(id, 'utf8'), map: null };
+    },
     // Cloudflare can eagerly import the Worker during configureServer. Generate
     // the manifest and graph roots before platform hooks can load virtual apps.
     configureServer: { order: 'pre', async handler(server) {
@@ -89,6 +102,8 @@ export interface RecoolerOptions {
   htmx?: false | {
     /** Request env binding, then process.env on Node. Never a build-time secret. */
     secretBinding?: string;
+    /** Stable app identity override; environment and dev nonce are still appended. */
+    namespace?: string;
     base?: string;
     trustedOrigins?: readonly string[];
     clientBannedImports?: readonly (RegExp | string)[];

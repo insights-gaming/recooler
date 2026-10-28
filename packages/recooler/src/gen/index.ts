@@ -76,6 +76,7 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
           const suggestion = entry.name.includes('\\d') ? 'use [0-9] instead of \\d in digit patterns' : 'rename the directory to avoid these characters';
           errors.push(`invalid route directory ${display(file)}: names containing \\, %, # or ? are not portable; ${suggestion}`);
         }
+        if (entry.name.includes(':')) warnings.push(`WARNING: route directory ${display(file)} contains : and is not portable to Windows; use bracket parameters such as [id] instead`);
         node.children.push(await walk(file, [...segments, entry.name]));
       } else if (entry.isFile()) {
         if (routeFile.test(entry.name)) {

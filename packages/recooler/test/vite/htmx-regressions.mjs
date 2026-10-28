@@ -63,10 +63,10 @@ try {
   }
   const config = (who = 'one') => ({ root, configFile: false, logLevel: 'silent',
     plugins: [...(cf ? [cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false })] : []), ...recooler()],
-    define: { __WHO__: JSON.stringify(who) }, // Vite's strict filesystem policy rejects ':' in filenames on workerd's
-    // fetch transport. This trusted fixture explicitly permits its alias paths.
-    server: { host: '127.0.0.1', port: 0, ...(cf ? { fs: { strict: false } } : {}), ...(!cf ? { middlewareMode: true, ws: false } : {}) } });
+    define: { __WHO__: JSON.stringify(who) },
+    server: { host: '127.0.0.1', port: 0, ...(!cf ? { middlewareMode: true, ws: false } : {}) } });
   server = await createServer(config());
+  assert.equal(server.config.server.fs.strict, true);
   if (cf) await server.listen();
   const origin = cf ? `http://127.0.0.1:${server.httpServer.address().port}` : 'http://test';
   const request = async (url, init) => cf ? fetch(new URL(url, origin), init)

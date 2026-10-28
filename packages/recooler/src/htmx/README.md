@@ -73,11 +73,13 @@ even if its Origin equals the request URL's origin.
 A synchronous HMAC-SHA256 caches the keyed inner/outer pad compression states
 per resolved secret and signs the JSON tuple
 `['recooler.action.v2', namespace, base, moduleHash, routeId, pathname, method, actionId, scope]`. The method is uppercase and scope
-is the exact serialized JSON string. `moduleHash` is the SHA-256 of the defining
-module's source entering the Vite transform. Changing that module invalidates its
-old URLs, including IDs shifted by inserting an earlier action; unchanged modules
-retain their URLs across builds. Namespace and base prevent cross-app replay even
-when apps share a secret. Every URL,
+is the exact serialized JSON string. Vite's `moduleHash` is the SHA-256 of the JSON
+tuple `[actionTransformVersion, definingModuleSource]`. The exported transform
+version must be bumped whenever action numbering semantics change. Changing that
+module invalidates its old URLs, including IDs shifted by inserting an earlier action; unchanged modules
+retain their URLs across builds. Namespace and base bind the intended app and
+mount. Distinct apps and distinct deployments (such as staging and production)
+must not share a signing secret. Every URL,
 including an action without captures, is signed. Signatures are compared without
 data-dependent early exit for equal-length strings. There is no expiry or session
 binding: anyone holding a valid URL can replay it on the same route/path
