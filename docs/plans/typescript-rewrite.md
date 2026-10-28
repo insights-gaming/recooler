@@ -469,7 +469,7 @@ Done: 0.0.27 is published.
 - **Ambient context:** `hono/context-storage` on workerd (`nodejs_als`), Node and Bun, including inside Suspense streaming after the handler returns.
 - **Dev loop:** Vite 8 with the Cloudflare plugin, running the bench app with a client environment.
 - **Conformance suite:** moved into the repo and running against 0.0.27.
-- **the main consumer app (private):** an inventory of the features it uses that the migration guide must cover.
+- **The main consumer app (private; two Workers packages):** an inventory of the features it uses that the migration guide must cover.
 
 Exit criteria: D3, D5 and D8 are decided with measurements, and the extension API shape is frozen.
 
