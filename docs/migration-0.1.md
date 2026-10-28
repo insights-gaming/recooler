@@ -311,15 +311,15 @@ export default Content => props => <html>
 ```
 
 The adapter places Recooler's startup scripts in the Content slot for every root,
-including legacy roots. Preserve Content. An external classic
-`assets/recooler-gate.js` script runs first and blocks the parser until its tiny
-confirm gate is installed. It needs no inline script or unsafe-eval permission.
-Each route module and client entry appears as an early async module and as an
-identical deferred module URL. The browser module map evaluates each URL once:
-the async copy registers during streaming, and the deferred copy guarantees
-registration before DOMContentLoaded. DefaultRootHOC avoids adding another copy;
-other script URLs retain their normal rendering. Dependency modulepreloads go in
-the head with DefaultRootHOC and in Content with a custom root.
+including legacy roots. Preserve Content. On full pages each route module and
+client entry appears as an early async module and an identical deferred module URL.
+The browser module map evaluates each URL once: the async copy registers during
+streaming, and the deferred copy guarantees registration before DOMContentLoaded.
+There is no blocking gate script. For non-boosted htmx responses, module scripts
+follow the content and preload links are omitted, preserving htmx 1 table rows.
+DefaultRootHOC avoids adding another copy; other script URLs retain their normal
+rendering. Full-page dependency modulepreloads go in the head with DefaultRootHOC
+and in Content with a custom root.
 
 Only routes with client code get a trailing `<template data-recooler-marker="true"
 data-recooler-route="/users/:id" data-recooler-version="…"></template>` in Content.
@@ -362,13 +362,14 @@ new marker and runs onLoad again. HX-Location, push-url, boosts and partial swap
 use this same path; unchanged markers do not rerun onLoad. Ready handlers on the
 surrounding page continue to run while another fragment loads or fails.
 
-During the short swap loading window, only `htmx:confirm` is canceled and deferred.
-After registration, handlers share the original request's `detail.issueRequest(true)`
-continuation, preserving cancellation and avoiding an automatic continuation if a
-handler already called it. Detached targets are skipped. `htmx:configRequest` and
-`htmx:beforeRequest` handlers run late: their preventDefault cannot cancel a request
-already in progress, and mutations to request configuration are not guaranteed to
-affect that request. There is no safe public continuation for those events.
+During the short loading window, generated hx-on attributes call a compact inline
+fallback when `$rc` is not available. Only `htmx:confirm` is canceled and held in
+`self.$rq`. After registration, held events always take the deferred path and
+resume through the original `detail.issueRequest()` with no skip argument. This
+preserves htmx's native `hx-confirm` prompt. A handler's cancellation or explicit
+continuation suppresses automatic continuation. Detached targets are skipped.
+Unavailable `htmx:configRequest` and `htmx:beforeRequest` handlers are dropped;
+there is no safe public continuation for those events.
 
 Other events, including native click/submit/keydown/paste/drop and htmx response,
 swap and settle events, are dropped until their handler registers. They never
@@ -378,10 +379,13 @@ Dropping avoids running stale lifecycle callbacks or late cancellation-dependent
 side effects. Once registered, handlers run normally with the original event. htmx's
 own listeners may ignore defaultPrevented; Recooler adds no replacement requests.
 Already-string hx-on attributes keep their behavior and unsafe-eval CSP needs.
-The external gate captures confirms and defers their dispatch by one microtask,
-so htmx 1.9.12 can install hx-on listeners before a synchronous load confirm runs.
-It then uses the public issueRequest continuation once. Confirms that arrive
-before the module entry are held until registration; detached targets are skipped.
+htmx 1.9.12 installs wildcard hx-on listeners after synchronous load requests, so
+a raw string load-confirm guard can be bypassed, including a cold boost from a
+handler-free page (also true in 0.0.27). Generated confirm listeners now include a
+legacy `hx-on` alias that runs before htmx 1 issues load requests, then is replaced
+by the normal listener; htmx 2 ignores this alias. This protects generated guards
+even with slow assets and the streamed `.forEach(htmx.process)` pattern, without
+intercepting unrelated confirms. Both forms use hx-on's existing eval permission.
 
 **Native preventDefault guards can be bypassed during the post-swap loading window.**
 This includes non-boosted links/forms, href="#" anchors and key/paste/drop guards.

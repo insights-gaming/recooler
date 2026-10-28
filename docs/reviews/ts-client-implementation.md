@@ -1,7 +1,7 @@
 # Phase 5 client scripts: implementation and review fixes
 
-**Current design: see the round 2 redesign below.** Earlier queue/replay descriptions
-and limits are historical and are superseded by that section.
+**Current design: see the round 4 changes at the end. Earlier gate/replay and
+late config/before-request descriptions are historical and superseded there.**
 
 Implemented on `ssttevee/ts-client` in the existing `t3-dd227eee` worktree,
 starting at `a8366ee` (Phase 5 based on `ssttevee/ts-htmx-vite` `98acae9`).
@@ -426,3 +426,89 @@ Logs: `/private/tmp/rc-r3-package-verified.log`,
 `/private/tmp/rc-r3-r2-{init,hist,hist-modern,replay,failure,skew}-{1,2}.log`,
 `/private/tmp/rc-r3-r2-settle-{after-settle,after-request,after-swap,load}-{1,2}.log`
 and `/private/tmp/rc-r3-r2-compat-{replay,skew}-{1,2}.log`.
+
+
+## Round 4: inline confirms and fragment parsing
+
+Implementation checkpoint: `6d936f8`; regression/compact-fallback checkpoint:
+`e21444c`. The final HEAD is recorded in the handoff. No push.
+
+1. **Native hx-confirm and ajax promises:** removed the document-wide confirm
+   listener. Only an unavailable recooler confirm listener holds a request; ready
+   listeners run synchronously. Automatic continuation uses `issueRequest()` with
+   no argument, preserving native prompts. Handler-free and client-bearing controls
+   cover button POST, form POST and boosted-link dialog accept/dismiss, plus
+   `htmx.ajax().then()` observing the completed swap, on htmx 1.9.12 and 2.0.11.
+2. **Blocking gate:** removed its HTML tag, development middleware, emitted asset
+   and version-hash dependency. Generated attributes call `(self.$rc||fallback)`.
+   The fallback only prevents confirms and queues the listener's arguments/event
+   (whose detail owns issueRequest) in `self.$rq`. Everything else drops without
+   canceling defaults; development warns. Full pages retain early async and
+   identical deferred module URLs. Fragment requests only receive trailing modules.
+   Tests hold every module while verifying content parsing and assert zero gate
+   fetches across four boosts.
+3. **Lost held confirms:** queue draining always calls the deferred dispatch path,
+   even when static slices registered before the entry wrapper. Both module load
+   orders, concurrent pending confirms, allow/cancel, deferred native prompt
+   acceptance/dismissal and subsequent ready acceptance have real Chromium assertions.
+4. **htmx 1 table rows:** non-boosted HX-Request responses put modules after the
+   rows and omit preload links. Links would otherwise be foster-parented ahead of
+   the parser's table and defeat htmx 1's depth-based fragment extraction. Tests
+   assert two intact rows, the nested button, its working handler and row onLoad,
+   alongside handler-free controls, on both htmx versions.
+5. **htmx 1 cold load ordering:** documented the upstream issue (also in 0.0.27).
+   Removing the gate alone cannot protect streamed load guards before the async
+   entry arrives: htmx 1 has not installed their wildcard listeners yet. Generated
+   confirms therefore also emit a legacy hx-on alias evaluating the canonical
+   attribute. htmx 1 installs it before load requests, then replaces it during
+   normal processing; htmx 2 ignores it. This additionally protects generated cold
+   boost guards. Raw string wildcard guards retain htmx 1's upstream limitation.
+
+Every round 4 scenario is an asserting package Chromium regression in
+`test/vite/client-confirm.mjs`: native dialogs, ajax promise ordering, six pending
+load variants, gate cost, module evaluation/registration/onLoad across boosts and
+history, markers/table rows, and cold boosts. The prior `client-streaming.mjs`
+matrix still covers both htmx versions and root styles, including consumer Suspense
+processing with slow assets. Unavailable config/before-request assertions now
+expect drops, as required by the new event policy.
+
+
+Inline size (UTF-8, handler ID `routes/index.tsx@0`, no captured scope): the
+production dispatch/fallback expression is **96 bytes**, and the full decoded
+hx-on attribute value is **134 bytes** (**183 bytes** for the HTML attribute,
+including its leading space, name, quotes and escaping). Development is
+**169/207 bytes** (**264 bytes** for the HTML attribute), including
+the dropped-event warning. A generated confirm adds a **54-byte** legacy hx-on
+value (**73 bytes** as an HTML attribute including its leading space and escaped
+quotes). Handler IDs and serialized scope add their actual lengths. Non-confirm
+attributes do not receive the compatibility alias.
+
+
+Representative production attribute value:
+
+```js
+(self.$rc||((...a)=>a[3].type=="htmx:confirm"&&(a[3].preventDefault(),(self.$rq??=[]).push(a))))("routes/index.tsx@0",null,this,event)
+```
+
+Final validation at `e21444c`:
+
+- `pnpm --filter recooler test`: **1,443 passed**, 48 files. Includes all four
+  htmx/root streaming combinations, native dialogs and deferred load orders,
+  Cloudflare v1/v2 build/dev/HMR and both `/_admin` service-binding versions.
+- Package typecheck (including JSX consumer types) and package build passed.
+- `CONFORMANCE_TARGETS=farm-0.0.27,ts pnpm --filter recooler-conformance test`:
+  **1,054 passed, 7 skipped**, three files.
+- Playground build, two application/leak tests and typecheck passed.
+- Unchanged round 3 Chromium attacks completed on both htmx versions; inspected
+  streamed confirms, body lifecycle/token counts, history, retry bounds and drops.
+  The asserting package matrix also passed. Unchanged round 4 attacks completed
+  on both versions with **zero reported failures**.
+- Every round 2 attack variant reran for both versions, with init preceding its
+  dependent history script: **18/20 completed**. Both original `skew.mjs` runs
+  stop at their obsolete `meta[name="recooler-route"]` selector; the existing
+  round 3 template-marker-compatible copies passed for both versions. The package
+  Chromium version-mismatch/reload assertions passed as well.
+
+Attack logs: `/private/tmp/rc-round4-final-attacks/` and
+`/private/tmp/rc-round4-final-r2/`. Package/conformance logs:
+`/private/tmp/rc-package-final.log`, `/private/tmp/rc-conformance-final.log`.

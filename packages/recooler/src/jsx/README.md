@@ -141,11 +141,13 @@ export default function Root(Content: Component<RouteProps>) {
 }
 ```
 
-For roots with client code, Content starts with a parser-blocking external confirm
-gate and async/deferred copies of identical client and route module URLs. The
-module map evaluates each URL once; async registration works during streaming and
-the deferred copy guarantees registration before DOMContentLoaded. Custom roots
-also get dependency modulepreloads. Keep Content intact.
+For full pages with client code, Content starts async/deferred copies of identical
+client and route module URLs. The module map evaluates each URL once; async
+registration works during streaming and the deferred copy guarantees registration
+before DOMContentLoaded. Custom roots also get dependency modulepreloads. For
+non-boosted htmx fragments, module scripts follow Content and preloads are omitted
+so htmx 1 preserves table-row parsing. There is no blocking gate request. Keep
+Content intact.
 
 A trailing template[data-recooler-marker] carries route/version metadata only on
 client-bearing routes. It survives tables and htmx 1's DOMParser history restore.
@@ -157,7 +159,8 @@ For one release an extension may still provide `page.clientScript: string`.
 It is passed to legacy custom roots as the second argument, and is available as
 `props.clientScript`; `props.scripts` contains only URL strings. The default root
 accepts the legacy string but emits only external URLs from `props.scripts`.
-Migrate custom roots to `props.scripts`; adapter-generated client code is never inlined. A custom root that inlines the legacy source must
+Migrate custom roots to `props.scripts`; client entry scripts stay external. Generated
+hx-on dispatch attributes remain inline and use htmx's existing eval permission. A custom root that inlines the legacy source must
 be updated by its owner. The old `?script` endpoint is gone; URLs belong to the
 extension. Suspense's engine-generated inline scripts are separate from client
 entry scripts. The resolved template and cleanup script are configurable through
@@ -167,8 +170,10 @@ Handlers become usable as soon as their slice registers. Route onLoad waits unti
 DOMContentLoaded (or runs immediately if parsing has finished) and sees the full
 DOM. Its promise is not awaited; errors reach reportError. Root/layout handlers
 already registered remain usable during body swaps. Only confirm can safely defer
-its request while modules load. The external gate also handles htmx 1's synchronous
-load-confirm listener timing. Native guards may be bypassed before registration;
+its request while modules load. Generated hx-on attributes have a small inline
+fallback that holds unavailable confirms and drops other events without canceling
+defaults. A legacy hx-on alias for generated confirms handles htmx 1's synchronous
+load-listener ordering; htmx 2 ignores the alias. Native guards may be bypassed before registration;
 see the migration guide. Enable htmx.legacyClientScript explicitly for roots that
 inline the second argument.
 

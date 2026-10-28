@@ -230,14 +230,26 @@ Each imports its own reachable slices and shares dependencies with other entries
 Names hash route.file and are guessable; public chunks are not a confidentiality
 boundary. The general entry is `assets/recooler-client.js?v=<version>`.
 
-Content starts with a parser-blocking external `assets/recooler-gate.js`, then
-async and deferred copies of the same client/route module URLs. The module map
-evaluates each once. Async modules register during Suspense streaming, including
-consumer renderers calling `.forEach(htmx.process)`; deferred copies still guarantee
-registration before DOMContentLoaded. Keep modulepreloads and the Content slot.
-The external gate needs no inline script. It captures confirms, waits one microtask
-for htmx 1's synchronous-load hx-on listener installation, then uses the public
-issueRequest continuation. Confirms received before the entry loads are held.
+Full-page Content starts async and deferred copies of the same client/route
+module URLs. The module map evaluates each once. Async modules register during
+Suspense streaming, including consumer renderers calling `.forEach(htmx.process)`;
+deferred copies still guarantee registration before DOMContentLoaded. Non-boosted
+htmx fragments put module scripts after the content and omit preload links, keeping
+htmx 1's table-row parsing intact. No parser-blocking gate is emitted or fetched.
+
+Generated hx-on code calls `(self.$rc||fallback)(id,scope,this,event)`. Before the
+entry arrives, the fallback prevents only htmx:confirm and stores its arguments in
+`self.$rq`. The entry drains held events through its deferred path, even if their
+handlers registered first, and calls the original `issueRequest()` without a skip
+argument when allowed. htmx's own hx-confirm prompts therefore still accept or
+cancel the request. Loaded handlers run immediately with the original event.
+
+htmx 1.9.12 installs wildcard hx-on listeners after issuing synchronous load
+requests. This also affects 0.0.27 and cold boosts from handler-free pages. Generated
+confirm attributes receive a small legacy `hx-on` alias which evaluates their
+canonical attribute early; htmx 1 replaces this listener during normal processing
+and htmx 2 ignores it. Raw string hx-on load guards still have the upstream htmx 1
+ordering limitation. The fallback and alias use htmx's existing hx-on eval permission.
 
 Handlers run immediately when their slice registers, independent of marker
 completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
@@ -251,10 +263,8 @@ and version. It survives table parsing and htmx 1 history; handler-free pages em
 no marker. Body attributes are never a fallback. New markers run their own route
 onLoad once; unchanged markers do not rerun, and history restoration does rerun.
 
-Only confirm is canceled/deferred while handlers load. Both kebab and camel spellings
-of config-request/before-request run late without cancellation or request restart;
-changes may miss the request. All other missing handlers drop events and leave
-defaults untouched. Dev warns for dropped events. Native preventDefault guards can
+Only confirm is canceled/deferred while handlers load. All other missing handlers,
+including config-request/before-request, drop events and leave defaults untouched. Dev warns for dropped events. Native preventDefault guards can
 be bypassed during a post-swap loading window; use htmx:confirm to gate requests.
 No native click/submit replay exists. Detached targets are skipped.
 
