@@ -1,4 +1,4 @@
-// Round 4 Chromium regressions. Usage: node client-confirm.mjs <1|2> [scenario...]
+// Round 4/5 Chromium regressions. Usage: node client-confirm.mjs <1|2> [scenario...]
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
@@ -82,6 +82,8 @@ async function page(s, pathname, { wait = true, init } = {}) {
   await p.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { globalThis.dclAt = performance.now(); }); });
   if (init) await p.addInitScript(init);
   p.nav = p.goto(s.origin + pathname);
+  // Observe unfinished navigation when an assertion closes a streamed page.
+  p.nav.catch(() => {});
   if (wait) await p.nav;
   return p;
 }
@@ -114,7 +116,7 @@ const handlersOnly = p => !/client/.test(p);
 const mods = s => s.requests.filter(r => r.includes('/m/'));
 const slow = `const Slow = async ({ ms, children }) => { await new Promise(r => setTimeout(r, ms)); return children; };`;
 const tail = `<Suspense rid={props.rid} fallback={<p>w2</p>}><Slow ms={1500}><p id="late">late</p></Slow></Suspense>`;
-// Runs a scenario in three windows: ready, streamed (fallback or dispatch path), boost from a loaded page, cold boost.
+// Runs ready and loading windows: ready, streamed (fallback or dispatch path), boost from a loaded page, cold boost.
 async function windows(s, ids, act, { cold = '/plain', warm = '/start' } = {}) {
   const out = {};
   for (const [variant, match, from] of [['ready', null, null], ['stream-all-held', all, null], ['stream-handlers-held', handlersOnly, null], ['warm-boost-held', handlersOnly, warm], ['cold-boost-held', all, cold]]) {
@@ -134,7 +136,7 @@ async function windows(s, ids, act, { cold = '/plain', warm = '/start' } = {}) {
     await act(p); await sleep(100);
     const whileHeld = mods(s);
     b?.release(); if (!from) await p.nav;
-    await p.waitForFunction(() => (globalThis.c_loads ?? 0) >= 1, null, { timeout: 4000 }).catch(() => {}); await sleep(700);
+    await p.waitForFunction(() => globalThis.c_loads === 1, null, { timeout: 4000 }); await sleep(700);
     out[variant] = { before, whileHeld, after: mods(s), dialogs: p.dialogs, state: await p.evaluate(() => Object.fromEntries(Object.entries(globalThis).filter(([k]) => k.startsWith('c_')))), errors: p.errors };
     await p.close();
   }
@@ -193,7 +195,12 @@ export default props => <>
     });
     const s = await serve(built);
     results.competing = await windows(s, ['g1', 'sw', 'raw'], async p => { await p.click('#capture'); await p.click('#raw-after'); await p.click('#g1'); await p.click('#sw'); await p.click('#raw'); });
-    for (const [k, v] of Object.entries(results.competing)) check(`competing ${k}: other listeners' cancels respected`, v.after.length === 0, v);
+    for (const [k, v] of Object.entries(results.competing)) {
+      assert.deepEqual(v.errors, []);
+      assert.equal(v.state.c_docDenied, 1);
+      assert.equal(v.state.c_swAsked, 1);
+      check(`competing ${k}: other listeners' cancels respected`, v.after.length === 0, v);
+    }
     await s.close();
   }
 

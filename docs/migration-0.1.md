@@ -368,6 +368,14 @@ fallback when `$rc` is not available. Only `htmx:confirm` is canceled and held i
 resume through the original `detail.issueRequest()` with no skip argument. This
 preserves htmx's native `hx-confirm` prompt. A handler's cancellation or explicit
 continuation suppresses automatic continuation. Detached targets are skipped.
+
+Held confirms preserve cancellations from other listeners: an already-prevented
+confirm is not held, and later calls to its `preventDefault()` suppress automatic
+continuation. The hold wraps that method on the event. Calls through a previously
+bound original or `Event.prototype.preventDefault.call(event)`, and setting
+`returnValue = false` after the hold, bypass the wrapper and cannot be distinguished
+from recooler's own prevention. Use the event's `preventDefault()` method.
+
 Unavailable `htmx:configRequest` and `htmx:beforeRequest` handlers are dropped;
 there is no safe public continuation for those events.
 
@@ -382,10 +390,13 @@ Already-string hx-on attributes keep their behavior and unsafe-eval CSP needs.
 htmx 1.9.12 installs wildcard hx-on listeners after synchronous load requests, so
 a raw string load-confirm guard can be bypassed, including a cold boost from a
 handler-free page (also true in 0.0.27). Generated confirm listeners now include a
-legacy `hx-on` alias that runs before htmx 1 issues load requests, then is replaced
-by the normal listener; htmx 2 ignores this alias. This protects generated guards
+legacy `hx-on` alias, emitted by the `recooler/jsx` runtime, that runs before
+htmx 1 issues load requests, then is replaced by the normal listener; htmx 2 ignores this alias. This protects generated guards
 even with slow assets and the streamed `.forEach(htmx.process)` pattern, without
-intercepting unrelated confirms. Both forms use hx-on's existing eval permission.
+intercepting unrelated confirms. Consumers retaining
+`jsxImportSource: easy-jsx-html-engine` do not receive the alias; the plugin warns,
+and generated htmx 1 load guards remain unprotected until normal listener
+installation, as in 0.0.27. Both forms use hx-on's existing eval permission.
 
 **Native preventDefault guards can be bypassed during the post-swap loading window.**
 This includes non-boosted links/forms, href="#" anchors and key/paste/drop guards.
@@ -403,6 +414,12 @@ other handlers. Dispatch-time properties such as currentTarget are unavailable t
 late handlers. Modules reachable only through server dynamic imports remain outside
 the static route graph.
 
+If the client runtime itself fails to load, its fallback-held confirms remain
+blocked for the tab: no handler or recovery code can drain them. Slice retry and
+reload recovery require a loaded runtime and do not cover this failure. The browser
+reports the failed module fetch; there is no additional recooler error reporter or
+retry for entry load failure. Restore asset delivery and refresh the page to recover.
+
 Client source maps are off by default and minification defaults on. Set
 `environments.client.build.sourcemap: true` to publish maps; these expose only
 the redacted client slices, with removed server source and comments blanked
@@ -411,7 +428,8 @@ without changing positions. This also applies to inline maps. Set minify in
 source contents. The content-derived version is reproducible, embedded in the
 entry and checked against every page marker before dispatch. A mismatch reloads
 at most once per HTML/client version pair in sessionStorage, then reports a console
-error and refuses dispatch. Unavailable sessionStorage disables automatic reloads.
+error, refuses handler dispatch and cancels confirms so guarded requests fail
+closed. Non-confirm defaults remain untouched. Unavailable sessionStorage disables automatic reloads.
 
 Rename `client_banned_imports` to
 `recooler({ htmx: { clientBannedImports: [...] } })`. String patterns remain regular

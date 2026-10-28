@@ -173,7 +173,10 @@ already registered remain usable during body swaps. Only confirm can safely defe
 its request while modules load. Generated hx-on attributes have a small inline
 fallback that holds unavailable confirms and drops other events without canceling
 defaults. A legacy hx-on alias for generated confirms handles htmx 1's synchronous
-load-listener ordering; htmx 2 ignores the alias. Native guards may be bypassed before registration;
+load-listener ordering; htmx 2 ignores the alias. This alias requires the
+`recooler/jsx` runtime. Consumers retaining `jsxImportSource: easy-jsx-html-engine`
+lack it and their htmx 1 generated load guards remain unprotected until normal
+listener installation (the plugin warns). Native guards may be bypassed before registration;
 see the migration guide. Enable htmx.legacyClientScript explicitly for roots that
 inline the second argument.
 

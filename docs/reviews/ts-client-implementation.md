@@ -265,7 +265,7 @@ htmx itself can ignore native defaultPrevented; Recooler adds no second request.
 | hx-on::load warning noise | No continuation warning machinery exists. Dropped htmx:load deliberately emits no dev warning. Browser production fixtures assert no warnings. All supplied loop variants report zero warnings. |
 | minify:false comment disclosure | All source comments are removed from client slices before bundling, including dropped-function JSDoc and /*! comments. JS, external maps and decoded inline maps are leak-scanned with minify:false. UTF-16 mappings of retained handlers remain tested. |
 | Relative Vite base falls back to / | Relative/empty bases now fail configuration. Regression covers './', '' and 'relative/'. Absolute CDN bases remain supported. Rooted /_admin/ still passes the real two-Worker proxy fixture. |
-| Persistent version mismatch reload loop | sessionStorage flag is keyed by HTML/client version pair. At most one reload per pair; further mismatch reports an error and refuses dispatch. If storage is unavailable, automatic reload is disabled. Chromium serves persistently stale HTML and asserts exactly two document requests total. |
+| Persistent version mismatch reload loop | sessionStorage flag is keyed by HTML/client version pair. At most one reload per pair; further mismatch reports an error, refuses handler dispatch and prevents confirms so guarded requests fail closed. Non-confirm defaults are untouched. If storage is unavailable, automatic reload is disabled. Chromium serves persistently stale HTML and asserts exactly two document requests total. |
 
 Round 1 and Phase 4b protections remain: redacted external/inline maps; user entries;
 onLoad before deferred confirm; dev fs boundary; builtin bans; exact server source
@@ -459,10 +459,13 @@ Implementation checkpoint: `6d936f8`; regression/compact-fallback checkpoint:
 5. **htmx 1 cold load ordering:** documented the upstream issue (also in 0.0.27).
    Removing the gate alone cannot protect streamed load guards before the async
    entry arrives: htmx 1 has not installed their wildcard listeners yet. Generated
-   confirms therefore also emit a legacy hx-on alias evaluating the canonical
+   confirms rendered by the `recooler/jsx` runtime therefore also emit a legacy hx-on alias evaluating the canonical
    attribute. htmx 1 installs it before load requests, then replaces it during
    normal processing; htmx 2 ignores it. This additionally protects generated cold
-   boost guards. Raw string wildcard guards retain htmx 1's upstream limitation.
+   boost guards. Consumers retaining `jsxImportSource: easy-jsx-html-engine` lack
+   the alias (the plugin warns), so their generated load guards remain unprotected
+   until normal htmx 1 listener installation, as in 0.0.27. Raw string wildcard
+   guards retain htmx 1's upstream limitation.
 
 Every round 4 scenario is an asserting package Chromium regression in
 `test/vite/client-confirm.mjs`: native dialogs, ajax promise ordering, six pending
@@ -473,7 +476,7 @@ processing with slow assets. Unavailable config/before-request assertions now
 expect drops, as required by the new event policy.
 
 
-Inline size (UTF-8, handler ID `routes/index.tsx@0`, no captured scope): the
+At the round 4 checkpoint, inline size (UTF-8, handler ID `routes/index.tsx@0`, no captured scope): the
 production dispatch/fallback expression is **96 bytes**, and the full decoded
 hx-on attribute value is **134 bytes** (**183 bytes** for the HTML attribute,
 including its leading space, name, quotes and escaping). Development is
@@ -484,7 +487,7 @@ quotes). Handler IDs and serialized scope add their actual lengths. Non-confirm
 attributes do not receive the compatibility alias.
 
 
-Representative production attribute value:
+Round 4 production attribute value (superseded by round 5 cancellation tracking):
 
 ```js
 (self.$rc||((...a)=>a[3].type=="htmx:confirm"&&(a[3].preventDefault(),(self.$rq??=[]).push(a))))("routes/index.tsx@0",null,this,event)
@@ -512,3 +515,64 @@ Final validation at `e21444c`:
 Attack logs: `/private/tmp/rc-round4-final-attacks/` and
 `/private/tmp/rc-round4-final-r2/`. Package/conformance logs:
 `/private/tmp/rc-package-final.log`, `/private/tmp/rc-conformance-final.log`.
+
+
+## Round 5: confirm cancellation and fallback coverage
+
+- Persistent version mismatch cancels confirms before returning, including after
+  the single guarded reload. The regression asserts two document requests, zero
+  guarded POSTs/handler calls, and an unchanged checkbox default.
+- Runtime and inline fallback share one per-event hold. Already-canceled confirms
+  are skipped; a wrapped event `preventDefault()` records subsequent external
+  cancellations. Drain checks this state after loading and before continuation.
+  Chromium covers document guards, the documented SweetAlert continuation pattern,
+  inner and outer raw string guards, and capture guards in ready, streamed fallback,
+  streamed runtime, warm-boost and cold-boost windows on htmx 1 and 2.
+- Native-default regressions wait for actual htmx onHandlers on streamed/swapped
+  controls with modules held. Checkbox toggles and native link/form requests prove
+  the unavailable-handler path does not cancel defaults. Stale loading variant
+  names have been replaced. The cancel-everything mutation must fail on both versions.
+- The legacy alias requires `recooler/jsx`; retaining the upstream JSX runtime
+  retains htmx 1's generated load-guard exposure. Documentation now states this.
+- Total runtime load failure remains a documented limitation: fallback-held confirms
+  stay blocked, with no recooler retry/reload/reporter available. Restore assets and
+  refresh. Slice recovery still requires a loaded runtime. Cancellation through a
+  cached/prototype original preventDefault or returnValue after a hold bypasses
+  tracking; this limitation is documented precisely.
+  The production dispatch/fallback expression is now 313 UTF-8 bytes (351 bytes
+  for the decoded attribute with `routes/index.tsx@0` and no scope); development
+  is 386/424 bytes. The round 4 size/example above are historical.
+- Plan §3.4 and D4 now describe static per-route modules, dual startup emission,
+  trailing template markers, confirm-only holding, recovery, source-map redaction
+  and proxy base support, with superseded queue/replay text removed.
+
+Round 5 verification:
+
+- Package suite: **48 files, 1,443 passed**, including Cloudflare v1/v2
+  build/dev/HMR and both `/_admin` service-binding versions. Package typecheck
+  (including JSX consumer), package build and conformance typecheck passed.
+- Both conformance targets (`farm-0.0.27,ts`): **1,054 passed, 7 skipped**.
+- Playground typecheck/build and both application/leak tests passed.
+- Unmodified round 4 `attack.mjs` and corrected round 5 `attack5b.mjs`:
+  **zero reported failures** on htmx 1 and 2. Persistent skew now records two
+  document requests and zero guarded POSTs. Competing cancellations remain closed
+  in every loading window; normal allowing continuations still issue requests.
+- Unmodified `attack5.mjs` ran on both versions. Its skew regression is fixed.
+  Four pre-existing harness failures remain per version: `entry-500`/`route-500`
+  expect no requests although the alternate graph path loads the runtime and
+  allowing handlers execute; `multi`'s two initial-load windows click before htmx
+  has processed the controls (deferred modules hold DOMContentLoaded), so no
+  confirms/handlers run. These are also present in its saved pre-fix output;
+  corrected `attack5b.mjs` exercises processed streamed controls and passes.
+- The reviewer's `mutate.sh` ran against fresh compiled code with the production
+  fallback's confirm-only condition replaced by `true`. **Both versions reject
+  the mutation at the checkbox assertion (`false !== true`)** in
+  `native-fallback`, after asserting actual htmx listener installation. Pending
+  navigation rejections are observed so teardown cannot obscure that assertion.
+
+Logs: `/private/tmp/rc-fix-package.log`, `/private/tmp/rc-fix-typecheck.log`,
+`/private/tmp/rc-fix-build.log`, `/private/tmp/rc-fix-conformance.log`,
+`/private/tmp/rc-fix-conformance-types.log`,
+`/private/tmp/rc-fix-playground-{types,build,check}.log`,
+`/private/tmp/rc-fix-attacks/`,
+`/private/tmp/rc-review5/mut-cancel-everything-{1,2}.out`.

@@ -244,12 +244,21 @@ handlers registered first, and calls the original `issueRequest()` without a ski
 argument when allowed. htmx's own hx-confirm prompts therefore still accept or
 cancel the request. Loaded handlers run immediately with the original event.
 
+Held confirms preserve cancellations from other listeners: an already-prevented
+confirm is not held, and later calls to its `preventDefault()` suppress automatic
+continuation. The hold wraps that method on the event. Calls through a previously
+bound original or `Event.prototype.preventDefault.call(event)`, and setting
+`returnValue = false` after the hold, bypass the wrapper and cannot be distinguished
+from recooler's own prevention. Use the event's `preventDefault()` method.
+
 htmx 1.9.12 installs wildcard hx-on listeners after issuing synchronous load
 requests. This also affects 0.0.27 and cold boosts from handler-free pages. Generated
-confirm attributes receive a small legacy `hx-on` alias which evaluates their
-canonical attribute early; htmx 1 replaces this listener during normal processing
+confirm attributes rendered with `recooler/jsx` receive a legacy `hx-on` alias
+which evaluates their canonical attribute early; htmx 1 replaces this listener during normal processing
 and htmx 2 ignores it. Raw string hx-on load guards still have the upstream htmx 1
-ordering limitation. The fallback and alias use htmx's existing hx-on eval permission.
+ordering limitation. Consumers retaining `jsxImportSource: easy-jsx-html-engine`
+also lack this alias (the plugin warns); their generated load guards remain
+unprotected on htmx 1 until normal listener installation. The fallback and alias use htmx's existing hx-on eval permission.
 
 Handlers run immediately when their slice registers, independent of marker
 completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
@@ -270,9 +279,17 @@ No native click/submit replay exists. Detached targets are skipped.
 
 __recooler_ready tracks registration and onLoad invocation, not async onLoad
 completion. Failed imports retry with a fresh URL, then attempt one guarded reload
-per client version. Version mismatch reloads once per HTML/client version pair.
+per client version. Version mismatch reloads once per HTML/client version pair,
+then refuses dispatch and cancels confirms; non-confirm defaults remain untouched.
 Custom createApp entries pass clientModules/clientPreloads alongside clients and
 clientEntry. legacyClientScript still supplies import(entry).then(m=>m.init()).
+
+If the client runtime itself fails to load, its fallback-held confirms remain
+blocked for the tab: no handler or recovery code can drain them. Slice retry and
+reload recovery require a loaded runtime and do not cover this failure. The browser
+reports the failed module fetch; there is no additional recooler error reporter or
+retry for entry load failure. Restore asset delivery and refresh the page to recover.
+
 Load classic htmx before the module scripts. See the migration guide for details.
 
 Bans, exact server input slicing, dev fs authorization, redacted maps, and opaque
