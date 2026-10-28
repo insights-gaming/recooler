@@ -69,3 +69,15 @@ describe("0.0.27 transform.rs fixtures (D3/D5 and ctx-rendering adaptations)", (
     });
   }
 });
+
+it('preserves the reference negative banned-import and non-route onLoad cases', () => {
+  for (const [name, patterns] of [
+    ['reports_banned_imports_with_reference_chain', ['^faunadb$']],
+    ['reports_banned_dynamic_imports_and_requires', ['server-only']],
+  ] as const) {
+    const source = fixtures.find(f => f.name === name)!.inputs[0]!;
+    expect(transform(source, { id: relativePath, relativePath, mode: 'client-slice', moduleKind: 'route', clientBannedImports: patterns }).diagnostics).toEqual([]);
+  }
+  const source = fixtures.find(f => f.name === 'slices_on_load_without_event_handlers')!.inputs[0]!;
+  expect(transform(source, { id: relativePath, relativePath, mode: 'client-slice', moduleKind: 'component' }).code.trim()).toBe('');
+});

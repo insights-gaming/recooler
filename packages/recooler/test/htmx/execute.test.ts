@@ -88,3 +88,42 @@ it('does not capture a context supplied only to the outer element', async () => 
     { id: 'test.tsx@1', scope: {}, ctx: ac },
   ]);
 });
+
+it('preserves shorthand capture keys in assignment defaults and ctx overrides', async () => {
+  const { module, runtime } = await execute(`
+    export default function Page({ count, ctx }) {
+      return <i hx-post={() => {
+        ({ count = 9 } = {});
+        return { ctx, 'hx-post': () => count };
+      }} />;
+    }
+  `);
+  expect(runtime.calls).toEqual([]);
+  module.default({ count: 1, ctx: 'serializable-test-context' });
+  const value = module['_action$post$0']({ scope: { count: 1, ctx: 'serializable-test-context' } });
+  expect(value.ctx).toBe('serializable-test-context');
+  expect(runtime.calls[1]).toEqual({ id: 'test.tsx@1', scope: { count: 9 }, ctx: 'serializable-test-context' });
+});
+
+it('preserves defaults, rest props and the ambient context option', async () => {
+  for (const signature of [
+    `({ count = 2, ctx } = { count: 4, ctx: 'default' })`,
+    `(...[{ count = 2, ctx }])`,
+  ]) {
+    const { module, runtime } = await execute(`export default ${signature} => <i hx-get={() => count} />;`);
+    module.default({ count: 3, ctx: 'provided' });
+    expect(runtime.calls[0]).toEqual({ id: 'test.tsx@0', scope: { count: 3 }, ctx: 'provided' });
+    expect(module['_action$get$0']({ scope: { count: 3 } })).toBe(3);
+  }
+  const { module, runtime } = await execute(`export default function Page({ count }) { return <i hx-get={() => count} />; }`, { componentContext: false });
+  module.default({ count: 3 });
+  expect(runtime.calls[0]).toEqual({ id: 'test.tsx@0', scope: { count: 3 }, ctx: undefined });
+});
+
+it('escapes handler IDs in template literals, including quotes and backslashes', async () => {
+  const relativePath = 'routes/a"b`c${d}\\e.tsx';
+  const { module, result } = await execute(`export default function Page({ count }) { return <i hx-on:click={() => count} />; }`, { relativePath });
+  const element = module.default({ count: 5 });
+  const run = new Function('$handlers', 'event', `return ${element.props['hx-on:click']}`);
+  expect(run({ [result.handlers[0]!.id]: module['_handler$0'] }, {})).toBe(5);
+});

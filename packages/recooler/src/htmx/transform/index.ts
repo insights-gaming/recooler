@@ -10,6 +10,7 @@ import type { Action, Candidate, Diagnostic, FunctionNode, TransformOptions, Tra
 export type { Action, Handler, Diagnostic, TransformOptions, TransformResult, TransformMode,
   ActionUrlEmission, RegistrationEmission } from "./types.js";
 export { emitActionUrl, emitRegistration } from "./codegen.js";
+export { bannedClientModules, isBannedModule, moduleIdForms } from "./banned-imports.js";
 
 /** Pure TSX → TSX transform. Diagnostics with severity `error` are build errors;
  * callers MUST reject them. On errors code/map are the unchanged source/map.
@@ -50,7 +51,8 @@ export function transform(code: string, options: TransformOptions): TransformRes
   };
   // These are public generated export names. Silently renaming them would break
   // plugin metadata and client registration, so diagnose user collisions.
-  for (const candidate of candidates) if (names.has(candidate.exportName)) diagnostics.push({
+  for (const candidate of candidates) if (analysis.variables.some(v => ["module", "global"].includes(v.scope.type) && v.name === candidate.exportName)
+    || analysis.references.some(r => !r.resolved && r.identifier.name === candidate.exportName)) diagnostics.push({
     severity: "error", code: "reserved-export", start: candidate.start, end: candidate.end,
     message: `${options.relativePath}: ${candidate.exportName} is reserved for generated htmx exports`,
   });
@@ -134,7 +136,9 @@ export function transform(code: string, options: TransformOptions): TransformRes
     if (!alias) continue;
     const node = ref.identifier as unknown as Node;
     const parent = analysis.parents.get(node);
-    const shorthand = parent?.type === "Property" && parent.shorthand && parent.value === node;
+    const grandparent = parent && analysis.parents.get(parent);
+    const shorthand = (parent?.type === "Property" && parent.shorthand && parent.value === node)
+      || (parent?.type === "AssignmentPattern" && parent.left === node && grandparent?.type === "Property" && grandparent.shorthand);
     ms.overwrite(span.start, span.end, shorthand ? `${ref.identifier.name}: ${alias}` : alias, { storeName: true });
   }
   const valueAtSite = (variable: Variable, c: Candidate) => {
@@ -175,7 +179,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
     }
   };
   for (const c of candidates) if (c.kind === "action" && siteAlive(c)) c.context = contextFor(c);
-  for (const [fn, props] of components) rewriteProps(ms, code, fn, props);
+  for (const [fn, props] of components) rewriteProps(ms, fn, props);
   for (const c of moved) if (c.addContext) addFirstParam(ms, code, c.fn, c.addContext);
 
   // Inner first: a moved range must never be overwritten by an outer edit.
@@ -189,7 +193,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
       else {
         const ref = `$handlers[${JSON.stringify(c.id)}]`;
         replacement = c.variables.length
-          ? `\`${ref}(\${${helper("handlerScope")}(${scopeAtSite(c)})}).call(this, event)\``
+          ? `\`${escapeTemplate(ref)}(\${${helper("handlerScope")}(${scopeAtSite(c)})}).call(this, event)\``
           : JSON.stringify(`${ref}.call(this, event)`);
       }
       ms.appendLeft(c.start, replacement);
@@ -225,6 +229,10 @@ function metadata(c: Candidate) {
   return { id: c.id, exportName: c.exportName, captures: c.captures, start: c.start, end: c.end };
 }
 
+function escapeTemplate(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+}
+
 function firstParam(fn: FunctionNode): Node | undefined {
   return fn.params.find(p => !(p.type === "Identifier" && p.name === "this"));
 }
@@ -232,24 +240,29 @@ function firstParam(fn: FunctionNode): Node | undefined {
 function addFirstParam(ms: MagicString, code: string, fn: FunctionNode, name: string): void {
   const thisParam = fn.params.find(p => p.type === "Identifier" && p.name === "this");
   if (thisParam) { ms.appendLeft(thisParam.end, `, ${name}`); return; }
-  const open = code.indexOf("(", fn.start);
-  ms.appendLeft(open + 1, name);
+  let pos = fn.typeParameters?.end ?? fn.id?.end ?? fn.start;
+  while (pos < fn.body!.start) {
+    if (code.startsWith("/*", pos)) { pos = code.indexOf("*/", pos + 2) + 2; continue; }
+    if (code.startsWith("//", pos)) { pos = code.indexOf("\n", pos + 2); continue; }
+    if (code[pos] === "(") { ms.appendLeft(pos + 1, name); return; }
+    pos++;
+  }
+  throw new Error("could not locate the parsed function's empty parameter list");
 }
 
-function rewriteProps(ms: MagicString, code: string, fn: FunctionNode, name: string): void {
+function rewriteProps(ms: MagicString, fn: FunctionNode, name: string): void {
   let param = firstParam(fn)!;
   if (param.type === "RestElement") param = param.argument;
   const pattern = param.type === "AssignmentPattern" ? param.left : param;
   const typeStart = "typeAnnotation" in pattern && pattern.typeAnnotation ? pattern.typeAnnotation.start : pattern.end;
-  const original = code.slice(pattern.start, typeStart);
-  const annotation = code.slice(typeStart, pattern.end);
-  ms.overwrite(pattern.start, pattern.end, name + annotation);
-  const init = `let ${original} = ${name}; `;
-  if (fn.body!.type === "BlockStatement") ms.prependRight(fn.body!.start + 1, init);
-  else {
-    ms.prependRight(fn.body!.start, `{ ${init}return (`);
-    ms.appendLeft(fn.body!.end, "); }");
-  }
+  const block = fn.body!.type === "BlockStatement";
+  // Leave the annotation/default in the parameter list and move the actual
+  // binding pattern. This preserves mappings and can contain nested hoists.
+  ms.move(pattern.start, typeStart, fn.body!.start + (block ? 1 : 0));
+  ms.prependRight(pattern.start, block ? "let " : "{ let ");
+  ms.appendLeft(typeStart, ` = ${name}; ${block ? "" : "return ("}`);
+  ms.appendLeft(pattern.start, name);
+  if (!block) ms.appendLeft(fn.body!.end, "); }");
 }
 
 function rewriteImport(ms: MagicString, code: string, item: Extract<Node, { type: "ImportDeclaration" }>, kept: typeof item.specifiers): void {

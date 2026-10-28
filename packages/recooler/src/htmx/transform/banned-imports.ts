@@ -4,9 +4,9 @@ import { patternsMatch } from "./slice.js";
  * patterns also see the package path after the last node_modules segment. */
 export function moduleIdForms(id: string): string[] {
   const path = id.split("?")[0]!;
-  const matches = [...path.matchAll(/(?:^|[/\\])node_modules[/\\]/g)];
+  const matches = [...path.matchAll(/(?:^|[/\\])node_modules(?=[/\\])/g)];
   const last = matches.at(-1);
-  return last ? [path, path.slice(last.index! + last[0].length)] : [path];
+  return last ? [path, path.slice(last.index! + last[0].length + 1)] : [path];
 }
 
 export function isBannedModule(patterns: readonly (RegExp | string)[], id: string): boolean {

@@ -1,4 +1,5 @@
 import type { SourceMap } from "magic-string";
+import type { ArrowFunctionExpression, Function as OxcFunction } from "oxc-parser";
 import type { Node, Span, Variable } from "./analysis.js";
 
 export type TransformMode = "full" | "server" | "client-slice";
@@ -58,7 +59,7 @@ export interface TransformResult {
   diagnostics: Diagnostic[];
 }
 
-export type FunctionNode = Extract<Node, { type: "ArrowFunctionExpression" | "FunctionExpression" | "FunctionDeclaration" }>;
+export type FunctionNode = ArrowFunctionExpression | (OxcFunction & { type: "FunctionExpression" | "FunctionDeclaration" });
 export interface Candidate extends HoistedFunction {
   kind: "action" | "handler";
   method?: ActionMethod;

@@ -71,3 +71,16 @@ it('isolates both open codegen decisions and aliases runtime helpers', () => {
   expect(result.code).toContain('CUSTOM_CONTEXT');
   expect(result.code).toContain('CUSTOM_REGISTRY');
 });
+
+it('allows locally shadowed generated export names and maps props without crossing nested hoists', () => {
+  for (const source of [
+    `function C({ x = <i hx-post={() => 1} /> }: Props) { const _handler$0 = 1; return <i hx-on:click={() => _handler$0} />; }`,
+    `const C = ({ x = { 'hx-post': () => 1 } }) => <i hx-post={() => x} />;`,
+    `<i hx-post={function /* ignore ( this comment */ () { return <i hx-post={() => 1} />; }} />`,
+    `<i hx-post={async <T extends Record<string, '('>>() => <i hx-post={() => 1} />} />`,
+  ]) {
+    const result = transform(source, options);
+    expect(result.diagnostics).toEqual([]);
+    expect(parseSync('test.tsx', result.code).errors, result.code).toEqual([]);
+  }
+});

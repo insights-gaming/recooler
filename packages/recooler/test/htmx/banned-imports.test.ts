@@ -10,6 +10,7 @@ const fixtures: Fixtures = JSON.parse(readFileSync(new URL('./fixtures/banned-im
 describe('0.0.27 banned_imports.rs fixtures', () => {
   it('matches_module_ids_without_query_and_by_package_path', () => {
     for (const [id, expected] of fixtures.forms) expect(moduleIdForms(id)).toEqual(expected);
+    expect(moduleIdForms('node_modules/node_modules/db/index.js')[1]).toBe('db/index.js');
     const patterns = [/^faunadb\//, /lib\/db\.ts$/];
     for (const id of [fixtures.forms[3]![0], 'node_modules/faunadb/index.js', 'src/lib/db.ts?recooler-handlers']) {
       expect(isBannedModule(patterns, id)).toBe(true);

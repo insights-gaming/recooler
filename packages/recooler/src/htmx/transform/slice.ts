@@ -177,7 +177,8 @@ export function warnOnLoad(analysis: Analysis, options: TransformOptions, diagno
     const d = item.declaration;
     const exported = (d?.type === "FunctionDeclaration" && !d.declare && d.id?.name === "onLoad")
       || (d?.type === "VariableDeclaration" && !d.declare && d.declarations.some(p => p.id.type === "Identifier" && p.id.name === "onLoad"))
-      || item.specifiers.some(s => attrName(s.exported) === "onLoad" && !(s.type === "ExportSpecifier" && s.exportKind === "type"));
+      || item.specifiers.some(s => attrName(s.exported) === "onLoad" && !(s.type === "ExportSpecifier" && s.exportKind === "type")
+        && (item.source || analysis.refs(s).some(r => r.resolved && isRuntimeVariable(r.resolved))));
     if (exported) diagnostics.push({ severity: "warning", code: "ignored-onload", start: item.start, end: item.end,
       message: `${options.relativePath}: onLoad exported by a ${options.moduleKind} never runs; export it from a route module instead` });
   }
