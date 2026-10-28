@@ -157,9 +157,11 @@ extension. Suspense's engine-generated inline scripts are separate from client
 entry scripts. The resolved template and cleanup script are configurable through
 the options below; the engine loader script is fixed.
 
-Phase 5 concern: external module scripts run only after the entire Suspense
-stream finishes, whereas the 0.0.27 inline onLoad script could run immediately.
-Client entry loading and onLoad timing must account for this during Phase 5.
+External module scripts run after the entire Suspense stream has parsed.
+The Phase 5 entry also waits for DOMContentLoaded for legacy inline imports,
+then loads route slices, replays queued events and calls onLoad. This changes
+0.0.27's earlier inline timing. Use `htmx.legacyClientScript: true` explicitly
+for roots that still inline the second argument; see the migration guide.
 
 ## Rendering options
 

@@ -158,8 +158,11 @@ collision-free local runtime helper name. All generated runtime imports come fro
 from the `htmx()` router extension. Client slices register their own handlers and
 do not import that server runtime.
 
-The bundler worker still owns SSR/client environment integration, action module
-reachability, dev invalidation, chunk loading and scheduling `onLoad`. Dynamic
+The Vite adapter owns SSR/client environment integration, module reachability,
+dev invalidation, chunk loading and scheduling `onLoad`. Its `queueHandlers: true`
+transform option emits self-installing dispatch stubs for early events; standalone
+transform callers keep the direct `$handlers` invocation by default. `hasOnLoad`
+metadata identifies runtime route exports even in onLoad-only modules. Dynamic
 imports are checked in client closures but are not an action-registration graph.
 
 ## Source maps and verification

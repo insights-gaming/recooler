@@ -1,6 +1,6 @@
 # Recooler conformance
 
-The checked-in source trees and JSON expectations test the published **farm-plugin-recooler 0.0.27** through **Farm 1.7.11**. They are independent of the Rust checkout. The `ts` target builds the same source trees with Vite 8 and `recooler()` for routing, JSX and server htmx actions. [SCENARIOS.md](SCENARIOS.md) indexes every runnable scenario and its provenance.
+The checked-in source trees and JSON expectations test the published **farm-plugin-recooler 0.0.27** through **Farm 1.7.11**. They are independent of the Rust checkout. The `ts` target builds the same source trees with Vite 8 and `recooler()` for routing, JSX, htmx actions and client delivery. [SCENARIOS.md](SCENARIOS.md) indexes every runnable scenario and its provenance.
 
 ```sh
 pnpm install
@@ -22,10 +22,12 @@ The adapter uses `recooler()` and `ssr.noExternal: true`, emits a single self-co
 
 The TS target wires the server htmx transform and D5 action table through
 `recooler()`, supplies its signing key at request time (including mounted apps),
-and enables the `htmx`-tagged checks. Three checks needing browser chunks/script
-delivery carry `requires: ["client"]` and remain explicit Phase 5 skips. This
-includes handler-chunk contents, handler-free client-entry exclusion, and root
-script delivery. Source attributes alone never skip a scenario.
+and enables both `htmx` and `client` feature checks. It builds server and client
+with `createBuilder().buildApp()` and exposes every emitted browser chunk,
+including lazy/shared chunks, as `BuiltApp.clientChunks`. All three client-tagged
+checks run on TS: handler-chunk contents, handler-free client-entry exclusion,
+and custom-root external module script delivery.
+
 Each directory contains `src/` and `scenario.json`. The source tree follows the normal `root.tsx`, `routes/**/index.tsx`, `layout.tsx`, and `middleware[@name].ts` conventions. Imported support files live in `src/lib` or `src/components`. Recovered fixture sources preserve their original import spelling; the runner uses NodeNext and `.js` imports.
 
 ```json

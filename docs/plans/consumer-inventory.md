@@ -180,7 +180,7 @@ aliases and packages outside `srcDir`.
   commands (the original plan lines 21, 354, 448 and 450) need the prefix
   `docs/plans/fixtures/`. The Appendix paths already have that prefix; they do
   not need correction.
-- The legacy-root contract remains open for the htmx phase: (1) explicit opt-in
+- The legacy-root contract gap (resolved in Phase 5 below) was: (1) explicit opt-in
   detection, because both legacy and new roots take two arguments `(Content, x)`;
   argument count cannot distinguish a script string from a URL array; (2) the
   exact compatibility string, for example inline `import("<entry>")`; and (3) the
@@ -262,3 +262,14 @@ for all 30,616 logical cases, with zero expected-difference allowances. All
 baseline-vs-instrumented status checks pass, and native missing-handler logs are
 absent. Private snapshots, logs, bindings and security profiles remain outside
 this public repository.
+
+## Phase 5 resolution of the legacy-root gap
+
+`recooler({ htmx: { legacyClientScript: true } })` is the explicit opt-in. It
+passes the string `import("<stable entry URL>?v=<buildId>")` only on routes
+reaching handlers/onLoad. New roots render `props.scripts`; no arity detection
+is used. Custom roots retain the Content-slot route meta. The client waits for
+DOMContentLoaded, registers lazy slices, replays early events with this/event/
+scope, then runs the owning route's onLoad. String event attributes remain
+unchanged. Route-changing hx-boost/swaps require a full page navigation in 0.1.0.
+See [the migration guide](../migration-0.1.md#browser-handlers-and-custom-roots-phase-5).

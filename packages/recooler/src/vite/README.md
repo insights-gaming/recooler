@@ -26,8 +26,7 @@ is installed as described below. For custom adapters or extensions,
 use your own `createApp` entry and the generated manifest. The plugin array
 keeps route generation separate from app wiring, so extension plugins can evolve
 without replacing the platform's app builder.
-The plugin wires server htmx transforms and action dispatch; client entry delivery
-remains Phase 5.
+The plugin wires server transforms/action dispatch and per-route lazy client delivery.
 
 For a virtual-only SSR build, use `build: { ssr: true, rolldownOptions: {
 input: 'virtual:recooler/app' } }`. Vite treats a string `build.ssr` as a real
@@ -88,7 +87,7 @@ declare module 'recooler/jsx' {
 pragmas are added. It automatically installs the htmx extension when any loaded
 source module contains `hx-`. Set `htmx: {}` to enable it explicitly or
 `htmx: false` to disable the transform and automatic extension. Handler strings
-are emitted, but client chunks, `onLoad` delivery and `page.scripts` are Phase 5.
+are emitted with a pre-load queue; client chunks, route `onLoad` and `page.scripts` are wired automatically.
 
 ```ts
 recooler({
@@ -112,10 +111,10 @@ The plugin intentionally accepts a binding name rather than a literal secret.
 Custom entries configure `htmx({ secret })` themselves and can import the graph:
 
 ```ts
-import { table, namespace } from 'virtual:recooler/htmx';
+import { table, clients, clientEntry, namespace } from 'virtual:recooler/htmx';
 import { htmx } from 'recooler/htmx';
 // createApp(manifest, { pages: jsxPages(), extensions: [htmx({
-//   table, namespace, secret: env => env.RECOOLER_SECRET,
+//   table, clients, clientEntry, namespace, secret: env => env.RECOOLER_SECRET,
 // })] });
 ```
 
@@ -158,10 +157,56 @@ The declarations/list are needed before Vite chooses externals or prebundles;
 source transforms cannot discover a package they never receive. Custom Rolldown
 `external` functions that override Vite's resolver remain the application's
 responsibility. `htmx.clientBannedImports` forwards raw-specifier checks to the
-transform; the client bundle graph check remains Phase 5.
+transform and rejects banned resolved paths in every client chunk (lazy/shared included).
 
 Verification fixtures: `test/vite/htmx-integration.mjs` (plain, Cloudflare v1,
 v2 beta), `htmx-options.mjs` (production guard and located diagnostics), and
 `htmx-bench.mjs` (interleaved full-plugin/no-htmx build and edit-response gates).
 Run them with `pnpm --filter recooler exec node test/vite/<script>.mjs`; add
 `--cloudflare` to the benchmark for the 400/1,000-route workerd dev gate.
+
+
+## Client scripts (Phase 5)
+
+`environments.client` is a client consumer whose input is
+`virtual:recooler/client`. Run `vite build`, or programmatically use
+`createBuilder(config).buildApp()`. The selected server environment discovers the
+same route → slice table that the client consumes; a build assertion rejects a
+mismatch or client-first orchestration. A post plugin hook builds server then
+client for plain Vite; it does not replace any platform's `builder.buildApp`.
+Only Recooler's own plugins opt into shared build state.
+
+The stable entry is `assets/recooler-client.js?v=<buildId>` under Vite's base.
+Server output needs no client manifest. Client outDir defaults to `dist/client`;
+platform overrides remain authoritative. Read the resolved environment outDirs,
+particularly with Cloudflare v2's `.cloudflare/output` convention. Cloudflare
+retains its Worker → client builder, manifests, asset movement and asset binding.
+
+Each `?recooler-handlers` variant transforms/slices the original source in one
+MagicString, returns its real map with original sourcesContent, and registers its
+own functions. The entry reads the rendered route pattern, imports only that
+route's reachable slices, and runs only that page's onLoad after registration and
+queue replay. Handler-free pages emit no entry URL; onLoad-only pages do.
+
+`htmx.clientBannedImports` patterns see raw specifiers in the scope check and
+resolved module paths in the bundle check. `htmx.legacyClientScript: true` opts
+legacy custom roots into an inline `import("<entry URL>")` string; the default is
+undefined. New roots render `props.scripts` module URLs.
+
+Full-page navigation initializes clients in 0.1.0. Disable hx-boost for links that
+change routes. Same-route swaps can use the existing route's handlers; swapping
+a new route marker does not load a new route. Early function-handler events queue
+with their element, event and capture scope, including events before the module
+entry starts. Queued event return values/preventDefault cannot act synchronously.
+The entry waits for document parsing, so onLoad follows a completed Suspense
+stream; load failures reject `globalThis.__recooler_ready`. See the
+[migration guide](../../../../docs/migration-0.1.md) for timing, CSP and legacy
+root details. Per-route chunks are public performance units, not a secrecy boundary.
+
+Dev changes invalidate the client entry and send a full reload over the real HMR
+channel, alongside the full server reload. `test/vite/client-integration.mjs`
+checks one CLI build, assets, emitted ESM with Happy DOM, queue replay, onLoad,
+shared/admin chunk separation, built/dev source maps and websocket reloads on
+plain Vite, Cloudflare v1 and v2. Run it with
+`node --experimental-vm-modules test/vite/client-integration.mjs [plain|cloudflare|beta]`.
+`client-options.mjs` covers both banned-import checks and the legacy opt-in.

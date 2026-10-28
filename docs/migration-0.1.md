@@ -104,9 +104,8 @@ also protect method-only routes, catch-alls and unmatched requests under its
 prefix. After-next middleware must still see `ctx.error` and `ctx.finalized` and
 may throw `HTTPException` with a response returned by `app.onError`.
 
-See the action URL and CSRF migration below for manual action requests. Client
-entry loading remains Phase 5 work; the JSX root compatibility contract is
-documented below.
+See the action URL and CSRF migration below for manual action requests, and
+the browser-handler section for client loading and the legacy-root opt-in.
 
 ## JSX pages
 
@@ -169,8 +168,9 @@ content because the HTTP status and headers are already sent. Default catches no
 longer expose errors or stack traces in HTML. Set `showStack` on a boundary or
 Suspense only when that output is desired.
 
-External module scripts execute after the entire Suspense stream finishes. Phase
-5 must account for this onLoad timing difference from the old inline script.
+External module scripts execute after the entire Suspense stream finishes. The
+client entry waits for document parsing before onLoad, including legacy dynamic
+imports. See the browser-handler section for early-event queue semantics.
 
 
 ## htmx action URLs and security (D3/D6/D7)
@@ -234,6 +234,96 @@ already includes the prefix. URLs preserve exact encoded segments and stay local
 even when a root catch-all matches a path starting with `//`.
 
 The lower-level `actionScope` helper now requires the ambient rendering binding;
-`configureActions` is replaced by per-extension secrets. `page.scripts` is empty
-until Phase 5 supplies the client entry. Client handler slices already register
-their own handlers; loading those slices and invoking onLoad remain Phase 5 work.
+`configureActions` is replaced by per-extension secrets. The Phase 5 client
+extension now supplies `page.scripts`, loads route slices and invokes onLoad as
+described below; each slice registers its own handlers.
+
+## Browser handlers and custom roots (Phase 5)
+
+Use `...recooler()` from `recooler/vite`. One **`vite build`** now builds the
+server followed by the browser environment. Programmatic integrations must use
+`createBuilder(config).buildApp()`; Vite's legacy `build(config)` builds a single
+environment. Recooler uses its own post `buildApp` hook for plain Vite and leaves
+`builder.buildApp` intact. Cloudflare's Worker → client order and asset movement
+remain owned by Cloudflare. Recooler shares only its own plugin state between
+environments. Read the environments' resolved `build.outDir` values: v1 and v2
+use different directories, with v2 under `.cloudflare/output/v0`.
+
+The stable browser entry is `assets/recooler-client.js?v=<buildId>`, relative to
+Vite's configured `base` (use a rooted base for nested routes). The server does
+not read a client manifest. Serve client output at that base; ensure deployment
+caches distinguish the version query. Keep old hashed lazy chunks available for
+cached HTML during rolling deployments. The entry's route map and all chunks
+are public; lazy loading is a performance choice, not a confidentiality boundary.
+
+The htmx extension contributes `props.scripts: string[]` only for page routes
+reaching function handlers or a route `onLoad`. New roots render these URLs:
+
+```tsx
+export default Content => props => <html>
+  <head>{renderHeadElements(props.head)}</head>
+  <body>
+    <Content {...props} />
+    {props.scripts.map(src => <script type="module" src={src} />)}
+  </body>
+</html>;
+```
+
+`DefaultRootHOC` already does this. The adapter supplies the matched route pattern
+through `body[data-recooler-route]` or a `meta[name="recooler-route"]` in the
+Content slot for custom roots. Preserve that slot. The marker is a pattern such
+as `/users/:id`, without a mount prefix, not the concrete request pathname.
+
+Legacy roots that inline their second `clientScript?: string` argument must
+explicitly enable `recooler({ htmx: { legacyClientScript: true } })`. That string
+is exactly `import("<entry URL>")`, with HTML-sensitive characters escaped; it is
+undefined on handler-free routes. No function-arity detection is attempted. For a
+custom `createApp` entry, pass `clients` and `clientEntry` from
+`virtual:recooler/htmx` to `htmx({ table, clients, clientEntry, namespace, ... })`,
+and set `legacyClientScript: true` there if required. Keep the argument a string;
+never pass a URL array into an inline script. A root should use either its legacy
+inline string or `props.scripts`. Default roots always render the external URLs.
+The shim needs your existing inline-script CSP policy. Migrate off it in 0.1.x.
+
+Load the classic htmx script before the module entry (for example, a non-async
+script in the head). Keep application head scripts in their required order;
+Recooler does not reorder them. Module scripts execute after the full HTML stream
+has parsed, including Suspense's streamed content. The entry also waits for
+`DOMContentLoaded` when imported by the legacy shim. It then loads all reachable
+slices, lets each register its own handlers, replays queued events, and calls only
+the owning route's `onLoad`. Layout/root `onLoad` still warns and does not run.
+`globalThis.__recooler_ready` is the promise for this sequence, useful for tests
+or initialization that must wait for handlers. Loading failures reject it.
+
+Function-valued event attributes now install a tiny queue on first invocation,
+even before the entry itself executes. It retains the original element (`this`),
+event object and captured values, and replays in order after the route's slices
+load. Replay is asynchronous: `preventDefault()`, immediate return values and
+transient event properties such as `currentTarget` cannot be relied on for queued
+events. Disable early interactions when those semantics matter. Already-string
+`hx-on:` attributes are left unchanged. htmx's evaluation of event attributes still
+requires the appropriate `unsafe-eval` CSP allowance, independently of the external
+module-script policy.
+
+Client route initialization is **full-page navigation only** in 0.1.0. Same-route
+htmx actions/swaps may use handlers already in that route's static closure, but
+route-changing `hx-boost`/swaps do not select new slices or rerun `onLoad`. Use
+`hx-boost="false"` on navigation links (including under inherited boosting) and a
+normal browser navigation, or issue an htmx `HX-Redirect` response. Merely changing
+a route marker after a swap does not initialize the new route. Modules reachable
+only through server dynamic imports are outside the static route graph.
+
+Rename `client_banned_imports` to
+`recooler({ htmx: { clientBannedImports: [...] } })`. String patterns remain regular
+expressions. The first check matches **raw specifiers** in each retained
+handler/`onLoad` reference chain, including literal dynamic imports and global
+`require`. The second check matches **resolved paths** from every emitted client
+chunk's `moduleIds`, including lazy/shared chunks and transitive side-effect
+imports; it also checks package-relative paths after the last `node_modules`
+segment. Both checks fail the build. Include resolved-path patterns for aliases
+that hide a server-only raw specifier. These are explicit application bans;
+Recooler does not classify arbitrary dependencies as server-only automatically.
+
+Dev edits invalidate the virtual entry and server graph and send a full reload
+over Vite's HMR socket. There is no preservation of browser component state.
+`playground-vite/` demonstrates this stack alongside the frozen Farm playground.

@@ -540,6 +540,14 @@ Slicing, the client environment, per-route chunks, `onLoad`, and dev invalidatio
 
 Exit criteria: event handlers work in the template, a test asserts that no server-only code reaches the client bundle, and dev HMR works.
 
+Implemented on `ssttevee/ts-client`: `playground-vite/` runs beside the Farm
+playground; all client conformance checks are enabled. The legacy-root opt-in is
+`htmx.legacyClientScript: true` (inline import of the stable entry). Early function
+events queue their this/event/scope, even before entry execution. The client waits
+for document parsing, registers slices, replays events, then runs the owning page's
+onLoad. Route-changing htmx navigation requires a full page load in 0.1.0.
+See [verification](../reviews/ts-client-implementation.md) and the migration guide.
+
 ### Phase 6: migration and cutover
 
 - **A migration guide**, covering:
