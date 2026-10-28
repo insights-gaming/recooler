@@ -5,7 +5,8 @@
   "type": "module",
   "license": "MIT",
   "repository": {
-    "url": "https://github.com/insights-gaming/recooler"
+    "type": "git",
+    "url": "git+https://github.com/insights-gaming/recooler.git"
   },
   "exports": {
     "./router": {
@@ -54,14 +55,14 @@
     }
   },
   "bin": {
-    "recooler-routes": "./dist/gen/cli.js"
+    "recooler-routes": "dist/gen/cli.js"
   },
   "files": [
     "dist",
     "src"
   ],
   "publishConfig": {
-    "access": "public"
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

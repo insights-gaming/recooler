@@ -4,8 +4,8 @@ on:
     branches:
       - main
 
-# the id-token permission that npm's OIDC publish needs is granted to the release job only, so that
-# the called CI jobs (dependency installs, lifecycle scripts) don't get it
+# the packages permission that publishing to GitHub Packages needs is granted to the release job
+# only, so that the called CI jobs (dependency installs, lifecycle scripts) don't get it
 permissions:
   contents: read
 
@@ -22,7 +22,7 @@ jobs:
     needs: [call-ci]
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Required for OIDC
+      packages: write
       contents: read
     steps:
       - name: Checkout Repo
@@ -39,6 +39,8 @@ jobs:
         with:
           node-version: 24.x
           cache: "pnpm"
+          registry-url: https://npm.pkg.github.com
+          scope: "@insights-gaming"
 
       - name: Install Dependencies
         uses: nick-fields/retry@v3
@@ -49,5 +51,7 @@ jobs:
           command: pnpm i --frozen-lockfile
 
       # prepack builds dist
-      - name: Publish to npm
+      - name: Publish to GitHub Packages
         run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,7 +2,7 @@
 
 ## Package
 
-0.1 is published as `@insights-gaming/recooler` and runs on Vite 8 instead of Farm.
+0.1 is published to GitHub Packages as `@insights-gaming/recooler` (see the README for the `.npmrc` setup) and runs on Vite 8 instead of Farm.
 Replace `farm-plugin-recooler` and `@farmfe/*` with `@insights-gaming/recooler` and
 `vite`, and import `DefaultRootHOC`, `ErrorBoundary` and the other page helpers from
 `@insights-gaming/recooler/jsx` instead of `farm-plugin-recooler/helpers`.

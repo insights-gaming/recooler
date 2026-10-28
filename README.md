@@ -8,6 +8,13 @@ Since 0.1, recooler is a set of TypeScript modules and a [Vite](https://vite.dev
 
 ## Quick Start
 
+The package is published to GitHub Packages. Point the `@insights-gaming` scope at it in your `.npmrc`, with a GitHub token that has the `read:packages` scope:
+
+```ini
+@insights-gaming:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
 ```sh
 pnpm add @insights-gaming/recooler hono easy-jsx-html-engine htmx.org
 pnpm add -D vite
