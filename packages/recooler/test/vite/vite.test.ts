@@ -116,3 +116,20 @@ for (const [script, marker] of [['client-htmx.mjs', 'realHtmx'], ['client-securi
     expect(result.stdout).toContain(`"${marker}":true`);
   }, 65000);
 }
+for (const runtime of ['node', 'workerd']) {
+  test(`htmx canonical layouts, table parity, source maps and full edit matrix on ${runtime}`, async () => {
+    const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-regressions.mjs', import.meta.url)), ...(runtime === 'workerd' ? ['--cloudflare'] : [])], {
+      timeout: 120000, maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, NODE_ENV: 'production', WRANGLER_SEND_METRICS: 'false' },
+    });
+    expect(result.stdout).toContain('"editMatrix":true');
+    expect(result.stdout).toContain('"tableParity":true');
+  }, 130000);
+}
+
+test('warmup and manifest-first entries retain actions; build identity survives relocation and isolates named apps', async () => {
+  const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-startup.mjs', import.meta.url))], {
+    timeout: 120000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+  });
+  expect(result.stdout).toContain('"samePathReplay":true');
+}, 130000);

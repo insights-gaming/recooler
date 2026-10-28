@@ -21,7 +21,12 @@ function isContext(value: unknown): boolean {
 }
 
 function filterAttributes(attrs: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(attrs).filter(([, value]) => !isContext(value)));
+  return Object.fromEntries(Object.entries(attrs).filter(([attribute, value]) => {
+    if (typeof value === 'function' && /^(?:data-)?hx-(?:(?:get|post|put|patch|delete)$|on)/i.test(attribute)) {
+      throw new TypeError(`recooler: function-valued ${attribute} cannot be rendered; module was not transformed`);
+    }
+    return !isContext(value);
+  }));
 }
 
 /** Classic JSX fallback used by transforms for a key following a spread. */

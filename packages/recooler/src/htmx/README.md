@@ -24,7 +24,7 @@ export default createApp<{ Bindings: { ACTION_SECRET: string } }>(manifest, {
 
 `ActionTable` is `Readonly<Record<string, readonly string[]>>`. Keys are exact
 manifest `route.file` identities. Values are the action-bearing module IDs from
-`registerActions(moduleId, methods, namespace?)`, including the route's root, layouts and
+`registerActions(moduleId, methods, namespace?, moduleHash?)`, including the route's root, layouts and
 surviving static dependencies. IDs must match the transform's supplied
 `relativePath`; there is no implicit prefix normalization. Missing keys mean no
 actions. Only routes with their own function `default` export register actions;
@@ -41,16 +41,16 @@ reachability; signing prevents a foreign URL from authorizing an unused action.
 The table is trusted server configuration, never request input.
 
 The table is static. Only reachable action methods are registered at app creation.
-In development, D5 uses a full SSR reload with `invalidateAll`, re-evaluating the
-virtual table module and `createApp` after edits. Getter tables are unsupported.
+In development, D5 invalidates the virtual table and uses a full SSR runner
+reload, re-evaluating registrations and `createApp` while retaining unchanged transforms. Getter tables are unsupported.
 The persistent `Symbol.for` registry survives runtime-module reloads; each module
 replaces its registration atomically, and `registerActions(id, {}, namespace)`
 removes its actions. Do not clear cached modules' registrations in dispose hooks.
 
-`registerActions(moduleId, methods, namespace?)` and `htmx({ namespace, ... })`
-must use the same namespace. Phase 4b's Vite plugin **must emit a stable per-project
-namespace** into both registrations and extension configuration to isolate apps
-with identical relative module IDs. Omitting it retains the default namespace for
+`registerActions(moduleId, methods, namespace?, moduleHash?)` and `htmx({ namespace, ... })`
+must use the same namespace. Vite emits a stable per-project/environment namespace
+in builds and adds a per-server nonce in dev, isolating apps, environments and
+concurrent dev servers with identical relative module IDs. Omitting it retains the default namespace for
 the transform's current emission; apps sharing that default also share registrations.
 
 ## Dispatch and security
@@ -75,11 +75,18 @@ An untrusted request with `cross-site` or an empty `Sec-Fetch-Site` is rejected
 even if its Origin equals the request URL's origin.
 
 A synchronous HMAC-SHA256 caches the keyed inner/outer pad compression states
-per resolved secret and signs a versioned JSON tuple of route file, exact
-pathname, uppercase method, action ID and exact serialized scope. Every URL,
+per resolved secret and signs the JSON tuple
+`['recooler.action.v2', namespace, base, moduleHash, routeId, pathname, method, actionId, scope]`. The method is uppercase and scope
+is the exact serialized JSON string. Vite's `moduleHash` is the SHA-256 of the JSON
+tuple `[actionTransformVersion, definingModuleSource]`. The exported transform
+version must be bumped whenever action numbering semantics change. Changing that
+module invalidates its old URLs, including IDs shifted by inserting an earlier action; unchanged modules
+retain their URLs across builds. Namespace and base bind the intended app and
+mount. Distinct apps and distinct deployments (such as staging and production)
+must not share a signing secret. Every URL,
 including an action without captures, is signed. Signatures are compared without
 data-dependent early exit for equal-length strings. There is no expiry or session
-binding in v1: anyone holding a valid URL can replay it on the same route/path
+binding: anyone holding a valid URL can replay it on the same route/path
 with valid CSRF headers. Authentication and authorization remain the route's job.
 Unknown, unsigned, tampered, foreign-route and wrong-path actions call `next()`;
 that route's terminal handlers/page are bypassed and later registrations run their
@@ -150,12 +157,17 @@ never registered before guards.
 `recooler/htmx/testing` exports only the test capability helper:
 
 ```ts
-signActionUrl({ routeId, pathname, method, actionId, scope }, secret): string
+signActionUrl({ namespace, base, moduleHash, routeId, pathname, method, actionId, scope }, secret): string
 ```
 
 Use the receiving manifest route file as `routeId`, and the exact pathname visible
 to that app (without an external mount base stripped by Hono). The helper returns
-a local URL; an adapter can prepend its external mount prefix. This is for
+a local URL including `base`. Supply the receiving registry namespace and current
+registration hash, plus the same normalized base configured on `htmx()`. These
+identities default to empty strings for manual registrations; Vite actions require
+the values emitted by Vite. Adapters can read the hash from
+`findRegisteredAction(modules, method, actionId, namespace)?.moduleHash` in
+`recooler/htmx/runtime`, using the receiving table’s module list and uppercase method. An adapter must not prepend the base twice. This is for
 conformance/consumer dispatch adapters. Do not expose capability minting as an
 application endpoint.
 

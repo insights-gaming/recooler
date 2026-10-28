@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { normalizePath, searchForWorkspaceRoot } from 'vite';
 import type { Plugin, ViteDevServer } from 'vite';
 import { crawlFrameworkPkgs } from 'vitefu';
@@ -25,14 +26,18 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error, result?
   let timer: ReturnType<typeof setTimeout> | undefined;
   let queue = Promise.resolve();
   let lastError: string | undefined;
+  const colonFiles = new Set<string>();
   const enqueue = (server?: ViteDevServer) => {
     const pending = queue.then(async () => {
       try {
         const result = await generateRoutes({ ...options, cwd });
+        colonFiles.clear();
+        for (const file of result.files) if (file.slice(path.parse(file).root.length).includes(':')) colonFiles.add(normalizePath(file));
         changed?.(undefined, result);
         lastError = undefined;
       } catch (cause) {
         const error = cause instanceof Error ? cause : new Error(String(cause));
+        colonFiles.clear();
         changed?.(error);
         if (!server) throw error;
         if (lastError !== error.message) {
@@ -49,6 +54,14 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error, result?
     name: 'recooler:routes',
     configResolved(config) { cwd ??= config.root; serve = config.command === 'serve'; },
     async buildStart() { if (!serve) await enqueue(); },
+    async load(id) {
+      // Vite's default filesystem loader rejects ':' even in explicitly allowed
+      // paths on workerd's transport. Read only exact manifest inputs, leaving
+      // strict fs and every other file/query under Vite's normal policy.
+      if (!colonFiles.has(id)) return;
+      this.addWatchFile(id);
+      return { code: await readFile(id, 'utf8'), map: null };
+    },
     // Cloudflare can eagerly import the Worker during configureServer. Generate
     // the manifest and graph roots before platform hooks can load virtual apps.
     configureServer: { order: 'pre', async handler(server) {
@@ -89,6 +102,8 @@ export interface RecoolerOptions {
   htmx?: false | {
     /** Request env binding, then process.env on Node. Never a build-time secret. */
     secretBinding?: string;
+    /** Stable app identity override; environment and dev nonce are still appended. */
+    namespace?: string;
     base?: string;
     trustedOrigins?: readonly string[];
     clientBannedImports?: readonly (RegExp | string)[];
@@ -136,6 +151,7 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
         },
       });
       noExternal = [...new Set([...noExternal, ...crawled.ssr.noExternal, ...(options.htmx && options.htmx.actionDependencies || [])])];
+      htmx.actionDependencies(noExternal, root);
     },
     configEnvironment(_name, config) {
       if ((config.consumer ?? (_name === 'client' ? 'client' : 'server')) !== 'server') return;
@@ -172,7 +188,7 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
       const settings = options.htmx || {};
       const binding = JSON.stringify(settings.secretBinding ?? 'RECOOLER_SECRET');
       const imports = options.htmx === false ? '' : `import { htmx } from 'recooler/htmx';\nimport { table, clients, clientEntry, clientPreloads, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
-      const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, clients, clientEntry, clientPreloads, legacyClientScript: ${JSON.stringify(settings.legacyClientScript === true)}, namespace, secret: env => env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined), base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
+      const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, clients, clientEntry, clientPreloads, legacyClientScript: ${JSON.stringify(settings.legacyClientScript === true)}, namespace, secret: env => { const value = env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined); if (typeof value !== 'string' || !value) throw new Error(${JSON.stringify('recooler: htmx actions require a nonempty ' + (settings.secretBinding ?? 'RECOOLER_SECRET') + ' binding; set it in .dev.vars for local Workers, a deployed Worker secret, or process.env on Node')}); return value; }, base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
       // Loading the table first pretransforms route closures in parallel. The
       // module runner otherwise lowers/evaluates manifest imports serially.
       // All registrations still evaluate before createApp consumes the table.

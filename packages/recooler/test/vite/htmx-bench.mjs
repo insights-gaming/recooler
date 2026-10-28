@@ -23,7 +23,7 @@ const modes = ['baseline', 'htmx'];
 // Gates are deliberately ratios, allowing noisy shared machines. The edit gate
 // also rejects the spike's multi-second serial-walk failure mode.
 const limits = { buildRatio: 6, linearity100to400: 5.5, editRatio: 6, editFloorMs: 100,
-  editOverheadMs: 500, editOverheadRatio: 0.5, nodeEditMaxMs: 2500 };
+  editOverheadMs: 500, editOverheadRatio: 0.5, nodeEditMaxMs: 1000, workerdEditMaxMs: 3500 };
 try {
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
@@ -53,22 +53,15 @@ try {
     const config = mode => ({
       root, configFile: false, logLevel: 'silent', mode: 'production',
       plugins: [...(cf ? [cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false })] : []), ...recooler({ htmx: mode === 'baseline' ? false : {}, ...(cf ? { serverEnvironment: 'bench_worker' } : {}) }),
-        // Both dev variants use the mandated full SSR reload. Comparing with
-        // incremental HMR would measure different invalidation policies rather
-        // than htmx overhead. Build baselines remain unmodified no-htmx builds.
-        ...(mode === 'baseline' ? [{ name: 'bench:full-reload-baseline', hotUpdate() {
-          if (this.environment.config.consumer !== 'server') return;
-          this.environment.moduleGraph.invalidateAll();
-          this.environment.hot.send({ type: 'full-reload', path: '*' });
-          return [];
-        } }] : []),
       ],
       resolve: { alias: { 'farm-plugin-recooler/helpers': 'recooler/jsx' } },
       build: { ssr: 'src/entry.ts', write: false, sourcemap: true, minify: false },
       server: { host: '127.0.0.1', port: 0 },
     });
+    const probe = mode => write('src/routes/probe/index.tsx', `import { marker } from '../../lib/edit'; export default () => <><p>{marker}</p>${mode === 'htmx' ? "<form hx-post={() => 'probe'}/>" : ''}</>;`);
     if (!cf) {
       const run = async (mode, warmup) => {
+        await probe(mode);
         const start = performance.now();
         const result = await build(config(mode));
         const ms = performance.now() - start;
@@ -92,6 +85,7 @@ try {
     }
     for (const mode of modes) {
       let server;
+      await probe(mode);
       await write('src/lib/edit.ts', `export const marker = 'before-edit';`);
       try {
         const devConfig = config(mode);
@@ -108,9 +102,9 @@ try {
         await server.listen();
         const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
         assert((await (await fetch(origin + '/probe')).text()).includes('before-edit'));
-        // Median of three real watcher edits and responses on the same warm server.
+        // Median of five real watcher edits and responses on the same warm server.
         const times = [];
-        for (let edit = 0; edit < 3; edit++) {
+        for (let edit = 0; edit < 5; edit++) {
           const marker = 'edit-' + edit;
           const start = performance.now();
           await write('src/lib/edit.ts', `export const marker = '${marker}';`);
@@ -130,11 +124,13 @@ try {
     const current = devSamples.filter(sample => sample.count === count && sample.grouped === grouped);
     const baseline = current.find(sample => sample.mode === 'baseline').ms;
     const full = current.find(sample => sample.mode === 'htmx').ms;
-    // workerd's mandatory full reload itself exceeds the Node cap at 1,000
-    // routes, even without htmx. Gate added overhead against that control.
-    assert((cf || full < limits.nodeEditMaxMs)
-      && full < baseline + Math.max(limits.editOverheadMs, baseline * limits.editOverheadRatio)
-      && full / Math.max(baseline, limits.editFloorMs) < limits.editRatio, JSON.stringify(current));
+    // Compare against stock HMR. workerd still reloads the whole module runner;
+    // report that cost honestly and cap it separately at 3.5 seconds. Node must
+    // stay under one second and within the incremental-HMR overhead budget.
+    assert(cf ? full < limits.workerdEditMaxMs
+      : full < limits.nodeEditMaxMs
+        && full < baseline + Math.max(limits.editOverheadMs, baseline * limits.editOverheadRatio)
+        && full / Math.max(baseline, limits.editFloorMs) < limits.editRatio, JSON.stringify(current));
   }
   for (const grouped of [false, true]) {
     const small = summaries.find(summary => summary.count === 100 && summary.grouped === grouped);

@@ -1,0 +1,1236 @@
+{
+  "baselineHead": "98acae9abbde97cf8ef9836dfa899a90154afd1e",
+  "implementationHead": "8b139cc",
+  "node": "v22.22.2",
+  "reviewerFixture": {
+    "routes": 1000,
+    "devBefore": {
+      "node": {
+        "coldMs": 3108,
+        "editsMs": [
+          2159,
+          1898,
+          1863,
+          1944,
+          1953
+        ],
+        "medianMs": 1944,
+        "post": "200:probe"
+      },
+      "workerd": {
+        "coldMs": 59,
+        "editsMs": [
+          4726,
+          4357,
+          4047,
+          4269,
+          3911
+        ],
+        "medianMs": 4269,
+        "post": "200:probe"
+      },
+      "stockNode": {
+        "coldMs": 2166,
+        "editsMs": [
+          305,
+          181,
+          204,
+          227,
+          240
+        ],
+        "medianMs": 227,
+        "post": "404:404 Not Found"
+      }
+    },
+    "devAfter": {
+      "node": {
+        "coldMs": 2635,
+        "editsMs": [
+          575,
+          443,
+          317,
+          314,
+          413
+        ],
+        "medianMs": 413,
+        "post": "200:probe"
+      },
+      "workerd": {
+        "coldMs": 57,
+        "editsMs": [
+          2460,
+          2158,
+          2101,
+          2221,
+          2156
+        ],
+        "medianMs": 2158,
+        "post": "200:probe"
+      }
+    },
+    "buildBefore": {
+      "runsMs": [
+        1469,
+        1248,
+        1183,
+        1191
+      ],
+      "warmMedianMs": 1191,
+      "totalHooksMs": {
+        "recooler:htmx.resolveId": 74,
+        "recooler:htmx-dev-registration.transform": 21,
+        "recooler:jsx-defaults.transform": 271,
+        "recooler:htmx.load": 18,
+        "recooler:app.load": 22,
+        "recooler:app.resolveId": 0,
+        "recooler:htmx.transform": 1852,
+        "recooler:htmx.renderChunk": 740
+      },
+      "meanRenderChunkMs": 185.0
+    },
+    "buildAfter": {
+      "runsMs": [
+        1187,
+        1050,
+        998,
+        987
+      ],
+      "warmMedianMs": 998,
+      "totalHooksMs": {
+        "recooler:htmx.resolveId": 81,
+        "recooler:htmx-dev-registration.transform": 19,
+        "recooler:htmx.load": 21,
+        "recooler:jsx-defaults.transform": 274,
+        "recooler:app.load": 24,
+        "recooler:app.resolveId": 0,
+        "recooler:htmx.transform": 1899,
+        "recooler:htmx.renderChunk": 64
+      },
+      "meanRenderChunkMs": 16.0
+    }
+  },
+  "pluginGateNode": {
+    "date": "2026-10-28T06:24:19.292Z",
+    "node": "v22.22.2",
+    "limits": {
+      "buildRatio": 6,
+      "linearity100to400": 5.5,
+      "editRatio": 6,
+      "editFloorMs": 100,
+      "editOverheadMs": 500,
+      "editOverheadRatio": 0.5,
+      "nodeEditMaxMs": 1000,
+      "workerdEditMaxMs": 5000
+    },
+    "samples": [
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": true,
+        "ms": 97.95462500000008,
+        "bytes": 231221,
+        "gzipBytes": 18815,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": true,
+        "ms": 199.7908339999999,
+        "bytes": 366165,
+        "gzipBytes": 36188,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 63.49679100000003,
+        "bytes": 231221,
+        "gzipBytes": 18815,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 137.2116669999998,
+        "bytes": 366165,
+        "gzipBytes": 36188,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 123.41550000000007,
+        "bytes": 366165,
+        "gzipBytes": 36188,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 59.68170800000007,
+        "bytes": 231221,
+        "gzipBytes": 18815,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 57.84162500000002,
+        "bytes": 231221,
+        "gzipBytes": 18815,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 121.61370799999986,
+        "bytes": 366165,
+        "gzipBytes": 36188,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": true,
+        "ms": 198.87787500000013,
+        "bytes": 822221,
+        "gzipBytes": 37236,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": true,
+        "ms": 423.82708400000047,
+        "bytes": 1318065,
+        "gzipBytes": 87874,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 192.5428750000001,
+        "bytes": 822221,
+        "gzipBytes": 37236,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 443.1143750000001,
+        "bytes": 1318065,
+        "gzipBytes": 87874,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 401.42691600000035,
+        "bytes": 1318065,
+        "gzipBytes": 87874,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 189.85570800000005,
+        "bytes": 822221,
+        "gzipBytes": 37236,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 192.05220800000006,
+        "bytes": 822221,
+        "gzipBytes": 37236,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 391.3478329999998,
+        "bytes": 1318065,
+        "gzipBytes": 87874,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": true,
+        "ms": 470.9584160000013,
+        "bytes": 2004221,
+        "gzipBytes": 71906,
+        "load": [
+          2.91943359375,
+          3.41650390625,
+          3.78955078125
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": true,
+        "ms": 1018.1792089999999,
+        "bytes": 3221868,
+        "gzipBytes": 190225,
+        "load": [
+          2.91943359375,
+          3.41650390625,
+          3.78955078125
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 456.16770799999904,
+        "bytes": 2004221,
+        "gzipBytes": 71906,
+        "load": [
+          2.91943359375,
+          3.41650390625,
+          3.78955078125
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 1005.8925829999989,
+        "bytes": 3221868,
+        "gzipBytes": 190225,
+        "load": [
+          2.91943359375,
+          3.41650390625,
+          3.78955078125
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 1067.7567080000008,
+        "bytes": 3221868,
+        "gzipBytes": 190225,
+        "load": [
+          3.005859375,
+          3.42578125,
+          3.79052734375
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 499.5737079999999,
+        "bytes": 2004221,
+        "gzipBytes": 71906,
+        "load": [
+          3.005859375,
+          3.42578125,
+          3.79052734375
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 465.16387499999837,
+        "bytes": 2004221,
+        "gzipBytes": 71906,
+        "load": [
+          3.005859375,
+          3.42578125,
+          3.79052734375
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 1001.2918750000008,
+        "bytes": 3221868,
+        "gzipBytes": 190225,
+        "load": [
+          3.005859375,
+          3.42578125,
+          3.79052734375
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": true,
+        "ms": 70.52595799999835,
+        "bytes": 242137,
+        "gzipBytes": 19533,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": true,
+        "ms": 155.48566700000083,
+        "bytes": 395281,
+        "gzipBytes": 37605,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 65.78012500000114,
+        "bytes": 242137,
+        "gzipBytes": 19533,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 117.06562499999927,
+        "bytes": 395281,
+        "gzipBytes": 37605,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 115.17491599999994,
+        "bytes": 395281,
+        "gzipBytes": 37605,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 66.7970000000023,
+        "bytes": 242137,
+        "gzipBytes": 19533,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 66.6183340000025,
+        "bytes": 242137,
+        "gzipBytes": 19533,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 117.64266700000007,
+        "bytes": 395281,
+        "gzipBytes": 37605,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": true,
+        "ms": 212.5334580000017,
+        "bytes": 855037,
+        "gzipBytes": 38258,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": true,
+        "ms": 393.36475000000064,
+        "bytes": 1423681,
+        "gzipBytes": 90892,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 203.03949999999895,
+        "bytes": 855037,
+        "gzipBytes": 38258,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 391.8815829999985,
+        "bytes": 1423681,
+        "gzipBytes": 90892,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 400.12216700000135,
+        "bytes": 1423681,
+        "gzipBytes": 90892,
+        "load": [
+          3.01025390625,
+          3.40478515625,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 203.82645800000319,
+        "bytes": 855037,
+        "gzipBytes": 38258,
+        "load": [
+          3.01025390625,
+          3.40478515625,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 204.36995799999931,
+        "bytes": 855037,
+        "gzipBytes": 38258,
+        "load": [
+          3.01025390625,
+          3.40478515625,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 391.481749999999,
+        "bytes": 1423681,
+        "gzipBytes": 90892,
+        "load": [
+          3.01025390625,
+          3.40478515625,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": true,
+        "ms": 506.84912500000064,
+        "bytes": 2080837,
+        "gzipBytes": 73637,
+        "load": [
+          2.92919921875,
+          3.38134765625,
+          3.76513671875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": true,
+        "ms": 954.6679999999978,
+        "bytes": 3480484,
+        "gzipBytes": 196467,
+        "load": [
+          2.92919921875,
+          3.38134765625,
+          3.76513671875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 483.3003329999992,
+        "bytes": 2080837,
+        "gzipBytes": 73637,
+        "load": [
+          2.92919921875,
+          3.38134765625,
+          3.76513671875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 954.3648749999993,
+        "bytes": 3480484,
+        "gzipBytes": 196467,
+        "load": [
+          2.92919921875,
+          3.38134765625,
+          3.76513671875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 1093.3108340000035,
+        "bytes": 3480484,
+        "gzipBytes": 196467,
+        "load": [
+          2.92919921875,
+          3.38134765625,
+          3.76513671875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 488.38200000000506,
+        "bytes": 2080837,
+        "gzipBytes": 73637,
+        "load": [
+          2.92919921875,
+          3.38134765625,
+          3.76513671875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "baseline",
+        "warmup": false,
+        "ms": 486.64279199999874,
+        "bytes": 2080837,
+        "gzipBytes": 73637,
+        "load": [
+          2.9345703125,
+          3.375,
+          3.76025390625
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "htmx",
+        "warmup": false,
+        "ms": 964.1524999999965,
+        "bytes": 3480484,
+        "gzipBytes": 196467,
+        "load": [
+          2.9345703125,
+          3.375,
+          3.76025390625
+        ]
+      }
+    ],
+    "summaries": [
+      {
+        "count": 100,
+        "grouped": false,
+        "variants": {
+          "baseline": {
+            "ms": 59.68170800000007,
+            "bytes": 231221,
+            "gzipBytes": 18815
+          },
+          "htmx": {
+            "ms": 123.41550000000007,
+            "bytes": 366165,
+            "gzipBytes": 36188
+          }
+        },
+        "ratio": 2.0678949067610453
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "variants": {
+          "baseline": {
+            "ms": 192.05220800000006,
+            "bytes": 822221,
+            "gzipBytes": 37236
+          },
+          "htmx": {
+            "ms": 401.42691600000035,
+            "bytes": 1318065,
+            "gzipBytes": 87874
+          }
+        },
+        "ratio": 2.0901968281458143
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "variants": {
+          "baseline": {
+            "ms": 465.16387499999837,
+            "bytes": 2004221,
+            "gzipBytes": 71906
+          },
+          "htmx": {
+            "ms": 1005.8925829999989,
+            "bytes": 3221868,
+            "gzipBytes": 190225
+          }
+        },
+        "ratio": 2.1624477674669005
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "variants": {
+          "baseline": {
+            "ms": 66.6183340000025,
+            "bytes": 242137,
+            "gzipBytes": 19533
+          },
+          "htmx": {
+            "ms": 117.06562499999927,
+            "bytes": 395281,
+            "gzipBytes": 37605
+          }
+        },
+        "ratio": 1.7572583697454047
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "variants": {
+          "baseline": {
+            "ms": 203.82645800000319,
+            "bytes": 855037,
+            "gzipBytes": 38258
+          },
+          "htmx": {
+            "ms": 391.8815829999985,
+            "bytes": 1423681,
+            "gzipBytes": 90892
+          }
+        },
+        "ratio": 1.9226237204200074
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "variants": {
+          "baseline": {
+            "ms": 486.64279199999874,
+            "bytes": 2080837,
+            "gzipBytes": 73637
+          },
+          "htmx": {
+            "ms": 964.1524999999965,
+            "bytes": 3480484,
+            "gzipBytes": 196467
+          }
+        },
+        "ratio": 1.9812324683522673
+      }
+    ],
+    "devSamples": [
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "baseline",
+        "runtime": "node",
+        "times": [
+          43.87529200000017,
+          88.32062499999984,
+          101.66091700000015,
+          99.8955420000002,
+          100.55379200000016
+        ],
+        "ms": 99.8955420000002,
+        "load": [
+          2.5341796875,
+          3.36279296875,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": false,
+        "mode": "htmx",
+        "runtime": "node",
+        "times": [
+          173.85316699999976,
+          84.26350000000002,
+          99.62162499999977,
+          101.69629099999975,
+          100.2356249999998
+        ],
+        "ms": 100.2356249999998,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "baseline",
+        "runtime": "node",
+        "times": [
+          121.80320800000027,
+          78.7338749999999,
+          103.66079200000058,
+          104.46424999999999,
+          107.8769169999996
+        ],
+        "ms": 104.46424999999999,
+        "load": [
+          2.6513671875,
+          3.373046875,
+          3.77685546875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "htmx",
+        "runtime": "node",
+        "times": [
+          224.31404199999997,
+          137.79466700000012,
+          135.0326669999995,
+          134.51920800000153,
+          137.51241599999958
+        ],
+        "ms": 137.51241599999958,
+        "load": [
+          2.91943359375,
+          3.41650390625,
+          3.78955078125
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "baseline",
+        "runtime": "node",
+        "times": [
+          206.72133399999802,
+          257.43991599999936,
+          152.96495800000048,
+          155.52483399999983,
+          153.39700000000084
+        ],
+        "ms": 155.52483399999983,
+        "load": [
+          2.92529296875,
+          3.40185546875,
+          3.77978515625
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "htmx",
+        "runtime": "node",
+        "times": [
+          529.9532499999987,
+          330.2280419999988,
+          426.5410000000011,
+          426.67554200000086,
+          436.60858299999745
+        ],
+        "ms": 426.67554200000086,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "baseline",
+        "runtime": "node",
+        "times": [
+          39.36779099999694,
+          96.26704100000279,
+          101.39779199999975,
+          110.60187500000029,
+          91.39800000000105
+        ],
+        "ms": 96.26704100000279,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 100,
+        "grouped": true,
+        "mode": "htmx",
+        "runtime": "node",
+        "times": [
+          138.8709170000002,
+          90.28399999999965,
+          101.29295799999818,
+          99.68733299999803,
+          99.95258299999841
+        ],
+        "ms": 99.95258299999841,
+        "load": [
+          3.01123046875,
+          3.41162109375,
+          3.78076171875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "baseline",
+        "runtime": "node",
+        "times": [
+          161.65087499999936,
+          80.49795799999993,
+          96.48012499999822,
+          98.74070800000118,
+          100.19250000000102
+        ],
+        "ms": 98.74070800000118,
+        "load": [
+          3.01025390625,
+          3.40478515625,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": true,
+        "mode": "htmx",
+        "runtime": "node",
+        "times": [
+          187.34908399999767,
+          145.82829200000197,
+          145.2694589999992,
+          142.35325000000012,
+          142.8969160000015
+        ],
+        "ms": 145.2694589999992,
+        "load": [
+          3.01025390625,
+          3.40478515625,
+          3.77587890625
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "baseline",
+        "runtime": "node",
+        "times": [
+          222.32545799999934,
+          276.92516700000124,
+          166.66787499999919,
+          165.24925000000076,
+          178.44654099999752
+        ],
+        "ms": 178.44654099999752,
+        "load": [
+          2.9345703125,
+          3.375,
+          3.76025390625
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": true,
+        "mode": "htmx",
+        "runtime": "node",
+        "times": [
+          440.8982079999987,
+          350.2638749999969,
+          445.935166999996,
+          350.03087499999674,
+          450.34687499999563
+        ],
+        "ms": 440.8982079999987,
+        "load": [
+          2.859375,
+          3.35205078125,
+          3.74951171875
+        ]
+      }
+    ],
+    "passed": true
+  },
+  "pluginGateWorkerd": {
+    "date": "2026-10-28T06:27:33.099Z",
+    "node": "v22.22.2",
+    "limits": {
+      "buildRatio": 6,
+      "linearity100to400": 5.5,
+      "editRatio": 6,
+      "editFloorMs": 100,
+      "editOverheadMs": 500,
+      "editOverheadRatio": 0.5,
+      "nodeEditMaxMs": 1000,
+      "workerdEditMaxMs": 3500
+    },
+    "samples": [],
+    "summaries": [],
+    "devSamples": [
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "baseline",
+        "runtime": "workerd",
+        "times": [
+          294.0862919999995,
+          325.48262499999964,
+          326.06945799999994,
+          298.1716669999996,
+          303.7757080000001
+        ],
+        "ms": 303.7757080000001,
+        "load": [
+          5.8701171875,
+          4.177734375,
+          3.998046875
+        ]
+      },
+      {
+        "count": 400,
+        "grouped": false,
+        "mode": "htmx",
+        "runtime": "workerd",
+        "times": [
+          1053.7615829999995,
+          1082.3453750000008,
+          1070.3740830000006,
+          944.278875,
+          1084.0954160000001
+        ],
+        "ms": 1070.3740830000006,
+        "load": [
+          5.65576171875,
+          4.1875,
+          4.00341796875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "baseline",
+        "runtime": "workerd",
+        "times": [
+          515.5115419999966,
+          556.937833,
+          545.5772920000018,
+          450.3120420000014,
+          543.726125000001
+        ],
+        "ms": 543.726125000001,
+        "load": [
+          5.52294921875,
+          4.18408203125,
+          4.0029296875
+        ]
+      },
+      {
+        "count": 1000,
+        "grouped": false,
+        "mode": "htmx",
+        "runtime": "workerd",
+        "times": [
+          2445.892499999998,
+          2483.098750000001,
+          2525.357707999996,
+          2471.868625000003,
+          2434.978207999993
+        ],
+        "ms": 2471.868625000003,
+        "load": [
+          4.5849609375,
+          4.05712890625,
+          3.96142578125
+        ]
+      }
+    ],
+    "passed": true
+  },
+  "notes": [
+    "All timing runs were serial. Reviewer fixture dev samples are medians of five edits.",
+    "Build runs contain one cold run followed by three warm runs. Hook totals include all four runs.",
+    "The Node gate report was captured before tightening the unused workerd-only cap from 5000 to 3500 ms. The final workerd report validates 3500 ms.",
+    "Stock HMR baseline has no synthetic full reload and the probe renders no untransformed function attributes."
+  ]
+}

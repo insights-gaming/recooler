@@ -356,7 +356,7 @@ Implementation:
 
 ### 3.2 Per-route action registration (D5, decided: registry plus module graph)
 
-Each route must accept exactly the actions reachable from its module, its layouts and the root, at module precision as in 0.0.27.
+Each route must accept exactly the actions reachable from its module, its layouts and the root, at module precision as in 0.0.27. Seed the graph from the generator’s resolved `layoutFiles` and `rootFile`, so canonical alias directories use the same chains as the router. Build and dev share reverse-edge action propagation.
 
 **★ Registry plus build-time graph.**
 - Every transformed htmx module registers its actions as a side effect: `registerActions("src/components/Button.tsx", { post: { "…@0": _action$post$0 } })`.
@@ -377,8 +377,8 @@ Each route must accept exactly the actions reachable from its module, its layout
   - Cache adjacency across routes and walk in parallel. The spike's per-route walk took about 2.9 s after an edit at 1,000 routes.
   - Recompute until the graph epoch is stable, and dedupe concurrent walks.
   - The table reaches the Worker through a virtual module.
-- **Dev registration.** Every server-environment transform of a source module registers, even with `{}`, so an action removed after a dev-server restart can't survive in the persistent registry. Route reachability alone does not prevent stale actions.
-- **Dev reloads.** For v1, a full SSR reload with `invalidateAll` on change. Scoped invalidation is a later investigation, because the Node runner kept stale route modules without it. Gate on dev time-to-response after an edit.
+- **Dev registration.** Activate registration only once an environment loads `virtual:recooler/htmx`. Reset hooks cover `srcDir`, declared action dependencies, and previously transformed action modules, including `{}` after action removal. Use a namespace containing the project, environment name and a per-server dev nonce; idle and auxiliary environments must receive no registrations.
+- **Dev reloads.** Invalidate the virtual action table and retain a full SSR runner reload, re-evaluating all modules while caching unchanged transforms. The Phase 4b review’s full Node/workerd edit matrix validated this targeted variant. Dev always installs the extension unless `htmx: false`, including before the first action import. Gate edit time against stock Vite HMR and explicit Node/workerd time budgets.
 - **Environments and dependencies.**
   - Select the configured Worker environment; `consumer === "server"` is necessary but not sufficient.
   - Canonicalise `?v=`/`?t=` queries.
@@ -448,7 +448,7 @@ Either way:
 Ported from `src/helpers.ts`:
 
 - **Helpers:** `wrapAction`, `wrapActionWithPayload`, `actionScope`, `handlerScope`, scope serialization checks, and `actionsMiddleware`, with 0.0.27's result handling and 404 for unknown actions.
-- **★ Sign every action URL (D6),** including actions without captures. Sign over the binding's route id (`route.file`) and exact pathname, the method, the action id and the scope. Verify against the receiving registration's own binding. On a mismatch, call `next()`, so fall-through still works and a foreign or replayed URL ends in 404. Because params are inside the pathname, a URL signed on `/users/1` doesn't replay on `/users/2`, and identical paths in different groups are distinguished by route id.
+- **★ Sign every action URL (D6),** including actions without captures. Sign the `recooler.action.v2` tuple over the namespace, normalized mount base, defining-module content hash, binding's route id (`route.file`) and exact pathname, method, action id and scope. Emit the module's SHA-256 at transform time through `RegistrationEmission`, preserving URLs across builds when that module is unchanged. Verify against the receiving registration's own binding. On a mismatch, call `next()`, so fall-through still works and a foreign or replayed URL ends in 404. Because params are inside the pathname, a URL signed on `/users/1` doesn't replay on `/users/2`, and identical paths in different groups are distinguished by route id.
   - This limits an action to the routes that rendered it.
   - In 0.0.27, a route that merely imports a barrel re-exporting an admin component accepts that admin action under its own middleware.
   - Optionally add an expiry and a session id.
@@ -575,7 +575,7 @@ Recommended defaults are marked ★.
 | D3 | Action URLs | **Decided:** ambient context plus a per-route binding `{routeId, pathname}` (§3.3) |
 | D4 | Client scripts | **Decided:** per-route lazy chunks, with a stable entry file name (§3.4) |
 | D5 | Action registration | **Decided:** registry plus module graph, with the dev requirements in §3.2 |
-| D6 | Action signing | ★ every action URL, bound to route id, pathname and method · captured scopes only (as 0.0.27) |
+| D6 | Action signing | ★ every action URL, bound to app namespace/base, module hash, route id, pathname and method · captured scopes only (as 0.0.27) |
 | D7 | CSRF | ★ `HX-Request` plus `Sec-Fetch-Site`/`Origin` on all actions, on by default · opt-in |
 | D8 | Scope analysis | ★ `@typescript-eslint/scope-manager` at runtime · hand-written analyzer |
 | D9 | Middleware order across the plain/group boundary | ★ keep 0.0.27 (plain-directory middleware first; documented) · strict depth order, which loses unmatched-path semantics for plain directories |

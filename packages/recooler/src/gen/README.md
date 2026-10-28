@@ -72,3 +72,6 @@ node packages/recooler/test/gen/node-smoke.mjs
 
 This exercises the compiled CLI, a TypeScript 7 NodeNext build, actual generated namespaces,
 guarded requests, HEAD, 404, stale checks and startup conflicts introduced by `export *`.
+
+Colon parameter directories such as `:id` are supported, but the generator warns
+that `:` names are not portable to Windows. Prefer `[id]` for portable checkouts.
