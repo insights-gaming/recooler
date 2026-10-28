@@ -17,6 +17,9 @@ import app from 'virtual:recooler/app';
 export default app;
 ```
 
+For TypeScript entries, add `/// <reference types="recooler/vite/client" />` to
+your `env.d.ts`.
+
 The virtual module exports **only default**, equivalent to
 `createApp(manifest, { pages: jsxPages() })`. For custom adapters or extensions,
 use your own `createApp` entry and the generated manifest. The plugin array

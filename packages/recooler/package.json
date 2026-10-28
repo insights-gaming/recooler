@@ -37,6 +37,9 @@
     "./jsx/jsx-dev-runtime": {
       "types": "./dist/jsx/jsx-dev-runtime.d.ts",
       "default": "./dist/jsx/jsx-dev-runtime.js"
+    },
+    "./vite/client": {
+      "types": "./src/vite/client.d.ts"
     }
   },
   "bin": {
