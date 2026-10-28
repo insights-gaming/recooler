@@ -82,3 +82,10 @@ Use `createApp<MyEnv>(manifest)` to type Hono context variables (for example
 `MyEnv = { Variables: { user: User } }`). `app.use()` called after `createApp()` does not
 run for matched terminal routes: Hono executes registrations in order. Install request
 middleware through the manifest or a parent app before routing the generated app.
+
+Extensions may supply `middleware: Handler[]` to run after scoped guards on every
+existing registration, independently of `methods`. This does not add registrations
+for unsupported methods. A `reserved(context)` predicate reserves a request from
+that route's `onRequest`, method handlers and page: when extension handlers call
+`next()`, dispatch continues through later matching registrations and their guards.
+This supports action dispatchers that must fall through on an invalid capability.

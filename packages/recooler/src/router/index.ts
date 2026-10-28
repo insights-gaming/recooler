@@ -69,6 +69,7 @@ export function createApp<E extends Env = Env>(manifest: Manifest, options: Crea
     if (page !== undefined && typeof page !== 'function') throw new RouteValidationError([`page adapter handler for ${route.file} is not a function`]);
     const scopedAdditions = additions.map(addition => ({
       methods: new Set((addition.methods ?? []).map(m => m.toUpperCase())),
+      middleware: addition.middleware ?? [],
       handlers: Array.isArray(addition.handlers) ? addition.handlers : undefined,
       byMethod: Object.entries(Array.isArray(addition.handlers) ? {} : addition.handlers ?? {})
         .map(([method, handlers]) => [method.toUpperCase(), handlers] as const),
@@ -83,7 +84,9 @@ export function createApp<E extends Env = Env>(manifest: Manifest, options: Crea
     if (typeof route.module.onRequest === 'function') { methods.clear(); methods.add('ALL'); }
     if (methods.has('ALL')) { methods.clear(); methods.add('ALL'); }
     if (!methods.size) continue;
+    const reserved = (c: Context) => additions.some(addition => addition.reserved?.(c));
     const methodDispatch: Handler = async (c, next) => {
+      if (reserved(c)) return next();
       const method = c.req.method === 'HEAD' ? 'GET' : c.req.method;
       const name = Object.entries(methodExports).find(([, value]) => value === method)?.[0];
       const handler = name ? route.module[name] as Handler | undefined : undefined;
@@ -91,15 +94,16 @@ export function createApp<E extends Env = Env>(manifest: Manifest, options: Crea
     };
     const handlers: Handler[] = [
       ...route.middleware.map((mw, i) => once(mw, route.middlewareModules[i])),
-      ...scopedAdditions.map(({ methods, handlers, byMethod }): Handler => (c, next) => {
+      ...scopedAdditions.map(({ methods, middleware, handlers, byMethod }): Handler => (c, next) => {
         const method = c.req.method;
         const matches = (declared: string) => declared === 'ALL' || declared === method || (method === 'HEAD' && declared === 'GET');
         return dispatch([
+          ...middleware,
           ...(handlers && [...methods].some(matches) ? handlers : []),
           ...byMethod.flatMap(([declared, chain]) => matches(declared) ? chain : []),
         ], c, next);
       }),
-      ...(typeof route.module.onRequest === 'function' ? [route.module.onRequest as Handler] : []),
+      ...(typeof route.module.onRequest === 'function' ? [((c, next) => reserved(c) ? next() : (route.module.onRequest as Handler)(c, next)) as Handler] : []),
       methodDispatch];
     // Hono dispatches HEAD through GET; the extension chains above retain the actual method.
     app.on([...new Set([...methods].map(method => method === 'HEAD' ? 'GET' : method))], route.path, handlers[0]!, ...handlers.slice(1));

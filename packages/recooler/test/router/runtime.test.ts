@@ -342,3 +342,19 @@ it('runs GET and HEAD extension chains once each for HEAD and keeps native GET d
   expect(await (await app.request('/')).text()).toBe('get');
   expect(seen).toEqual(['get']);
 });
+
+it('runs extension middleware only on existing registrations and reserves fall-through from terminal handlers', async () => {
+  const calls: string[] = [];
+  const app = createApp(manifest({
+    'x/index.tsx': { ...page, onRequest: text('onRequest'), onGet: text('onGet') },
+    '(later)/[[rest]]/index.ts': { onGet: text('later') },
+    'api/index.ts': { onPost: text('api') },
+  }), { pages, extensions: [{ name: 'reserved', route: route => ({
+    middleware: [async (_c, next) => { calls.push(route.file); await next(); }],
+    reserved: c => route.file === 'routes/x/index.tsx' && c.req.query('reserved') !== undefined,
+  }) }] });
+  expect(await (await app.request('/x')).text()).toBe('onRequest');
+  expect(await (await app.request('/x?reserved')).text()).toBe('later');
+  expect((await app.request('/api', { method: 'DELETE' })).status).toBe(404);
+  expect(calls).toEqual(['routes/x/index.tsx', 'routes/x/index.tsx', 'routes/(later)/[[rest]]/index.ts']);
+});

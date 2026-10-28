@@ -1,4 +1,4 @@
-import type { Env, Handler, MiddlewareHandler } from 'hono';
+import type { Context, Env, Handler, MiddlewareHandler } from 'hono';
 import type { HonoOptions } from 'hono/hono-base';
 
 export type ModuleNs = Record<string, unknown>;
@@ -53,6 +53,10 @@ export interface RouterExtension {
   name: string;
   route?(route: ResolvedRoute): {
     methods?: string[];
+    /** Runs on every existing registration, without declaring additional methods. */
+    middleware?: Handler[];
+    /** Reserved requests bypass onRequest, method handlers and page after extension fall-through. */
+    reserved?: (context: Context) => boolean;
     /** Array handlers require methods; map keys also declare methods. GET includes HEAD.
      * HEAD registers as GET for Hono routing, but its handlers run only for HEAD requests. */
     handlers?: Handler[] | Record<string, Handler[]>;
