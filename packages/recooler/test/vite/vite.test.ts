@@ -83,3 +83,10 @@ test('production unsigned guard covers custom entries and diagnostics retain loc
   });
   expect(result.stdout).toContain('"productionGuard":true');
 }, 130000);
+
+test('watch builds retain unchanged actions and discard removed actions', async () => {
+  const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-watch.mjs', import.meta.url))], {
+    timeout: 60000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+  });
+  expect(result.stdout).toContain('"cachedActions":true');
+}, 65000);

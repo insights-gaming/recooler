@@ -183,16 +183,21 @@ export function htmxPlugin(options: RecoolerOptions) {
       return { define: { __RECOOLER_PRODUCTION__: JSON.stringify(env.command === 'build') } };
     },
     configResolved(config) {
+      states.clear();
       roots = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root });
       serving = config.command === 'serve';
       namespace = 'recooler:' + createHash('sha256').update(normalizePath(roots.srcDir)).digest('hex').slice(0, 24);
     },
-    buildStart() {
-      if (serving || !selected(this.environment)) return;
-      const state = stateFor(this.environment.name);
-      state.modules.clear();
-      state.outputs.clear();
-      state.epoch++;
+    watchChange(file) {
+      if (serving) return;
+      // Rolldown may retain unchanged modules without calling transform again.
+      // Preserve their metadata and clear only changed source identities, even
+      // when removing hx- makes the filtered transform stop matching entirely.
+      file = canonicalId(file).split('?')[0]!;
+      for (const state of states.values()) {
+        for (const id of state.modules.keys()) if (id.split('?')[0] === file) state.modules.delete(id);
+        state.epoch++;
+      }
     },
     async hotUpdate(context) {
       if (!selected(this.environment) || options.htmx === false) return;
