@@ -88,6 +88,12 @@ importers:
       hono:
         specifier: ^4.13.14
         version: 4.13.14
+      hono-412:
+        specifier: npm:hono@4.12.34
+        version: hono@4.12.34
+      hono-5:
+        specifier: npm:hono@5.0.0-rc.1
+        version: hono@5.0.0-rc.1
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1362,6 +1368,10 @@ packages:
   hono@4.13.14:
     resolution: {integrity: sha512-yhRLQ21U6qa9Hsu2N7Qcbh8tE+WKEcoErjIo56LeSGiGXGp9sA7UpE86Ui9uexb61KakiGwuHMn2QdV7w6i6kQ==}
     engines: {node: '>=16.9.0'}
+
+  hono@5.0.0-rc.1:
+    resolution: {integrity: sha512-vTcfU9yAggXh/+ZSi8zpYbzYDubCgFnSt8d5afCAlgkd38dyYb3CVtOh8YWhS65NkEqBseCsTj/P8mceJ+7KNA==}
+    engines: {node: '>=22.12.0'}
 
   html-escaper@3.0.3:
     resolution: {integrity: sha512-RuMffC89BOWQoY0WKGpIhn5gX3iI54O6nRA0yC124NYVtzjmFWBIiFd8M0x+ZdX0P9R4lADg1mgP8C7PxGOWuQ==}
@@ -3309,6 +3319,8 @@ snapshots:
   hono@4.12.34: {}
 
   hono@4.13.14: {}
+
+  hono@5.0.0-rc.1: {}
 
   html-escaper@3.0.3: {}
 
