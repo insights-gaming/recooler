@@ -12,6 +12,12 @@ export type ActionTable = Readonly<Record<string, readonly string[]>>;
 export interface HtmxOptions<E extends Env = Env> {
   /** Static reachability table. Dev reloads must recreate the app. Dynamic imports are not followed. */
   table: ActionTable;
+  /** Route-file → slice ids from the same server graph as table (supplied by Vite). */
+  clients?: ActionTable;
+  /** Stable external module URL, including build cache-busting query. */
+  clientEntry?: string;
+  /** Explicit opt-in for roots that inline their second argument as JavaScript. */
+  legacyClientScript?: boolean;
   /** Env functions are resolved synchronously and cached by env object identity. */
   secret?: string | { unsafeUnsigned: true } | ((env: E['Bindings']) => string);
   /** Per-project registry namespace; must match registerActions (supplied by Vite). */
@@ -118,9 +124,11 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
           throw error;
         }
       };
+      const hasClient = hasPage && !!options.clients?.[route.file]?.length && !!options.clientEntry;
       return {
         methods: [...methods],
-        middleware: [binding, dispatch], reserved: reserves, page: { scripts: [] },
+        middleware: [binding, dispatch], reserved: reserves, page: { scripts: hasClient ? [options.clientEntry!] : [],
+          ...(hasClient && options.legacyClientScript ? { clientScript: `import(${JSON.stringify(options.clientEntry).replaceAll('<', '\\u003c')})` } : {}) },
       };
     },
   };

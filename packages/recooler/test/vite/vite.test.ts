@@ -90,3 +90,20 @@ test('watch builds retain unchanged actions and discard removed actions', async 
   });
   expect(result.stdout).toContain('"cachedActions":true');
 }, 65000);
+
+for (const runtime of ['plain', 'cloudflare', 'beta']) {
+  test(`client CLI, native ESM/DOM, lazy chunks, maps, assets and HMR on ${runtime}`, async () => {
+    const result = await execute(process.execPath, ['--experimental-vm-modules', fileURLToPath(new URL('./client-integration.mjs', import.meta.url)), runtime], {
+      timeout: 120000, maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, NODE_ENV: 'production', WRANGLER_SEND_METRICS: 'false' },
+    });
+    expect(result.stdout).toContain('"hmr":true');
+  }, 130000);
+}
+
+test('client banned-import checks and explicit legacy-root opt-in', async () => {
+  const result = await execute(process.execPath, [fileURLToPath(new URL('./client-options.mjs', import.meta.url))], {
+    timeout: 60000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+  });
+  expect(result.stdout).toContain('"clientOptions":true');
+}, 65000);

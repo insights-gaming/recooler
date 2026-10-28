@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import MagicString from 'magic-string';
@@ -6,10 +7,12 @@ import { normalizePath } from 'vite';
 import type { DevEnvironment, Plugin } from 'vite';
 import type { GenerateResult } from '../gen/index.js';
 import { locations } from '../gen/locations.js';
-import { emitRegistration, transform } from '../htmx/transform/index.js';
+import { emitRegistration, transform, isBannedModule } from '../htmx/transform/index.js';
 import type { ActionTable } from '../htmx/index.js';
 import type { TransformResult } from '../htmx/transform/index.js';
 import type { RecoolerOptions } from './index.js';
+import { routePathWithoutGroups, routeSegment } from '../router/resolve.js';
+import { clientEntry, clientId, internalClient, clientFile, sliceQuery, type ClientRoute } from './client.js';
 
 export const tableId = 'virtual:recooler/htmx';
 const internalTable = '\0' + tableId;
@@ -25,11 +28,13 @@ export function canonicalId(id: string): string {
   return normalizePath(id.slice(0, at)) + (parts.length ? '?' + parts.join('&') : '');
 }
 
+interface TableData { table: ActionTable; clients: ActionTable; enabled: boolean }
+
 interface State {
   epoch: number;
-  modules: Map<string, { actions: boolean; htmx: boolean }>;
-  cached?: { epoch: number; table: ActionTable; enabled: boolean };
-  pending?: Promise<{ table: ActionTable; enabled: boolean }>;
+  modules: Map<string, { actions: boolean; htmx: boolean; client?: boolean; onLoad?: boolean }>;
+  cached?: TableData & { epoch: number };
+  pending?: Promise<TableData>;
   outputs: Map<string, string>;
   transforms: Map<string, { source: string; kind: string; result: TransformResult }>;
 }
@@ -38,6 +43,11 @@ interface State {
 export function htmxPlugin(options: RecoolerOptions) {
   let roots: ReturnType<typeof locations>;
   let serving = false;
+  let devServer: import('vite').ViteDevServer | undefined;
+  let entryUrl: string;
+  let buildId: string;
+  let builtData: TableData | undefined;
+  let clientData: string | undefined;
   let files: string[] = [];
   const kinds = new Map<string, 'route' | 'layout' | 'root'>();
   let namespace: string;
@@ -66,7 +76,9 @@ export function htmxPlugin(options: RecoolerOptions) {
         if (directory === roots.routesDir || path.dirname(directory) === directory) break;
       }
       if (root) chain.push(root);
-      return { file, chain };
+      const directory = path.relative(roots.routesDir, path.dirname(file)).split(path.sep).join('/');
+      const pattern = routePathWithoutGroups('/' + directory.split('/').filter(Boolean).map(routeSegment).join('/'));
+      return { file, chain, pattern };
     });
   };
   // Do not walk into our own table (custom entries can import it), or inject a
@@ -75,7 +87,7 @@ export function htmxPlugin(options: RecoolerOptions) {
     && !id.startsWith(framework + 'src/') && !id.startsWith(framework + 'dist/')
     && !id.includes('/.vite/');
 
-  async function devTable(environment: DevEnvironment): Promise<{ table: ActionTable; enabled: boolean }> {
+  async function devTable(environment: DevEnvironment): Promise<TableData> {
     const state = stateFor(environment.name);
     if (state.cached?.epoch === state.epoch) return state.cached;
     if (state.pending) return state.pending;
@@ -140,8 +152,8 @@ export function htmxPlugin(options: RecoolerOptions) {
         // promise or special evaluation ordering.
         const reachable = new Map<string, Set<string>>();
         for (const id of nodes.keys()) {
-          if (!state.modules.get(id)?.actions) continue;
-          const action = relative(id);
+          if (!state.modules.get(id)?.actions && !state.modules.get(id)?.client) continue;
+          const action = id;
           const queue = [id];
           const seen = new Set<string>();
           for (let index = 0; index < queue.length; index++) {
@@ -155,6 +167,7 @@ export function htmxPlugin(options: RecoolerOptions) {
           }
         }
         const table: Record<string, string[]> = Object.create(null);
+        const clients: Record<string, string[]> = Object.create(null);
         await Promise.all(routes.map(async ({ file, chain }) => {
           if (!(await edges(file))?.page) return;
           const actions = new Set<string>();
@@ -162,11 +175,12 @@ export function htmxPlugin(options: RecoolerOptions) {
             const node = await edges(seed);
             for (const action of node && reachable.get(node.id) || []) actions.add(action);
           }
-          table[relative(file)] = [...actions].sort();
+          table[relative(file)] = [...actions].filter(id => state.modules.get(id)?.actions).map(relative).sort();
+          clients[relative(file)] = [...actions].filter(id => state.modules.get(id)?.client).map(relative).sort();
         }));
         if (epoch !== state.epoch) continue;
         const enabled = options.htmx !== false && (options.htmx !== undefined || [...state.modules.values()].some(m => m.htmx));
-        state.cached = { epoch, table, enabled };
+        state.cached = { epoch, table, clients, enabled };
         return state.cached;
       }
     })();
@@ -180,14 +194,36 @@ export function htmxPlugin(options: RecoolerOptions) {
     config(_config, env) {
       // Applies to custom createApp entries too; no runtime evaluation of a
       // Worker bundle in Node is needed to enforce the production guard.
-      return { define: { __RECOOLER_PRODUCTION__: JSON.stringify(env.command === 'build') } };
+      return {
+        ...(options.htmx === false ? {} : { builder: {} }),
+        define: { __RECOOLER_PRODUCTION__: JSON.stringify(env.command === 'build') },
+        ...(options.htmx === false ? {} : { environments: { client: { consumer: 'client', build: {
+          ssr: false, outDir: _config.environments?.client?.build?.outDir ?? 'dist/client',
+          rolldownOptions: { input: { 'recooler-client': clientId }, output: { entryFileNames: clientFile, inlineDynamicImports: false } },
+        } } } }),
+      };
     },
     configResolved(config) {
       states.clear();
+      builtData = undefined; clientData = undefined;
+      buildId = randomUUID();
+      const base = config.base === './' || config.base === '' ? '/' : config.base;
+      entryUrl = config.command === 'serve' ? `${base}@id/${clientId}` : `${base}${clientFile}?v=${buildId}`;
       roots = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root });
       serving = config.command === 'serve';
       namespace = 'recooler:' + createHash('sha256').update(normalizePath(roots.srcDir)).digest('hex').slice(0, 24);
     },
+    configureServer(server) { devServer = server; },
+    // A post hook leaves platform builders intact. Cloudflare has already built
+    // Worker -> client (and moved assets); plain Vite's default builder is a no-op.
+    buildApp: { order: 'post', async handler(builder) {
+      if (options.htmx === false) return;
+      for (const environment of Object.values(builder.environments)) {
+        if (selected(environment) && !environment.isBuilt) await builder.build(environment);
+      }
+      const client = builder.environments.client;
+      if (client && !client.isBuilt) await builder.build(client);
+    } },
     watchChange(file) {
       if (serving) return;
       // Rolldown may retain unchanged modules without calling transform again.
@@ -206,25 +242,68 @@ export function htmxPlugin(options: RecoolerOptions) {
       if (generationFailed) return [];
       const state = stateFor(this.environment.name);
       const active = options.htmx !== undefined || [...state.modules.values()].some(module => module.htmx);
-      if (!active && !(sourcePattern.test(context.file) && context.type !== 'delete' && (await context.read()).includes('hx-'))) return;
+      if (!active && !(sourcePattern.test(context.file) && context.type !== 'delete' && /hx-|onLoad/.test(await context.read()))) return;
       state.epoch++;
+      const client = context.server.environments.client;
+      client?.moduleGraph.invalidateAll();
+      client?.hot.send({ type: 'full-reload', path: '*' });
       this.environment.moduleGraph.invalidateAll();
       this.environment.hot.send({ type: 'full-reload', path: '*' });
       return [];
     },
-    resolveId(id) {
+    async resolveId(id, importer) {
+      if (id === clientId) return internalClient;
+      const query = id.indexOf('?');
+      if (query >= 0 && id.slice(query + 1).split('&').includes(sliceQuery)) {
+        if (this.environment.name !== 'client') this.error('recooler: handler slices require the client environment');
+        const original = id.slice(0, query) + (id.slice(query + 1).split('&').filter(p => p !== sliceQuery && !/^(?:v|t)=/.test(p)).length
+          ? '?' + id.slice(query + 1).split('&').filter(p => p !== sliceQuery && !/^(?:v|t)=/.test(p)).join('&') : '');
+        const resolved = await this.resolve(original, importer, { skipSelf: true });
+        if (!resolved || resolved.external) this.error(`recooler: cannot resolve handler slice ${original}`);
+        return resolved.id + (resolved.id.includes('?') ? '&' : '?') + sliceQuery;
+      }
       if (id !== tableId) return;
       if (!selected(this.environment)) this.error('recooler: virtual:recooler/htmx requires the selected server environment');
       return internalTable;
     },
     async load(id) {
+      if (id === internalClient) {
+        if (this.environment.name !== 'client') this.error('recooler: client entry requires the client environment');
+        const environment = serving ? Object.values(devServer?.environments ?? {}).find(selected) : undefined;
+        const data = environment ? await devTable(environment) : builtData;
+        if (!data) this.error('recooler: build the selected server environment before the client environment');
+        clientData = JSON.stringify(data.clients);
+        const routes: Record<string, ClientRoute> = Object.create(null);
+        for (const { file, pattern } of seeds()) {
+          const modules = data.clients[relative(file)];
+          if (!modules?.length) continue;
+          const state = stateFor(environment?.name ?? [...states.keys()].find(name => states.get(name)?.cached?.clients === data.clients) ?? '');
+          const onLoad = state.modules.get(canonicalId(file))?.onLoad;
+          routes[pattern] = { slices: [...modules], ...(onLoad ? { onLoad: relative(file) } : {}) };
+        }
+        return { code: clientEntry(routes, id => normalizePath(path.resolve(roots.srcDir, id))), map: null };
+      }
+      if (id.split('?')[1]?.split('&').includes(sliceQuery)) {
+        const original = id.replace(new RegExp('([?&])' + sliceQuery + '(?=&|$)'), '').replace('?&', '?');
+        // The slice runs directly on the original source: hoisting AND slicing
+        // share one MagicString, with sourcesContent for the real filename.
+        const code = await readFile(original.split('?')[0]!, 'utf8');
+        const result = transform(code, { id: original, relativePath: relative(original), mode: 'client-slice',
+          moduleKind: kinds.get(original.split('?')[0]!) ?? 'component',
+          clientBannedImports: options.htmx && options.htmx.clientBannedImports || undefined });
+        for (const diagnostic of result.diagnostics) {
+          if (diagnostic.severity === 'error') this.error({ message: diagnostic.message, id: original, pos: diagnostic.start });
+        }
+        this.addWatchFile(original.split('?')[0]!);
+        return { code: result.code, map: result.map.toString() };
+      }
       if (id !== internalTable) return;
       if (!selected(this.environment)) this.error('recooler: virtual:recooler/htmx requires the selected server environment');
       const data = serving ? JSON.stringify(await devTable(this.environment as DevEnvironment)) : token;
-      return { code: `const data = JSON.parse(${JSON.stringify(data)});\nexport const table = data.table;\nexport const enabled = data.enabled;\nexport const namespace = ${JSON.stringify(namespace)};\n`, map: null };
+      return { code: `const data = JSON.parse(${JSON.stringify(data)});\nexport const table = data.table;\nexport const clients = data.clients;\nexport const clientEntry = ${JSON.stringify(entryUrl)};\nexport const enabled = data.enabled;\nexport const namespace = ${JSON.stringify(namespace)};\n`, map: null };
     },
     transform: {
-      filter: { id: sourcePattern, code: 'hx-' },
+      filter: { id: sourcePattern, code: /hx-|onLoad/ },
       handler(code, id) {
         if (!selected(this.environment) || options.htmx === false || !source(id)) return;
         id = canonicalId(id);
@@ -232,7 +311,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         const state = stateFor(this.environment.name);
         const previous = serving ? state.transforms.get(id) : undefined;
         const result = previous?.source === code && previous.kind === moduleKind ? previous.result : transform(code, {
-          id, relativePath: relative(id), mode: 'server', moduleKind,
+          id, relativePath: relative(id), mode: 'server', moduleKind, queueHandlers: true,
           clientBannedImports: options.htmx && options.htmx.clientBannedImports,
           codegen: { registerActions: input => emitRegistration(input).replace(/\);$/, `, ${JSON.stringify(namespace)});`) },
         });
@@ -248,7 +327,7 @@ export function htmxPlugin(options: RecoolerOptions) {
           if (diagnostic.severity === 'error') this.error(log);
           else this.warn(log);
         }
-        state.modules.set(id, { actions: result.actions.length > 0, htmx: true });
+        state.modules.set(id, { actions: result.actions.length > 0, htmx: true, client: result.handlers.length > 0 || result.hasOnLoad, onLoad: result.hasOnLoad });
         if (serving) state.outputs.set(id, result.code);
         state.epoch++;
         // Give Vite a fresh map object; normalization must not mutate a cached map.
@@ -256,7 +335,7 @@ export function htmxPlugin(options: RecoolerOptions) {
       },
     },
     renderChunk(code) {
-      if (!selected(this.environment) || !code.includes(token)) return;
+      if (!selected(this.environment)) return;
       const state = stateFor(this.environment.name);
       // Cache bridge calls AND copied adjacency once per render pass.
       const adjacency = new Map<string, { deps: readonly string[]; page: boolean } | undefined>();
@@ -268,27 +347,44 @@ export function htmxPlugin(options: RecoolerOptions) {
         return adjacency.get(id);
       };
       const table: Record<string, string[]> = Object.create(null);
+      const clients: Record<string, string[]> = Object.create(null);
       for (const { file, chain } of seeds()) {
         if (!edges(file)?.page) continue;
         const seen = new Set<string>();
         const actions = new Set<string>();
+        const slices = new Set<string>();
         const visit = (id: string) => {
           if (seen.has(id)) return;
           seen.add(id);
           const node = edges(id);
           if (!node) return;
           if (state.modules.get(canonicalId(id))?.actions) actions.add(relative(id));
+          if (state.modules.get(canonicalId(id))?.client) slices.add(relative(id));
           node.deps.forEach(visit);
         };
         chain.forEach(visit);
         table[relative(file)] = [...actions].sort();
+        clients[relative(file)] = [...slices].sort();
       }
       const enabled = options.htmx !== false && (options.htmx !== undefined || [...state.modules.values()].some(m => m.htmx));
+      builtData = { table, clients, enabled };
+      state.cached = { ...builtData, epoch: state.epoch };
+      if (!code.includes(token)) return;
       const ms = new MagicString(code);
       const needle = JSON.stringify(token);
       const start = code.indexOf(needle);
-      ms.overwrite(start, start + needle.length, JSON.stringify(JSON.stringify({ table, enabled })));
+      ms.overwrite(start, start + needle.length, JSON.stringify(JSON.stringify({ table, clients, enabled })));
       return { code: ms.toString(), map: ms.generateMap({ hires: true, includeContent: true }) };
+    },
+    generateBundle(_options, bundle) {
+      if (this.environment.name !== 'client') return;
+      if (clientData !== JSON.stringify(builtData?.clients)) this.error('recooler: client route → slice table differs from the server build');
+      const patterns = options.htmx && options.htmx.clientBannedImports || [];
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        const banned = chunk.moduleIds.filter(id => isBannedModule(patterns, id));
+        if (banned.length) this.error(`recooler: banned imports in client chunk ${chunk.fileName}:\n${banned.join('\n')}`);
+      }
     },
   };
 
@@ -304,7 +400,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         if (!serving || !selected(this.environment) || options.htmx === false || !source(id)) return;
         id = canonicalId(id);
         const state = stateFor(this.environment.name);
-        if (state.outputs.get(id) === code && state.modules.get(id)?.actions) return;
+        if (state.outputs.get(id) === code && state.modules.get(id)?.htmx) return;
         state.modules.set(id, { actions: false, htmx: code.includes('hx-') });
         state.epoch++;
         const ms = new MagicString(code);

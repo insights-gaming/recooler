@@ -6,6 +6,8 @@ declare module 'virtual:recooler/app' {
 }
 declare module 'virtual:recooler/htmx' {
   export const table: import('recooler/htmx').ActionTable;
+  export const clients: import('recooler/htmx').ActionTable;
+  export const clientEntry: string;
   export const namespace: string;
   export const enabled: boolean;
 }

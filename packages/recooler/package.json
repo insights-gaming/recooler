@@ -90,12 +90,15 @@
     "@cloudflare/vite-plugin": "1.65.0",
     "@jridgewell/trace-mapping": "^0.3.31",
     "@types/node": "^22.1.0",
+    "@types/ws": "^8.18.2",
     "easy-jsx-html-engine": "^0.1.13",
+    "happy-dom": "^21.0.4",
     "hono": "^4.13.14",
     "hono-412": "npm:hono@4.12.34",
     "hono-5": "npm:hono@5.0.0-rc.1",
     "typescript": "^7.0.2",
     "vite": "~8.3.5",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "ws": "^8.22.0"
   }
 }

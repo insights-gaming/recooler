@@ -21,10 +21,11 @@ export { bannedClientModules, isBannedModule, moduleIdForms } from "./banned-imp
 export function transform(code: string, options: TransformOptions): TransformResult {
   const ms = new MagicString(code, { filename: options.id });
   const diagnostics: Diagnostic[] = [];
+  let hasOnLoad = false;
   const result = (candidates: Candidate[] = []): TransformResult => ({
     code: ms.toString(), map: ms.generateMap({ hires: true, source: options.id, includeContent: true }),
     actions: candidates.filter(c => c.kind === "action").map(c => ({ ...metadata(c), method: c.method! })),
-    handlers: candidates.filter(c => c.kind === "handler").map(metadata), diagnostics,
+    handlers: candidates.filter(c => c.kind === "handler").map(metadata), hasOnLoad, diagnostics,
   });
   let analysis: Analysis;
   try { analysis = parseAndAnalyze(code, options.id, options.rawTransfer); }
@@ -34,6 +35,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
     diagnostics.push(...errors.map(e => ({ ...e, severity: "error" as const, code: "parse-error" })));
     return result();
   }
+  hasOnLoad = options.moduleKind === "route" && onLoadExports(analysis).size > 0;
   const candidates = collect(analysis, options, diagnostics);
   warnOnLoad(analysis, options, diagnostics);
   const mode = options.mode ?? "full";
@@ -245,6 +247,15 @@ export function transform(code: string, options: TransformOptions): TransformRes
         replacement = c.variables.length
           ? `\`${escapeTemplate(ref)}(\${${helper("handlerScope")}(${scopeAtSite(c)})}).call(this, event)\``
           : JSON.stringify(`${ref}.call(this, event)`);
+        if (options.queueHandlers) {
+          // Self-installing: an event can arrive before even the module entry
+          // executes (notably while a Suspense response is still streaming).
+          const dispatch = `(globalThis.__recooler_dispatch ??= function(id,scope,element,event){const fn=globalThis.$handlers?.[id];if(fn)return (scope===null?fn:fn(scope)).call(element,event);(globalThis.__recooler_queue??=[]).push([id,scope,element,event])})`;
+          const prefix = `${dispatch}(${JSON.stringify(c.id)},`;
+          replacement = c.variables.length
+            ? `\`${escapeTemplate(prefix)}\${${helper("handlerScope")}(${scopeAtSite(c)})},this,event)\``
+            : JSON.stringify(`${prefix}null,this,event)`);
+        }
       }
       ms.appendLeft(c.start, replacement);
     }
