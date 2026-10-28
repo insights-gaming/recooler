@@ -8,6 +8,7 @@ declare module 'virtual:recooler/htmx' {
   export const table: import('recooler/htmx').ActionTable;
   export const clients: import('recooler/htmx').ActionTable;
   export const clientEntry: string;
+  export const clientPreloads: Readonly<Record<string, readonly string[]>>;
   export const namespace: string;
   export const enabled: boolean;
 }

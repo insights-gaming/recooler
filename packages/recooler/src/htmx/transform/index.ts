@@ -268,7 +268,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
         if (options.queueHandlers) {
           // Self-installing: an event can arrive before even the module entry
           // executes (notably while a Suspense response is still streaming).
-          const dispatch = `(globalThis.__recooler_dispatch ??= function(id,scope,element,event){const fn=globalThis.$handlers?.[id];if(fn)return (scope===null?fn:fn(scope)).call(element,event);(globalThis.__recooler_queue??=[]).push([id,scope,element,event])})`;
+          const dispatch = `(globalThis.$rc??=(...a)=>{a[3].preventDefault();(globalThis.$rq??=[]).push(a)})`;
           const prefix = `${dispatch}(${JSON.stringify(c.id)},`;
           replacement = c.variables.length
             ? `\`${escapeTemplate(prefix)}\${${helper("handlerScope")}(${scopeAtSite(c)})},this,event)\``

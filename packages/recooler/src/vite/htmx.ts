@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -18,6 +18,7 @@ import { clientEntry, clientId, internalClient, clientFile, sliceQuery, type Cli
 export const tableId = 'virtual:recooler/htmx';
 const internalTable = '\0' + tableId;
 const token = '__RECOOLER_ACTION_TABLE_6d32ad94__';
+const versionToken = '__RECOOLER_CLIENT_VERSION_6d32ad94__';
 const framework = normalizePath(fileURLToPath(new URL('../../', import.meta.url)));
 const sourcePattern = /\.[cm]?[jt]sx?(?:\?|$)/;
 
@@ -29,7 +30,7 @@ export function canonicalId(id: string): string {
   return normalizePath(id.slice(0, at)) + (parts.length ? '?' + parts.join('&') : '');
 }
 
-interface TableData { table: ActionTable; clients: ActionTable; enabled: boolean }
+interface TableData { table: ActionTable; clients: ActionTable; enabled: boolean; preloads?: Record<string, string[]> }
 
 interface State {
   epoch: number;
@@ -47,6 +48,10 @@ export function htmxPlugin(options: RecoolerOptions) {
   let devServer: import('vite').ViteDevServer | undefined;
   let entryUrl: string;
   let buildId: string;
+  let base: string;
+  const rendered = new Map<string, TableData>();
+  let clientBuild: (() => Promise<unknown>) | undefined;
+  let rebuildingClient = Promise.resolve<unknown>(undefined);
   let builtData: TableData | undefined;
   let clientData: string | undefined;
   const sliceContents = new Set<string>();
@@ -190,6 +195,11 @@ export function htmxPlugin(options: RecoolerOptions) {
     finally { state.pending = undefined; }
   }
 
+  const sliceIds = () => [...new Set(Object.values(builtData?.clients ?? {}).flat())].sort();
+  const sliceFile = (id: string) => `assets/recooler-slice-${buildId}-${sliceIds().indexOf(id)}.js`;
+  const preloads = (data: TableData) => Object.fromEntries(Object.entries(data.clients).map(([route, ids]) => [route,
+    ids.map(id => serving ? `${base}@fs${normalizePath(path.resolve(roots.srcDir, id))}?${sliceQuery}` : base + sliceFile(id))]));
+
   const plugin: Plugin = {
     name: 'recooler:htmx',
     enforce: 'pre',
@@ -204,6 +214,7 @@ export function htmxPlugin(options: RecoolerOptions) {
           sourcemap: _config.environments?.client?.build?.sourcemap ?? false,
           minify: _config.environments?.client?.build?.minify ?? true,
           rolldownOptions: {
+            preserveEntrySignatures: 'exports-only',
             input: (() => {
               const input = _config.environments?.client?.build?.rolldownOptions?.input
                 ?? (existsSync(path.resolve(_config.root ?? process.cwd(), 'index.html')) ? 'index.html' : {});
@@ -223,8 +234,9 @@ export function htmxPlugin(options: RecoolerOptions) {
     configResolved(config) {
       states.clear();
       builtData = undefined; clientData = undefined;
-      buildId = randomUUID();
-      const base = config.base === './' || config.base === '' ? '/' : config.base;
+      buildId = versionToken;
+      if (config.base === './' || config.base === '') config.logger.warn('recooler: relative Vite base is unsupported; client URLs use /');
+      base = config.base === './' || config.base === '' ? '/' : config.base;
       entryUrl = config.command === 'serve' ? `${base}@id/${clientId}` : `${base}${clientFile}?v=${buildId}`;
       roots = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root });
       serving = config.command === 'serve';
@@ -239,8 +251,38 @@ export function htmxPlugin(options: RecoolerOptions) {
         if (selected(environment) && !environment.isBuilt) await builder.build(environment);
       }
       const client = builder.environments.client;
-      if (client && !client.isBuilt) await builder.build(client);
+      if (client?.config.build.watch) {
+        // One server watcher owns generation order. Independent client watchers
+        // can race the server table and retain a stale virtual route entry.
+        clientBuild = async () => {
+          const watch = client.config.build.watch;
+          client.config.build.watch = null;
+          try { return await builder.build(client); }
+          finally { client.config.build.watch = watch; }
+        };
+      } else if (client && !client.isBuilt) await builder.build(client);
     } },
+    outputOptions(output) {
+      if (this.environment.name !== 'client') return;
+      const naming = output.chunkFileNames;
+      output.chunkFileNames = chunk => {
+        const id = chunk.facadeModuleId;
+        if (id?.includes(sliceQuery)) return sliceFile(relative(id.replace(new RegExp('([?&])' + sliceQuery + '(?=&|$)'), '')));
+        return typeof naming === 'function' ? naming(chunk) : naming ?? 'assets/[name]-[hash].js';
+      };
+    },
+    buildStart() {
+      if (selected(this.environment)) {
+        rendered.delete(this.environment.name);
+        this.addWatchFile(roots.routesDir);
+      }
+      if (this.environment.name === 'client') sliceContents.clear();
+    },
+    async writeBundle() {
+      if (!selected(this.environment) || !clientBuild) return;
+      rebuildingClient = rebuildingClient.catch(() => {}).then(() => clientBuild!());
+      await rebuildingClient;
+    },
     watchChange(file) {
       if (serving) return;
       // Rolldown may retain unchanged modules without calling transform again.
@@ -311,12 +353,17 @@ export function htmxPlugin(options: RecoolerOptions) {
           const onLoad = state.modules.get(canonicalId(file))?.onLoad;
           routes[pattern] = { slices: [...modules], ...(onLoad ? { onLoad: relative(file) } : {}) };
         }
-        return { code: clientEntry(routes, id => normalizePath(path.resolve(roots.srcDir, id))), map: null };
+        for (const file of files) this.addWatchFile(file);
+        return { code: clientEntry(routes, id => normalizePath(path.resolve(roots.srcDir, id)), serving ? '' : buildId, serving), map: null };
       }
       if (id.split('?')[1]?.split('&').includes(sliceQuery)) {
         const original = id.replace(new RegExp('([?&])' + sliceQuery + '(?=&|$)'), '').replace('?&', '?');
-        // The slice runs directly on the original source: hoisting AND slicing
-        // share one MagicString, with sourcesContent for the real filename.
+        // Slice the exact input seen by the server, including earlier plugins.
+        // Both hoisting and slicing share one map with redacted sourcesContent.
+        if (serving) {
+          const environment = Object.values(devServer?.environments ?? {}).find(selected);
+          if (environment) await devTable(environment);
+        }
         const key = canonicalId(original);
         const serverInput = [...states.values()].map(state => state.transforms.get(key)).find(Boolean);
         const known = [...states.values()].some(state => state.modules.get(key)?.client);
@@ -338,8 +385,9 @@ export function htmxPlugin(options: RecoolerOptions) {
       }
       if (id !== internalTable) return;
       if (!selected(this.environment)) this.error('recooler: virtual:recooler/htmx requires the selected server environment');
-      const data = serving ? JSON.stringify(await devTable(this.environment as DevEnvironment)) : token;
-      return { code: `const data = JSON.parse(${JSON.stringify(data)});\nexport const table = data.table;\nexport const clients = data.clients;\nexport const clientEntry = ${JSON.stringify(entryUrl)};\nexport const enabled = data.enabled;\nexport const namespace = ${JSON.stringify(namespace)};\n`, map: null };
+      const current = serving ? await devTable(this.environment as DevEnvironment) : undefined;
+      const data = current ? JSON.stringify({ ...current, preloads: preloads(current) }) : token;
+      return { code: `const data = JSON.parse(${JSON.stringify(data)});\nexport const table = data.table;\nexport const clients = data.clients;\nexport const clientPreloads = data.preloads ?? {};\nexport const clientEntry = ${JSON.stringify(entryUrl)};\nexport const enabled = data.enabled;\nexport const namespace = ${JSON.stringify(namespace)};\n`, map: null };
     },
     transform: {
       filter: { id: sourcePattern, code: /hx-|onLoad/ },
@@ -376,43 +424,62 @@ export function htmxPlugin(options: RecoolerOptions) {
     renderChunk(code) {
       if (!selected(this.environment)) return;
       const state = stateFor(this.environment.name);
-      // Cache bridge calls AND copied adjacency once per render pass.
-      const adjacency = new Map<string, { deps: readonly string[]; page: boolean } | undefined>();
-      const edges = (id: string) => {
-        if (!adjacency.has(id)) {
-          const info = this.getModuleInfo(id);
-          adjacency.set(id, !info ? undefined : { deps: [...info.importedIds], page: info.exports.includes('default') });
-        }
-        return adjacency.get(id);
-      };
-      const table: Record<string, string[]> = Object.create(null);
-      const clients: Record<string, string[]> = Object.create(null);
-      for (const { file, chain } of seeds()) {
-        if (!edges(file)?.page) continue;
-        const seen = new Set<string>();
-        const actions = new Set<string>();
-        const slices = new Set<string>();
-        const visit = (id: string) => {
-          if (seen.has(id)) return;
-          seen.add(id);
-          const node = edges(id);
-          if (!node) return;
-          if (state.modules.get(canonicalId(id))?.actions) actions.add(relative(id));
-          if (state.modules.get(canonicalId(id))?.client) slices.add(relative(id));
-          node.deps.forEach(visit);
+      if (!rendered.has(this.environment.name)) {
+        // Cache bridge calls AND copied adjacency once per build, not per chunk.
+        const adjacency = new Map<string, { deps: readonly string[]; page: boolean } | undefined>();
+        const edges = (id: string) => {
+          if (!adjacency.has(id)) {
+            const info = this.getModuleInfo(id);
+            adjacency.set(id, !info ? undefined : { deps: [...info.importedIds], page: info.exports.includes('default') });
+          }
+          return adjacency.get(id);
         };
-        chain.forEach(visit);
-        table[relative(file)] = [...actions].sort();
-        clients[relative(file)] = [...slices].sort();
+        const table: Record<string, string[]> = Object.create(null);
+        const clients: Record<string, string[]> = Object.create(null);
+        for (const { file, chain } of seeds()) {
+          if (!edges(file)?.page) continue;
+          const seen = new Set<string>();
+          const actions = new Set<string>();
+          const slices = new Set<string>();
+          const visit = (id: string) => {
+            if (seen.has(id)) return;
+            seen.add(id);
+            const node = edges(id);
+            if (!node) return;
+            if (state.modules.get(canonicalId(id))?.actions) actions.add(relative(id));
+            if (state.modules.get(canonicalId(id))?.client) slices.add(relative(id));
+            node.deps.forEach(visit);
+          };
+          chain.forEach(visit);
+          table[relative(file)] = [...actions].sort();
+          clients[relative(file)] = [...slices].sort();
+        }
+        const enabled = options.htmx !== false && (options.htmx !== undefined || [...state.modules.values()].some(m => m.htmx));
+        // Hash the exact server inputs plus all static/dynamic graph inputs. No
+        // randomness or absolute project paths enter the public build version.
+        const clientBuild = this.environment.config.environments.client?.build;
+        const hash = createHash('sha256').update(JSON.stringify(clients)).update(clientEntry.toString())
+          .update(JSON.stringify({ base, minify: clientBuild?.minify, target: clientBuild?.target,
+            sourcemap: clientBuild?.sourcemap, define: this.environment.config.define,
+            banned: options.htmx && options.htmx.clientBannedImports?.map(String) }));
+        for (const id of [...this.getModuleIds()].sort((a, b) => relative(a).localeCompare(relative(b)))) {
+          const info = this.getModuleInfo(id);
+          if (id === internalTable || !info?.code) continue;
+          hash.update(relative(id)).update(state.transforms.get(canonicalId(id))?.source ?? info.code);
+        }
+        buildId = hash.digest('hex').slice(0, 20);
+        builtData = { table, clients, enabled };
+        builtData.preloads = preloads(builtData);
+        rendered.set(this.environment.name, builtData);
+        state.cached = { ...builtData, epoch: state.epoch };
       }
-      const enabled = options.htmx !== false && (options.htmx !== undefined || [...state.modules.values()].some(m => m.htmx));
-      builtData = { table, clients, enabled };
-      state.cached = { ...builtData, epoch: state.epoch };
-      if (!code.includes(token)) return;
+      const data = rendered.get(this.environment.name)!;
+      if (!code.includes(token) && !code.includes(versionToken)) return;
       const ms = new MagicString(code);
-      const needle = JSON.stringify(token);
-      const start = code.indexOf(needle);
-      ms.overwrite(start, start + needle.length, JSON.stringify(JSON.stringify({ table, clients, enabled })));
+      for (const match of code.matchAll(new RegExp(token + '|' + versionToken, 'g'))) {
+        ms.overwrite(match.index, match.index + match[0].length, match[0] === token
+          ? JSON.stringify(JSON.stringify(data)).slice(1, -1) : buildId);
+      }
       return { code: ms.toString(), map: ms.generateMap({ hires: true, includeContent: true }) };
     },
     generateBundle(_options, bundle) {
@@ -436,7 +503,15 @@ export function htmxPlugin(options: RecoolerOptions) {
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
         const banned = chunk.moduleIds.filter(id => id.includes("__vite-browser-external") || isBannedModule(patterns, id));
-        if (banned.length) this.error(`recooler: banned imports in client chunk ${chunk.fileName}:\n${banned.join('\n')}`);
+        const chains = banned.map(id => {
+          const chain = [id];
+          const seen = new Set<string>();
+          for (let current = this.getModuleInfo(id)?.importers[0]; current && !seen.has(current); current = this.getModuleInfo(current)?.importers[0]) {
+            seen.add(current); chain.unshift(current);
+          }
+          return chain.join(' → ');
+        });
+        if (banned.length) this.error(`recooler: banned imports in client chunk ${chunk.fileName}:\n${chains.join('\n')}`);
       }
     },
   };

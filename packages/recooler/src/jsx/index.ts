@@ -23,6 +23,8 @@ export interface RouteProps<TContext = RouteContext> {
   /** Matched manifest pattern, with route groups removed. */
   route: string;
   scripts: string[];
+  /** Module URLs for the current route. Render as rel="modulepreload" in custom roots. */
+  preloads?: string[];
   /** @deprecated Migrate custom roots to scripts (external module URLs). */
   clientScript?: string;
 }
@@ -49,6 +51,8 @@ export interface JSXPage {
   Root: RootHOC;
   head(ctx: RouteContext): Promise<RouteHead>;
   scripts: string[];
+  /** Module URLs for the current route. Render as rel="modulepreload" in custom roots. */
+  preloads?: string[];
   /** @deprecated */
   clientScript?: string;
 }
@@ -122,7 +126,7 @@ async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<Rou
   return head;
 }
 
-const markedRequests = new WeakSet<object>();
+declare const __RECOOLER_PRODUCTION__: boolean;
 
 export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
   return {
@@ -144,10 +148,14 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
       }
       // Custom roots may render their own body without using renderHeadElements. Put a
       // discoverable meta in the content slot, which works for those roots as well.
-      if (Root !== DefaultRootHOC) {
+      {
         const Page = Content;
         Content = (props: RouteProps) => createElement(Fragment, {},
-          !markedRequests.has(props.ctx) && createElement('meta', { name: 'recooler-route', content: props.route }),
+          createElement('meta', { name: 'recooler-route', content: props.route,
+            'data-recooler-version': props.scripts.filter(src => new URL(src, props.url).pathname.endsWith('/assets/recooler-client.js'))
+              .map(src => new URL(src, props.url).searchParams.get('v')).find(Boolean) }),
+          typeof __RECOOLER_PRODUCTION__ !== 'undefined' && !__RECOOLER_PRODUCTION__ && props.scripts.some(src => src.includes('virtual:recooler/client'))
+            && createElement('script', {}, dangerouslyPreventEscaping(`setTimeout(()=>{if(!globalThis.__recooler_entry_loaded)console.warn('recooler: client entry did not load; render props.scripts in your root and check CSP')},5000)`)),
           createElement(Page, props));
       }
       // Named contributions are available to adapters for collision policies. JSX
@@ -157,11 +165,15 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
       if (!Array.isArray(scripts) || scripts.some(script => typeof script !== 'string')) {
         throw new TypeError(`Invalid page scripts for ${route.file}: expected URL strings`);
       }
+      const preloads = extra.preloads ?? [];
+      if (!Array.isArray(preloads) || preloads.some(url => typeof url !== 'string')) {
+        throw new TypeError(`Invalid page preloads for ${route.file}: expected URL strings`);
+      }
       if (extra.clientScript != null && typeof extra.clientScript !== 'string') {
         throw new TypeError(`Invalid clientScript for ${route.file}: expected a string`);
       }
       const page: JSXPage = {
-        route, Root, Content, scripts: [...scripts],
+        route, Root, Content, scripts: [...scripts], preloads: [...preloads],
         clientScript: extra.clientScript as string | undefined,
         head: ctx => resolveHead(route, ctx),
       };
@@ -179,7 +191,7 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
           body = await renderToStream(
             (rid: RouteProps['rid']) => shell = Promise.resolve(createElement(page.Root(page.Content, page.clientScript), {
               rid, url: new URL(ctx.req.url), ctx, params, head, route: route.path,
-              scripts: requestScripts, clientScript: page.clientScript,
+              scripts: requestScripts, preloads: [...page.preloads ?? []], clientScript: page.clientScript,
             })).catch(error => { shellRejected = true; throw error; }),
             { waitUntil: promise => {
               // Shell errors are handled by render below (and Hono's onError).
@@ -249,13 +261,13 @@ function hasCharsetMeta(head: RouteHead): boolean {
 }
 
 export const DefaultRootHOC: RootHOC = Content => (props: RouteProps) => {
-  markedRequests.add(props.ctx);
   return createElement(Fragment, {},
     dangerouslyPreventEscaping('<!DOCTYPE html>'),
     createElement('html', {},
       createElement('head', {},
         !hasCharsetMeta(props.head) && createElement('meta', { charset: 'utf-8' }),
-        renderHeadElements(props.head)),
+        renderHeadElements(props.head),
+        props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href }))),
       createElement('body', { 'data-recooler-route': props.route },
         createElement(Content, props),
         props.scripts.map(src => createElement('script', { type: 'module', src })))));
