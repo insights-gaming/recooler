@@ -24,7 +24,7 @@ let server;
 try {
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await write('tsconfig.json', '{"compilerOptions":{"target":"ES2022","module":"ESNext"}}');
   await write('src/routes/index.tsx', routeSource);
   await write('src/entry.ts', `import app from 'virtual:recooler/app';\napp.onError(error => Response.json({ stack: error.stack }, { status: 500 }));\nexport default app;\n`);

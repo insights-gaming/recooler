@@ -44,7 +44,7 @@ describe('jsxPages', () => {
       { default: hoc('root'), head: { title: 'root' } },
       [{ default: hoc('outer'), head: extend('outer') }, { head: extend('head-only') }, { default: hoc('inner'), head: extend('inner') }]));
     expect(calls).toEqual(['outer', 'head-only', 'inner', 'page']);
-    expect(result).toBe('<root><meta name="recooler-route" content="/"/><outer><inner><p>page</p></inner></outer></root>');
+    expect(result).toBe('<root><outer><inner><p>page</p></inner></outer></root>');
   });
 
   it.each([undefined, null])('uses the default root when root.default is %s', async defaultExport => {
@@ -288,7 +288,7 @@ describe('client script URLs and route metadata', () => {
     expect(scripts).toEqual(['/one.js']);
   });
 
-  it('uses props.scripts per request and emits only one marker when a root wraps DefaultRootHOC', async () => {
+  it('uses props.scripts per request and emits no marker without client code when a root wraps DefaultRootHOC', async () => {
     const received: string[][] = [];
     const Root = (Content: Component<RouteProps>, clientScript?: string) => {
       expect(clientScript).toBeUndefined();
@@ -303,7 +303,7 @@ describe('client script URLs and route metadata', () => {
     const result = await html(a);
     expect(result).toBe(await html(a));
     expect(result).toContain('<body data-recooler-route="/"><p>page</p>');
-    expect(result).not.toContain('name="recooler-route"');
+    expect(result).not.toContain('data-recooler-marker');
     expect(received[0]).not.toBe(received[1]);
     expect(received[0]).toEqual(['/entry.js', '/root.js']);
   });
@@ -326,10 +326,10 @@ describe('client script URLs and route metadata', () => {
     expect(await html(app({ default: Page }, undefined, [], {}, [{ clientScript: source }, { scripts: ['/entry.js'] }]))).toContain('src="/entry.js"');
   });
 
-  it('emits a route-pattern meta for custom bodies even without renderHeadElements', async () => {
+  it('emits no marker for handler-free custom bodies', async () => {
     const manifest: Manifest = { version: 1, root: { default: hoc('body') }, tree: node({ default: Page }, [], '/:id') };
     const a = new Hono().route('/mount', createApp(manifest, { pages: jsxPages() }));
-    expect(await html(a, '/mount/42')).toBe('<body><meta name="recooler-route" content="/:id"/><p>page</p></body>');
+    expect(await html(a, '/mount/42')).toBe('<body><p>page</p></body>');
   });
 
   it('has no legacy ?script endpoint', async () => {

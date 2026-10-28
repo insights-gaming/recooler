@@ -11,7 +11,7 @@ const root = await mkdtemp(path.join(packageDir, '.cache/htmx-watch-'));
 const write = async (name, code) => { await mkdir(path.dirname(path.join(root, name)), { recursive: true }); await writeFile(path.join(root, name), code); };
 let watcher, completed = 0, failure;
 try {
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
@@ -47,6 +47,7 @@ try {
   let urls = actions(await page(app));
   assert.equal(urls.length, 2);
   assert.equal(await (await post(app, urls[1])).text(), 'other');
+  const initialPage = urls[0];
   const oldOther = urls[1];
   let previous = completed;
   await write('src/components/Other.tsx', `export const Other = () => <p>other removed</p>;`);
@@ -55,7 +56,16 @@ try {
   assert.equal(urls.length, 1);
   assert.equal(await (await post(app, urls[0])).text(), 'page', 'unchanged page action survives a cached rebuild');
   assert.equal((await post(app, oldOther)).status, 404);
-  const oldPage = urls[0];
+  assert.equal(await (await post(app, initialPage)).text(), 'page', 'URLs from unchanged defining modules survive rebuilds');
+  previous = completed;
+  await write('src/routes/index.tsx', `import { Other } from '../components/Other'; export default () => <><form hx-post={() => 'inserted'}/><form hx-post={() => 'page'}/><Other/></>;`);
+  app = await nextBuild(previous);
+  urls = actions(await page(app));
+  assert.equal(urls.length, 2);
+  assert.equal((await post(app, initialPage)).status, 404, 'old position zero cannot invoke the newly inserted action');
+  assert.equal(await (await post(app, urls[0])).text(), 'inserted');
+  assert.equal(await (await post(app, urls[1])).text(), 'page');
+  const oldPage = urls[1];
   previous = completed;
   await write('src/routes/index.tsx', `import { Other } from '../components/Other'; export default () => <><p>all actions removed</p><Other/></>;`);
   app = await nextBuild(previous);

@@ -18,7 +18,7 @@ const build = async (htmx = {}, extras = {}) => {
   return { html: await (await app.fetch(new Request('http://test/'))).text(), builder };
 };
 try {
-  await write('package.json', '{"type":"module"}'); await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}'); await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/server-only.ts', `globalThis.__serverMarker = 1; export const db = () => 'database';`);
   await write('src/routes/index.tsx', `import { db } from '../server-only'; const update = () => db(); export default () => <button hx-on:click={() => update()}/>;`);
@@ -32,16 +32,20 @@ try {
   await write('src/root.tsx', `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine'; export default (Content, clientScript) => props => <html><body><Content {...props}/><script>{dangerouslyPreventEscaping(clientScript ?? '')}</script></body></html>;`);
   const modern = await build(); assert(!modern.html.includes('import('), modern.html);
   const legacy = await build({ legacyClientScript: true });
-  assert.match(legacy.html, /<script>import\("\/static\/assets\/recooler-client\.js\?v=[^"]+"\)<\/script>/);
-  assert.match(legacy.html, /name="recooler-route" content="\/"/);
+  assert.match(legacy.html, /<script>import\("\/static\/assets\/recooler-client\.js\?v=[^"]+"\)\.then\(m=>m.init\(\)\)<\/script>/);
+  assert.match(legacy.html, /data-recooler-marker="true" data-recooler-route="\/"/);
   assert(!legacy.html.includes('this.textContent'));
   // The default root continues to render URL scripts even with the shim enabled.
   await rm(path.join(root, 'src/root.tsx'));
   const defaults = await build({ legacyClientScript: true });
   assert.match(defaults.html, /type="module" src="\/static\/assets\/recooler-client.js\?v=/);
   const first = defaults.html.match(/recooler-client.js\?v=([^"]+)/)[1];
-  const second = (await build()).html.match(/recooler-client.js\?v=([^"]+)/)[1];
-  assert.notEqual(first, second);
+  const second = (await build({ legacyClientScript: true })).html.match(/recooler-client.js\?v=([^"]+)/)[1];
+  assert.equal(first, second, 'identical inputs produce the same version');
+  await write('src/routes/index.tsx', `export default () => <button hx-on:click={function () { this.textContent = 'changed'; }}/>;`);
+  assert.notEqual(first, (await build()).html.match(/recooler-client.js\?v=([^"]+)/)[1]);
+  for (const base of ['./', '', 'relative/']) await assert.rejects(build({}, { base }), /relative Vite base is unsupported/);
+  assert((await build({}, { base: 'https://cdn.example.test/static/' })).html.includes('https://cdn.example.test/static/assets/recooler-client.js'));
   // Bad custom orchestration is an actionable error, not an empty route table.
   await assert.rejects(build({}, { builder: { buildApp: builder => builder.build(builder.environments.client) } }), /build the selected server environment before the client/);
   console.log(JSON.stringify({ clientOptions: true, rawBanned: true, resolvedBanned: true, legacyOptIn: true, cacheBusting: true }));

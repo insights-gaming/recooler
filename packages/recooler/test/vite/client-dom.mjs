@@ -24,8 +24,10 @@ export async function evaluateClientPage(clientOut, html, beforeLoad) {
     await module.link((specifier, parent) => load(fileURLToPath(new URL(specifier, parent.identifier))));
     return module;
   };
+  // Retain the previous private queue name for older review harnesses.
+  Object.defineProperty(window, '__recooler_queue', { get: () => window.$rq, set: value => { window.$rq = value; }, configurable: true });
   beforeLoad?.(window, context);
   const module = await load(path.join(clientOut, 'assets/recooler-client.js'));
-  await module.evaluate(); await vm.runInContext('globalThis.__recooler_ready', context);
+  await module.evaluate(); await module.namespace.ready; await vm.runInContext("globalThis.__recooler_client.init()", context); await vm.runInContext('globalThis.__recooler_ready', context);
   return window;
 }

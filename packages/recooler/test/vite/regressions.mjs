@@ -28,7 +28,7 @@ const waitFor = async (check) => {
 try {
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
-  await write('package.json', JSON.stringify({ type: 'module', dependencies: { 'ui-lib': '1.0.0' } }));
+  await write('package.json', JSON.stringify({ name: 'recooler-test-app', type: 'module', dependencies: { 'ui-lib': '1.0.0' } }));
   await write('tsconfig.json', '{}');
   await write('src/routes/index.tsx', `import { Badge } from 'ui-lib'; export default () => <h1><Badge/></h1>;`);
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);

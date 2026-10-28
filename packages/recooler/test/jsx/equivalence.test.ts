@@ -42,8 +42,7 @@ it('matches a custom root, removing only the legacy inline client script and add
   expect(expected).toContain('<script>(()=>{document.title="loaded";})()</script>');
   const app = createApp({ version: 1, root, tree: dir('', '/', customIndex) }, { pages: jsxPages() });
   const actual = await (await app.request('/')).text();
-  expect(actual).toBe(expected.replace('<script>(()=>{document.title="loaded";})()</script>', '')
-    .replace('<div id="app">', '<div id="app"><meta name="recooler-route" content="/"/>'));
+  expect(actual).toBe(expected.replace('<script>(()=>{document.title="loaded";})()</script>', ''));
 });
 
 for (const [name, module, expected] of [

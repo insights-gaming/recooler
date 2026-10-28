@@ -23,6 +23,8 @@ export interface RouteProps<TContext = RouteContext> {
   /** Matched manifest pattern, with route groups removed. */
   route: string;
   scripts: string[];
+  /** Module URLs for the current route. Render as rel="modulepreload" in custom roots. */
+  preloads?: string[];
   /** @deprecated Migrate custom roots to scripts (external module URLs). */
   clientScript?: string;
 }
@@ -49,6 +51,8 @@ export interface JSXPage {
   Root: RootHOC;
   head(ctx: RouteContext): Promise<RouteHead>;
   scripts: string[];
+  /** Module URLs for the current route. Render as rel="modulepreload" in custom roots. */
+  preloads?: string[];
   /** @deprecated */
   clientScript?: string;
 }
@@ -122,7 +126,7 @@ async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<Rou
   return head;
 }
 
-const markedRequests = new WeakSet<object>();
+const recoolerScript = (src: string) => /(?:\/assets\/recooler-(?:client|route-[a-f0-9]+)\.js|\/@id\/virtual:recooler\/(?:client|route\/))/.test(src);
 
 export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
   return {
@@ -142,13 +146,27 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         const source = route.rootFile ?? `root (used by ${route.file})`;
         throw new RouteValidationError([`Invalid root in ${source}: default export is not a function`]);
       }
-      // Custom roots may render their own body without using renderHeadElements. Put a
-      // discoverable meta in the content slot, which works for those roots as well.
-      if (Root !== DefaultRootHOC) {
+      // Full documents start async modules during streaming; identical deferred
+      // URLs still hold DOMContentLoaded. Fragment scripts follow the content so
+      // htmx 1 chooses the correct table/select parsing context.
+      {
         const Page = Content;
-        Content = (props: RouteProps) => createElement(Fragment, {},
-          !markedRequests.has(props.ctx) && createElement('meta', { name: 'recooler-route', content: props.route }),
-          createElement(Page, props));
+        Content = (props: RouteProps) => {
+          const modules = props.scripts.filter(recoolerScript);
+          const entry = modules.find(src => /(?:recooler-client\.js|virtual:recooler\/client)/.test(src));
+          const fragment = props.ctx.req.header('hx-request') === 'true' && !props.ctx.req.header('hx-boosted');
+          const startup = [
+            ...(!fragment && Root !== DefaultRootHOC ? props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href })) ?? [] : []),
+            ...modules.map(src => createElement('script', { type: 'module', src })),
+          ];
+          return createElement(Fragment, {},
+            ...(!fragment ? modules.map(src => createElement('script', { type: 'module', async: true, src })) : []),
+            ...(!fragment ? startup : []),
+            createElement(Page, props),
+            ...(fragment ? startup : []),
+            modules.length > 0 && createElement('template', { 'data-recooler-marker': 'true', 'data-recooler-route': props.route,
+              'data-recooler-version': entry && new URL(entry, props.url).searchParams.get('v') }));
+        };
       }
       // Named contributions are available to adapters for collision policies. JSX
       // uses the standard ordered extras merge and needs no extension-specific policy.
@@ -157,11 +175,15 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
       if (!Array.isArray(scripts) || scripts.some(script => typeof script !== 'string')) {
         throw new TypeError(`Invalid page scripts for ${route.file}: expected URL strings`);
       }
+      const preloads = extra.preloads ?? [];
+      if (!Array.isArray(preloads) || preloads.some(url => typeof url !== 'string')) {
+        throw new TypeError(`Invalid page preloads for ${route.file}: expected URL strings`);
+      }
       if (extra.clientScript != null && typeof extra.clientScript !== 'string') {
         throw new TypeError(`Invalid clientScript for ${route.file}: expected a string`);
       }
       const page: JSXPage = {
-        route, Root, Content, scripts: [...scripts],
+        route, Root, Content, scripts: [...scripts], preloads: [...preloads],
         clientScript: extra.clientScript as string | undefined,
         head: ctx => resolveHead(route, ctx),
       };
@@ -179,7 +201,7 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
           body = await renderToStream(
             (rid: RouteProps['rid']) => shell = Promise.resolve(createElement(page.Root(page.Content, page.clientScript), {
               rid, url: new URL(ctx.req.url), ctx, params, head, route: route.path,
-              scripts: requestScripts, clientScript: page.clientScript,
+              scripts: requestScripts, preloads: [...page.preloads ?? []], clientScript: page.clientScript,
             })).catch(error => { shellRejected = true; throw error; }),
             { waitUntil: promise => {
               // Shell errors are handled by render below (and Hono's onError).
@@ -249,16 +271,16 @@ function hasCharsetMeta(head: RouteHead): boolean {
 }
 
 export const DefaultRootHOC: RootHOC = Content => (props: RouteProps) => {
-  markedRequests.add(props.ctx);
   return createElement(Fragment, {},
     dangerouslyPreventEscaping('<!DOCTYPE html>'),
     createElement('html', {},
       createElement('head', {},
         !hasCharsetMeta(props.head) && createElement('meta', { charset: 'utf-8' }),
-        renderHeadElements(props.head)),
+        renderHeadElements(props.head),
+        props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href }))),
       createElement('body', { 'data-recooler-route': props.route },
         createElement(Content, props),
-        props.scripts.map(src => createElement('script', { type: 'module', src })))));
+        props.scripts.filter(src => !recoolerScript(src)).map(src => createElement('script', { type: 'module', src })))));
 };
 
 /** Logs the error; stack traces in HTML require an explicit opt-in. */

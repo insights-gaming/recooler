@@ -37,6 +37,11 @@ The Cloudflare plugin serves the Worker entry automatically.
 `recooler()` includes `routes()` for build-time generation and dev watching.
 `routes: { check: true }` compares committed output instead of writing it.
 The standalone `routes(options)` export remains usable for API-only apps.
+Colon parameter directories such as `routes/:id/` work in Cloudflare dev with
+Vite's default strict filesystem policy. The route plugin reads only exact known
+manifest inputs containing `:`; it does not disable the filesystem allow-list.
+These directory names cannot be checked out on Windows; prefer `routes/[id]/`.
+The generator returns a portability warning for names containing `:`.
 
 JSX defaults to the automatic `recooler/jsx` runtime per file. The plugin adds
 pragmas only when the file's own tsconfig and pragmas do not select a source or
@@ -84,16 +89,18 @@ declare module 'recooler/jsx' {
 ## Server htmx actions (Phase 4b)
 
 `recooler()` transforms `hx-*` source attributes in server mode before the JSX
-pragmas are added. It automatically installs the htmx extension when any loaded
+pragmas are added. Dev always installs the htmx extension so adding the first
+action through an import works immediately. Builds install it when a loaded
 source module contains `hx-`. Set `htmx: {}` to enable it explicitly or
 `htmx: false` to disable the transform and automatic extension. Handler strings
-are emitted with a pre-load queue; client chunks, route `onLoad` and `page.scripts` are wired automatically.
+call the shared dispatcher; static route modules, route `onLoad` and `page.scripts` are wired automatically.
 
 ```ts
 recooler({
   serverEnvironment: 'my_worker', // Cloudflare v1 Worker environment, if restricted
   htmx: {
     secretBinding: 'RECOOLER_SECRET', // default
+    namespace: 'my-app',            // required if nearest package.json has no name
     base: '/app',                   // only for prefix-stripping mounts/proxies
     trustedOrigins: ['https://app.example'],
   },
@@ -105,6 +112,8 @@ back to `process.env[binding]` on Node. Configure a Worker secret (a `.dev.vars`
 value locally); Cloudflare v2 also requires declaring the binding as a secret in
 `worker.env`. Supply a nonempty value before the first request to an action-bearing
 route. The key is never read during compilation or inlined into the JS bundle.
+Cloudflare copies `.dev.vars` into `dist/<worker>/` for local build preview; that
+file contains secrets, so keep build output private and out of source control.
 Rotation follows the runtime's env-identity cache; use a fresh env object or app.
 The plugin intentionally accepts a binding name rather than a literal secret.
 
@@ -118,11 +127,19 @@ import { htmx } from 'recooler/htmx';
 // })] });
 ```
 
-Always pass that namespace: it is a stable hash of the absolute srcDir and matches
-all generated registrations, isolating projects with identical relative module
-IDs. Module/action IDs are **srcDir-relative**, with POSIX separators (including
-`../` for outside-source modules). Farm compiler paths can include a different
-source-root prefix; do not persist old IDs across the migration. Only Vite transport
+Always pass that namespace: its app identity hashes the nearest `package.json`
+name and the POSIX `srcDir` path relative to that package root. The environment
+name is appended, along with a per-server nonce in dev. Moving a checkout leaves
+build identity unchanged; named apps built at the same Docker path remain
+separate. `htmx.namespace` overrides the app identity while retaining environment
+and dev isolation. Give every app a distinct package name or explicit namespace;
+build and dev startup reject a nearest package.json with no name unless an
+explicit namespace is set.
+Distinct apps, and separate deployments of one app such as staging and production,
+**must not share a signing secret**, even when their namespaces differ.
+It matches all registrations and isolates concurrent dev servers with identical
+relative module IDs. Module/action IDs are **srcDir-relative**, with POSIX separators (including
+`../` for outside-source modules). Farm compiler paths can include a different source-root prefix; do not persist old IDs across the migration. Only Vite transport
 `?v=`/`?t=` queries are removed; meaningful variants remain distinct.
 
 Production builds define `__RECOOLER_PRODUCTION__` as true. `htmx()` throws at
@@ -135,17 +152,23 @@ explicit unsafe mode. Bundler-independent consumers without this plugin must
 provide their own production policy.
 
 The D5 table follows surviving static imports/re-exports/side effects from each
-page route, its layouts and the root. It emits only action-bearing module IDs.
+page route, its router-resolved layouts (including canonical alias directories)
+and the root. It emits only action-bearing module IDs.
 Dynamic imports are not action roots. Barrels intentionally over-approximate at
 module precision; D6 signatures prevent foreign-route/path authorization. Routes
-without a page never receive table entries. Build adjacency is cached once per
-`renderChunk` pass; table replacement returns a source map. Dev uses the selected
+without a page never receive table entries. Both build and dev propagate action
+identities through reverse static edges, discovering shared closures once. Table
+replacement returns `map: null` when later mapped code does not move; combined
+lines use a boundary source map. Dev uses the selected
 server environment's lowered `transformResult.deps`, parallel discovery with cached
 adjacency, reverse-edge action propagation, stable graph epochs and deduped
 concurrent computations. Unchanged pure htmx transforms are cached across full
-reloads; source changes still re-evaluate every registration. Every source
-transform registers, including `{}` when actions are absent. Changes use
-`invalidateAll` and an SSR full reload. Route generation runs before platform
+reloads; source changes still re-evaluate every registration. Action transforms also run during warmup and before the table is imported, so
+manifest-first custom entries work. Empty dev registration
+starts only after that environment loads `virtual:recooler/htmx`. Reset hooks cover
+`srcDir`, declared action packages, and previously transformed action modules,
+including `{}` when actions are absent. Idle and auxiliary environments receive no
+empty-registration imports before they load the table. Changes invalidate only the virtual table and use a full SSR runner reload. Route generation runs before platform
 startup hooks, so eager workerd imports see the initial graph.
 
 Action packages must remain source inputs. Packages declaring `recooler` or
@@ -160,8 +183,19 @@ source transforms cannot discover a package they never receive. Custom Rolldown
 responsibility. `htmx.clientBannedImports` forwards raw-specifier checks to the
 transform and rejects banned resolved paths in every client chunk (lazy/shared included).
 
+Each registration includes a SHA-256 hash of the JSON tuple
+`[actionTransformVersion, definingModuleSource]` through the codegen contract.
+The transform exports `actionTransformVersion`; maintainers must bump it whenever
+action collection or numbering semantics change, even for unchanged source. V2 signed URLs bind that hash, namespace and mount base;
+editing a module invalidates old positional action IDs from that module.
+Function-valued action and `hx-on*` attributes reaching the JSX runtime throw a
+“module was not transformed” diagnostic instead of rendering server source.
+
 Verification fixtures: `test/vite/htmx-integration.mjs` (plain, Cloudflare v1,
-v2 beta), `htmx-options.mjs` (production guard and located diagnostics), and
+v2 beta), `htmx-options.mjs` (production guard and located diagnostics),
+`htmx-startup.mjs` (warmup, manifest-first entries, stable app identity,
+namespace overrides and same-path replay), `htmx-regressions.mjs` (alias layouts, table parity, map paths, edit matrix, shifted
+IDs and server/environment isolation; add `--cloudflare` for workerd), and
 `htmx-bench.mjs` (interleaved full-plugin/no-htmx build and edit-response gates).
 Run them with `pnpm --filter recooler exec node test/vite/<script>.mjs`; add
 `--cloudflare` to the benchmark for the 400/1,000-route workerd dev gate.
@@ -169,45 +203,106 @@ Run them with `pnpm --filter recooler exec node test/vite/<script>.mjs`; add
 
 ## Client scripts (Phase 5)
 
-`environments.client` is a client consumer whose input is
-`virtual:recooler/client`. Run `vite build`, or programmatically use
-`createBuilder(config).buildApp()`. The selected server environment discovers the
-same route → slice table that the client consumes; a build assertion rejects a
-mismatch or client-first orchestration. A post plugin hook builds server then
-client for plain Vite; it does not replace any platform's `builder.buildApp`.
-Only Recooler's own plugins opt into shared build state.
+Run `vite build`, or use `createBuilder(config).buildApp()`. Recooler adds
+`virtual:recooler/client` to `environments.client` while preserving user entries
+and an existing default `index.html`. Only Recooler's entry gets the reserved
+`assets/recooler-client.js` filename. Plain Vite builds server then client;
+Cloudflare retains its own builder, asset movement and bindings. Client outDir
+defaults to `dist/client`; read resolved environment outDirs on platform builders.
 
-The stable entry is `assets/recooler-client.js?v=<buildId>` under Vite's base.
-Server output needs no client manifest. Client outDir defaults to `dist/client`;
-platform overrides remain authoritative. Read the resolved environment outDirs,
-particularly with Cloudflare v2's `.cloudflare/output` convention. Cloudflare
-retains its Worker → client builder, manifests, asset movement and asset binding.
+The entry URL is `assets/recooler-client.js?v=<content hash>` under Vite's base.
+The generated entry embeds that version and refuses to dispatch a mismatched
+page, with one guarded reload per version pair. Identical graph/source-tree inputs, runtime, configuration and package/lock
+metadata produce the same version, including helpers pruned from server code. Versioned opaque slice filenames avoid stale lazy-chunk collisions.
+Keep old slices available during rolling deployments. Relative Vite bases are build errors. Server output needs no client manifest.
 
-Each `?recooler-handlers` variant transforms/slices the original source in one
-MagicString, returns its real map with original sourcesContent, and registers its
-own functions. The entry reads the rendered route pattern, imports only that
-route's reachable slices, and runs only that page's onLoad after registration and
-queue replay. Handler-free pages emit no entry URL; onLoad-only pages do.
+Client source maps default to **off**, and minification to **on**, independently
+of the top-level server build. Override with `environments.client.build.sourcemap`
+and `.minify`. Slices use the exact input seen by the server transform, including
+preceding plugins, and assert matching handler IDs. Their sourcesContent blanks
+dropped ranges and comments while preserving UTF-16 positions and newlines.
+Unsliced dependencies retain mappings without embedded source contents, including
+when they have tree-shaken server exports. Public entry lookup keys are opaque.
+Client chunks are public performance units; bans remain an application boundary.
 
-`htmx.clientBannedImports` patterns see raw specifiers in the scope check and
-resolved module paths in the bundle check. `htmx.legacyClientScript: true` opts
-legacy custom roots into an inline `import("<entry URL>")` string; the default is
-undefined. New roots render `props.scripts` module URLs.
+Initial pages include `assets/recooler-route-<route hash>.js?v=<version>` modules.
+Each imports its own reachable slices and shares dependencies with other entries.
+Names hash route.file and are guessable; public chunks are not a confidentiality
+boundary. The general entry is `assets/recooler-client.js?v=<version>`.
 
-Full-page navigation initializes clients in 0.1.0. Disable hx-boost for links that
-change routes. Same-route swaps can use the existing route's handlers; swapping
-a new route marker does not load a new route. Early function-handler events queue
-with their element, event and capture scope, including events before the module
-entry starts. Queued event return values/preventDefault cannot act synchronously.
-The entry waits for document parsing, so onLoad follows a completed Suspense
-stream; load failures reject `globalThis.__recooler_ready`. See the
-[migration guide](../../../../docs/migration-0.1.md) for timing, CSP and legacy
-root details. Per-route chunks are public performance units, not a secrecy boundary.
+Full-page Content starts async and deferred copies of the same client/route
+module URLs. The module map evaluates each once. Async modules register during
+Suspense streaming, including consumer renderers calling `.forEach(htmx.process)`;
+deferred copies still guarantee registration before DOMContentLoaded. Non-boosted
+htmx fragments put module scripts after the content and omit preload links, keeping
+htmx 1's table-row parsing intact. No parser-blocking gate is emitted or fetched.
 
-Dev changes invalidate the client entry and send a full reload over the real HMR
-channel, alongside the full server reload. `test/vite/client-integration.mjs`
-checks one CLI build, assets, emitted ESM with Happy DOM, queue replay, onLoad,
-shared/admin chunk separation, built/dev source maps and websocket reloads on
-plain Vite, Cloudflare v1 and v2. Run it with
-`node --experimental-vm-modules test/vite/client-integration.mjs [plain|cloudflare|beta]`.
-`client-options.mjs` covers both banned-import checks and the legacy opt-in.
+Generated hx-on code calls `(self.$rc||fallback)(id,scope,this,event)`. Before the
+entry arrives, the fallback prevents only htmx:confirm and stores its arguments in
+`self.$rq`. The entry drains held events through its deferred path, even if their
+handlers registered first, and calls the original `issueRequest()` without a skip
+argument when allowed. htmx's own hx-confirm prompts therefore still accept or
+cancel the request. Loaded handlers run immediately with the original event.
+
+Held confirms preserve cancellations from other listeners: an already-prevented
+confirm is not held, and later calls to its `preventDefault()` suppress automatic
+continuation. The hold wraps that method on the event. Calls through a previously
+bound original or `Event.prototype.preventDefault.call(event)`, and setting
+`returnValue = false` after the hold, bypass the wrapper and cannot be distinguished
+from recooler's own prevention. Use the event's `preventDefault()` method.
+
+htmx 1.9.12 installs wildcard hx-on listeners after issuing synchronous load
+requests. This also affects 0.0.27 and cold boosts from handler-free pages. Generated
+confirm attributes rendered with `recooler/jsx` receive a legacy `hx-on` alias
+which evaluates their canonical attribute early; htmx 1 replaces this listener during normal processing
+and htmx 2 ignores it. Raw string hx-on load guards still have the upstream htmx 1
+ordering limitation. Consumers retaining `jsxImportSource: easy-jsx-html-engine`
+also lack this alias (the plugin warns); their generated load guards remain
+unprotected on htmx 1 until normal listener installation. The fallback and alias use htmx's existing hx-on eval permission.
+
+Handlers run immediately when their slice registers, independent of marker
+completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
+Route onLoad runs at DOMContentLoaded or immediately if parsing has finished,
+sees the complete DOM, and is never awaited. Rejections go to reportError (with a
+console.error fallback). Root/layout onLoad stays ignored.
+
+The entry exports init() and observes afterSwap, afterSettle and historyRestore.
+Only client-bearing pages get a trailing template[data-recooler-marker] with route
+and version. It survives table parsing and htmx 1 history; handler-free pages emit
+no marker. Body attributes are never a fallback. New markers run their own route
+onLoad once; unchanged markers do not rerun, and history restoration does rerun.
+
+Only confirm is canceled/deferred while handlers load. All other missing handlers,
+including config-request/before-request, drop events and leave defaults untouched. Dev warns for dropped events. Native preventDefault guards can
+be bypassed during a post-swap loading window; use htmx:confirm to gate requests.
+No native click/submit replay exists. Detached targets are skipped.
+
+__recooler_ready tracks registration and onLoad invocation, not async onLoad
+completion. Failed imports retry with a fresh URL, then attempt one guarded reload
+per client version. Version mismatch reloads once per HTML/client version pair,
+then refuses dispatch and cancels confirms; non-confirm defaults remain untouched.
+Custom createApp entries pass clientModules/clientPreloads alongside clients and
+clientEntry. legacyClientScript still supplies import(entry).then(m=>m.init()).
+
+If the client runtime itself fails to load, its fallback-held confirms remain
+blocked for the tab: no handler or recovery code can drain them. Slice retry and
+reload recovery require a loaded runtime and do not cover this failure. The browser
+reports the failed module fetch; there is no additional recooler error reporter or
+retry for entry load failure. Restore asset delivery and refresh the page to recover.
+
+Load classic htmx before the module scripts. See the migration guide for details.
+
+Bans, exact server input slicing, dev fs authorization, redacted maps, and opaque
+lookup keys remain enforced. Dropped slice comments are removed even with minify:false.
+Server graph edits retain SSR runner invalidation; client table changes (including onLoad metadata) trigger a
+client reload, while unrelated SPA CSS/TypeScript edits keep normal Vite updates.
+Build watch orders client rebuilding after server output.
+
+`test/vite/client-htmx.mjs` uses headless Chromium through Playwright with real
+htmx 1.9.12 and 2.x. Install its browser with `pnpm --filter recooler exec playwright
+install chromium`. It covers static/DCL and Suspense ordering, all request replay
+attacks, native defaults during swaps, body lifecycle loops, A→B→C→Back for both
+root styles, HX-Location, push-url, fragments, failure retries and guarded reloads.
+The jsdom proxy fixture still runs two real Workers through /_admin; Happy DOM
+checks emitted ESM, sharing, maps and route isolation. client-hmr.mjs checks that
+unrelated CSS and TypeScript edits send updates only.

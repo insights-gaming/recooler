@@ -28,6 +28,8 @@ export interface ActionUrlEmission {
   helper: string;
 }
 export interface RegistrationEmission {
+  namespace?: string;
+  moduleHash?: string;
   moduleId: string;
   actions: readonly Action[];
   helper: string;
@@ -48,6 +50,8 @@ export interface TransformOptions {
   rawTransfer?: boolean;
   /** Vite delivery: queue events until the route's lazy slices have loaded. */
   queueHandlers?: boolean;
+  /** Warn when an unavailable handler cannot safely defer its event. */
+  dev?: boolean;
   codegen?: {
     actionUrl?: (input: ActionUrlEmission) => string;
     registerActions?: (input: RegistrationEmission) => string;

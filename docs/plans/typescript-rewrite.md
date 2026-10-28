@@ -356,7 +356,7 @@ Implementation:
 
 ### 3.2 Per-route action registration (D5, decided: registry plus module graph)
 
-Each route must accept exactly the actions reachable from its module, its layouts and the root, at module precision as in 0.0.27.
+Each route must accept exactly the actions reachable from its module, its layouts and the root, at module precision as in 0.0.27. Seed the graph from the generator’s resolved `layoutFiles` and `rootFile`, so canonical alias directories use the same chains as the router. Build and dev share reverse-edge action propagation.
 
 **★ Registry plus build-time graph.**
 - Every transformed htmx module registers its actions as a side effect: `registerActions("src/components/Button.tsx", { post: { "…@0": _action$post$0 } })`.
@@ -377,8 +377,8 @@ Each route must accept exactly the actions reachable from its module, its layout
   - Cache adjacency across routes and walk in parallel. The spike's per-route walk took about 2.9 s after an edit at 1,000 routes.
   - Recompute until the graph epoch is stable, and dedupe concurrent walks.
   - The table reaches the Worker through a virtual module.
-- **Dev registration.** Every server-environment transform of a source module registers, even with `{}`, so an action removed after a dev-server restart can't survive in the persistent registry. Route reachability alone does not prevent stale actions.
-- **Dev reloads.** For v1, a full SSR reload with `invalidateAll` on change. Scoped invalidation is a later investigation, because the Node runner kept stale route modules without it. Gate on dev time-to-response after an edit.
+- **Dev registration.** Activate registration only once an environment loads `virtual:recooler/htmx`. Reset hooks cover `srcDir`, declared action dependencies, and previously transformed action modules, including `{}` after action removal. Use a namespace containing the project, environment name and a per-server dev nonce; idle and auxiliary environments must receive no registrations.
+- **Dev reloads.** Invalidate the virtual action table and retain a full SSR runner reload, re-evaluating all modules while caching unchanged transforms. The Phase 4b review’s full Node/workerd edit matrix validated this targeted variant. Dev always installs the extension unless `htmx: false`, including before the first action import. Gate edit time against stock Vite HMR and explicit Node/workerd time budgets.
 - **Environments and dependencies.**
   - Select the configured Worker environment; `consumer === "server"` is necessary but not sufficient.
   - Canonicalise `?v=`/`?t=` queries.
@@ -413,42 +413,22 @@ Either way:
 
 ### 3.4 Client scripts (D4)
 
-- **Client-slice modules.** For each source module with handlers, the plugin serves a `?recooler-handlers` variant.
-  - The variant is transformed exactly like the original, so IDs match.
-  - It is then sliced down to the `_handler$N` exports, the route module's `onLoad`, and the module-level declarations and imports they reference.
-  - Port the slice rules from `slice_handler_module` in `src/htmx/transform.rs`: breadth-first reference walk, type-only imports trimmed, partially used imports trimmed, `onLoad` recognised in its three forms in route modules only, and a warning when a layout or the root exports `onLoad`.
-  - Each slice registers its own handlers (`$handlers["…@2"] = _handler$2`), so no entry needs to know the IDs.
-- **★ Per-route lazy chunks.**
-  - The client entry maps a route path to `() => import(slice)` for the slices that route reaches. Rolldown dedupes shared slices.
-  - This keeps per-page module side effects per page, as in 0.0.27, and stops admin-only handler code reaching public pages.
-  - The entry's module list comes from the server build's graph (`buildApp`, server first), so no glob pre-scan is needed.
-  - The alternative is one global bundle.
-- **Loading.**
-  - Pages link the entry with `<script type="module" src>` through the extension's `page.scripts`.
-  - The entry reads `data-recooler-route`, loads that route's chunk, installs `window.$handlers`, and calls `onLoad` itself. There is no inline script, so no CSP nonce is needed.
-  - `hx-on` attributes themselves still need `unsafe-eval`, as with htmx in general; document this.
-  - Handlers triggered before the chunk loads: queue them in a tiny stub, or document it.
-- **Build.** Declare `environments.client` with `build.rolldownOptions.input` set to the virtual entry, so one `vite build` builds both environments, as `@cloudflare/vite-plugin` already does.
-  - The client entry has a **stable file name** with a `?v=<buildId>` query, so the server never needs the client manifest, and the Cloudflare plugin's own Worker → client order is a correct two-pass build.
-  - Don't override `builder.buildApp` in `config`. The spike did, and it dropped the Cloudflare plugin's asset step and forced `sharedPlugins`.
-  - Assert that the route → slice table the client build uses matches the server build's.
-  - The Environment API is RC, and `createBuilder`/`buildApp` are still `@experimental`, so pin the Vite minor.
-- **Isolation.** Per-route chunks are a performance measure, not a confidentiality boundary: the entry's route map and every chunk are public.
-- **Source maps for slices.** `?recooler-handlers` slices are virtual modules with real source. Produce the transform and the slice from one MagicString, or compose with remapping, and test it.
-- **Server mode.** The transform drops `_handler$N` exports and every import used only by handler bodies. This is required: Rolldown keeps and evaluates side-effectful modules whose importing export was tree-shaken.
-- **`clientBannedImports`.** Port both checks:
-  - the per-handler reference chain (`_handler$2 → updateTable → dbClient`), with `import()` and global `require` specifiers
-  - a path check over every module in the client bundle, in the client environment's `generateBundle` over `chunk.moduleIds`
-
-  Patterns match the raw specifier in the first check and resolved paths in the second; document that.
-- **Dev:** the client entry is a virtual module, invalidated when a file containing `hx-on` changes.
+- **Client slices.** Each handler-bearing source module has a `?recooler-handlers` variant, transformed from the exact server input so handler IDs match. One MagicString retains handler exports, the owning route's `onLoad`, and their reachable declarations/imports; server-only code, comments and type-only imports are removed. Slices register their own `$handlers` entries. Root/layout `onLoad` is ignored with a warning.
+- **Static per-route modules.** Each route entry imports its reachable slices and registers their namespaces with a shared runtime. Deterministic opaque route/slice names and a content-derived version come from the server graph, source tree, runtime, settings and package metadata. Shared dependencies are deduplicated; unrelated routes' slices are not evaluated on initial load. Chunks and the route map are public, not a confidentiality boundary.
+- **Loading and parsing.** Full pages emit async and deferred copies of identical external client/route module URLs. Async evaluation can register handlers during streaming; deferred evaluation holds DOMContentLoaded. The module map evaluates each URL once. `onLoad` runs after parsing, sees the complete DOM and is not awaited; failures are reported. Non-boosted htmx fragments put modules after content and omit preloads to preserve htmx 1 table parsing.
+- **Markers and swaps.** Client-bearing routes alone emit trailing `template[data-recooler-marker]` elements containing route/version. Init scans markers after swaps, settle and history restoration, lazily imports missing slices and invokes `onLoad` once per new marker. There is no stale-body fallback. Registered root/layout handlers remain usable during body swaps.
+- **Early events.** Generated hx-on attributes call the runtime or a local inline fallback. Only unavailable `htmx:confirm` listeners hold requests; the fallback queues their arguments until runtime startup. Deferred handlers use the original `issueRequest()` continuation, preserving native hx-confirm prompts. Confirms already canceled by another listener are not held; later calls to the event's `preventDefault()` suppress automatic continuation. The `recooler/jsx` runtime adds a legacy hx-on alias for generated confirms so htmx 1 installs them before synchronous load requests. Other missing handlers are dropped without canceling defaults; development warns. No native event replay exists.
+- **Recovery.** Failed lazy imports retry at a fresh URL, then attempt one sessionStorage-guarded reload per client version; persistent failure reports an error. HTML/client version mismatch allows one guarded reload per version pair, then refuses handler dispatch and cancels confirms. Unavailable sessionStorage disables automatic reloads. A runtime that itself never loads cannot drain held confirms or run recovery; the documented fallback is to restore asset delivery and refresh.
+- **Build and dev.** Declare a client environment and build it after the selected server consumer without replacing Cloudflare's builder. The shared entry keeps a stable filename; route entries use deterministic opaque names, with versioned URLs and slice filenames. Assert server/client route-table agreement. Honor absolute Vite `base` paths, including proxied Workers such as `/_admin`; reject relative bases. Dev serves virtual modules and invalidates client inputs on edits. Pin Vite's minor while the Environment API is experimental.
+- **Source maps and imports.** Client maps default off and minification on, independently of server settings. Opt-in maps redact dropped source/comments while preserving positions; unsliced dependencies omit embedded source contents. `clientBannedImports` checks raw specifiers along retained handler/onLoad reference chains (including literal dynamic imports/global require), then resolved paths across every emitted client chunk.
+- **Documented limits.** hx-on needs htmx's unsafe-eval permission. Native click/submit and config/before-request guards can be bypassed before registration; use confirm for request gating. Raw string guards and consumers retaining the easy-jsx-html-engine JSX runtime lack the generated htmx 1 load alias. Deferred events lack dispatch-time properties such as currentTarget; detached targets are skipped. Cancellation bypassing the event's wrapped method (a pre-bound/prototype `preventDefault`, or `returnValue = false` after the hold) cannot be distinguished from recooler's own default prevention. Modules reachable only by server dynamic imports are outside the static graph. Keep old slices available during rolling deployments.
 
 ### 3.5 Runtime and security (`recooler/htmx` extension)
 
 Ported from `src/helpers.ts`:
 
 - **Helpers:** `wrapAction`, `wrapActionWithPayload`, `actionScope`, `handlerScope`, scope serialization checks, and `actionsMiddleware`, with 0.0.27's result handling and 404 for unknown actions.
-- **★ Sign every action URL (D6),** including actions without captures. Sign over the binding's route id (`route.file`) and exact pathname, the method, the action id and the scope. Verify against the receiving registration's own binding. On a mismatch, call `next()`, so fall-through still works and a foreign or replayed URL ends in 404. Because params are inside the pathname, a URL signed on `/users/1` doesn't replay on `/users/2`, and identical paths in different groups are distinguished by route id.
+- **★ Sign every action URL (D6),** including actions without captures. Sign the `recooler.action.v2` tuple over the namespace, normalized mount base, defining-module content hash, binding's route id (`route.file`) and exact pathname, method, action id and scope. Emit the module's SHA-256 at transform time through `RegistrationEmission`, preserving URLs across builds when that module is unchanged. Verify against the receiving registration's own binding. On a mismatch, call `next()`, so fall-through still works and a foreign or replayed URL ends in 404. Because params are inside the pathname, a URL signed on `/users/1` doesn't replay on `/users/2`, and identical paths in different groups are distinguished by route id.
   - This limits an action to the routes that rendered it.
   - In 0.0.27, a route that merely imports a barrel re-exporting an admin component accepts that admin action under its own middleware.
   - Optionally add an expiry and a session id.
@@ -541,11 +521,12 @@ Slicing, the client environment, per-route chunks, `onLoad`, and dev invalidatio
 Exit criteria: event handlers work in the template, a test asserts that no server-only code reaches the client bundle, and dev HMR works.
 
 Implemented on `ssttevee/ts-client`: `playground-vite/` runs beside the Farm
-playground; all client conformance checks are enabled. The legacy-root opt-in is
-`htmx.legacyClientScript: true` (inline import of the stable entry). Early function
-events queue their this/event/scope, even before entry execution. The client waits
-for document parsing, registers slices, replays events, then runs the owning page's
-onLoad. Route-changing htmx navigation requires a full page load in 0.1.0.
+playground; all client conformance checks are enabled. After round 2 review,
+initial pages use deterministic static route module entries, including legacy
+roots, with registration/onLoad before htmx's DOMContentLoaded startup. No initial
+queue. Swap initialization loads every route marker and runs onLoad per inserted
+marker. Only confirm uses a deferred continuation; config/beforeRequest run late,
+and other early events are dropped without canceling defaults or replaying requests.
 See [verification](../reviews/ts-client-implementation.md) and the migration guide.
 
 ### Phase 6: migration and cutover
@@ -573,9 +554,9 @@ Recommended defaults are marked ★.
 | D1 | Packaging | ★ one package with subpath exports and a new name (before the first publish) · separate packages |
 | D2 | `routes.gen.ts` in git | ★ committed, with `generate --check` in CI · gitignored |
 | D3 | Action URLs | **Decided:** ambient context plus a per-route binding `{routeId, pathname}` (§3.3) |
-| D4 | Client scripts | **Decided:** per-route lazy chunks, with a stable entry file name (§3.4) |
+| D4 | Client scripts | **Decided:** static per-route modules, async/deferred startup and lazy swaps (§3.4) |
 | D5 | Action registration | **Decided:** registry plus module graph, with the dev requirements in §3.2 |
-| D6 | Action signing | ★ every action URL, bound to route id, pathname and method · captured scopes only (as 0.0.27) |
+| D6 | Action signing | ★ every action URL, bound to app namespace/base, module hash, route id, pathname and method · captured scopes only (as 0.0.27) |
 | D7 | CSRF | ★ `HX-Request` plus `Sec-Fetch-Site`/`Origin` on all actions, on by default · opt-in |
 | D8 | Scope analysis | ★ `@typescript-eslint/scope-manager` at runtime · hand-written analyzer |
 | D9 | Middleware order across the plain/group boundary | ★ keep 0.0.27 (plain-directory middleware first; documented) · strict depth order, which loses unmatched-path semantics for plain directories |

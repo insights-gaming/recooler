@@ -3,7 +3,7 @@ import { contextStorage } from 'hono/context-storage';
 import { Fragment, type Children } from 'easy-jsx-html-engine';
 import { createElement } from '../jsx/jsx-runtime.js';
 import type { RouterExtension } from '../router/index.js';
-import { getActionRegistry, bindingKey, findAction, getActionBinding } from './runtime.js';
+import { getActionRegistry, bindingKey, findRegisteredAction, getActionBinding } from './runtime.js';
 import { createActionSigner, type ActionSigner } from './signing.js';
 import { timingSafeEqual } from './crypto.js';
 
@@ -16,6 +16,10 @@ export interface HtmxOptions<E extends Env = Env> {
   clients?: ActionTable;
   /** Stable external module URL, including build cache-busting query. */
   clientEntry?: string;
+  /** Deterministically named static route modules, supplied by Vite. */
+  clientModules?: Readonly<Record<string, string>>;
+  /** Current route modulepreloads, supplied by Vite. */
+  clientPreloads?: Readonly<Record<string, readonly string[]>>;
   /** Explicit opt-in for roots that inline their second argument as JavaScript. */
   legacyClientScript?: boolean;
   /** Env functions are resolved synchronously and cached by env object identity. */
@@ -104,12 +108,13 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
         if (!allowed) return c.text('Forbidden', 403);
         const bound = getActionBinding(c);
         const actionId = c.req.query('action')!;
+        const registered = findRegisteredAction(bound.modules, c.req.method, actionId, bound.namespace);
+        if (!registered) return next();
         const json = c.req.query('scope');
         const signature = bound.sign({ routeId: bound.routeId, pathname: bound.pathname,
-          method: c.req.method, actionId }, json ?? '');
+          method: c.req.method, actionId, namespace: bound.namespace, base: bound.base, moduleHash: registered.moduleHash }, json ?? '');
         if (signature !== undefined && (json === undefined || !timingSafeEqual(c.req.query('sig') ?? '', signature))) return next();
-        const action = findAction(bound.modules, c.req.method, actionId, bound.namespace);
-        if (!action) return next();
+        const { action } = registered;
         try {
           const result = await action(c);
           if (result instanceof Response) return result;
@@ -127,8 +132,9 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
       const hasClient = hasPage && !!options.clients?.[route.file]?.length && !!options.clientEntry;
       return {
         methods: [...methods],
-        middleware: [binding, dispatch], reserved: reserves, page: { scripts: hasClient ? [options.clientEntry!] : [],
-          ...(hasClient && options.legacyClientScript ? { clientScript: `import(${JSON.stringify(options.clientEntry).replaceAll('<', '\\u003c')})` } : {}) },
+        middleware: [binding, dispatch], reserved: reserves, page: { scripts: hasClient ? [options.clientEntry!, ...(options.clientModules?.[route.file] ? [options.clientModules[route.file]!] : [])] : [],
+          preloads: hasClient ? [...(options.clientPreloads?.[route.file] ?? [])] : [],
+          ...(hasClient && options.legacyClientScript ? { clientScript: `import(${JSON.stringify(options.clientEntry).replaceAll('<', '\\u003c')}).then(m=>m.init())` } : {}) },
       };
     },
   };

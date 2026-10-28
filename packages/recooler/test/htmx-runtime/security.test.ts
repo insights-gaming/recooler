@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import type { Context } from 'hono';
+import { Hono, type Context } from 'hono';
 import { htmx } from '../../src/htmx/index.js';
 import { actionUrl, registerActions } from '../../src/htmx/runtime.js';
 import { createApp } from '../../src/router/index.js';
@@ -102,4 +102,51 @@ it('binds actionUrl before handlers of extensions listed ahead of htmx', async (
   const target = await render(a);
   expect(target).toBe(url('/', 'a'));
   expect(await (await submit(a, target)).text()).toBe('action');
+});
+
+it.each(['namespace', 'base', 'both'] as const)('rejects cross-app replay with a shared secret: %s', async identity => {
+  const make = (name: string) => {
+    const namespace = identity === 'base' ? 'same-app' : name;
+    registerActions('same-module', { post: { a: () => name } }, namespace, 'same-source');
+    return app(manifest({ 'index.tsx': { default: () => h('form', { 'hx-post': actionUrl('a', {}) }) } }),
+      { 'routes/index.tsx': ['same-module'] }, { namespace, base: identity === 'namespace' ? '' : '/' + name });
+  };
+  const first = make('a'), second = make('b');
+  if (identity === 'namespace') {
+    const target = extract(await render(first));
+    expect((await submit(first, target)).status).toBe(200);
+    expect((await submit(second, target)).status).toBe(404);
+  } else {
+    const parent = new Hono();
+    // Emulate a prefix-stripping mount on Hono 4 and 5.
+    parent.all('*', c => {
+      const incoming = new URL(c.req.url);
+      const target = incoming.pathname.startsWith('/a/') ? first : second;
+      incoming.pathname = incoming.pathname.slice(2);
+      return target.fetch(new Request(incoming, c.req.raw));
+    });
+    const target = extract(await render(parent, '/a/'));
+    expect((await submit(parent, target)).status).toBe(200);
+    expect((await submit(parent, target.replace(/^\/a\//, '/b/'))).status).toBe(404);
+  }
+});
+
+it('rejects a shifted positional ID after its defining module changes, preserving unchanged-module URLs', async () => {
+  const namespace = 'shifted-actions';
+  const make = () => app(manifest({ 'index.tsx': { default: () => h('form', { 'hx-post': actionUrl('module@0', {}) }) } }),
+    { 'routes/index.tsx': ['module', 'unchanged'] }, { namespace });
+  registerActions('module', { post: { 'module@0': () => 'old action' } }, namespace, 'old-module-hash');
+  registerActions('unchanged', { post: { stable: () => 'stable action' } }, namespace, 'stable-module-hash');
+  const first = make();
+  const old = extract(await render(first));
+  const stablePage = app(manifest({ 'index.tsx': { default: () => h('form', { 'hx-post': actionUrl('stable', {}) }) } }),
+    { 'routes/index.tsx': ['unchanged'] }, { namespace });
+  const stable = extract(await render(stablePage));
+  const shifted = vi.fn(() => 'different action now at position zero');
+  registerActions('module', { post: { 'module@0': shifted, 'module@1': () => 'old action' } }, namespace, 'new-module-hash');
+  const second = make();
+  expect((await submit(second, old)).status).toBe(404);
+  expect(shifted).not.toHaveBeenCalled();
+  expect(await (await submit(second, extract(await render(second)))).text()).toBe('different action now at position zero');
+  expect(await (await submit(stablePage, stable)).text()).toBe('stable action');
 });

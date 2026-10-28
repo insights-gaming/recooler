@@ -17,7 +17,7 @@ const compile = async (extra = {}, options = {}) => {
   return { load: () => import(pathToFileURL(path.join(root, outDir, 'app.mjs'))), code: await readFile(path.join(root, outDir, 'app.mjs'), 'utf8') };
 };
 try {
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await write('src/routes/index.tsx', `export default () => <form hx-post={() => 'signed'}/>;`);
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
@@ -46,6 +46,11 @@ try {
   customLogger.warn = message => warnings.push(message);
   await compile({ customLogger });
   assert(warnings.some(message => message.includes('onLoad') && message.includes('root.tsx') && /1:|1 \u2502|1\s*\|/.test(message)), warnings.join('\n'));
+  await write('src/entry.ts', `import app from 'virtual:recooler/app'; app.onError(error => new Response(error.message, { status: 500 })); export default app;`);
+  const missingBinding = (await (await compile({}, { htmx: { secretBinding: 'CUSTOM_ACTION_SECRET' } })).load()).default;
+  const missingResponse = await missingBinding.fetch(new Request('http://test/'), {});
+  assert.equal(missingResponse.status, 500);
+  assert.match(await missingResponse.text(), /recooler:.*CUSTOM_ACTION_SECRET.*\.dev.vars.*process.env/);
   await write('src/entry.ts', `export { namespace as default } from 'virtual:recooler/htmx';`);
   const originalNamespace = (await (await compile()).load()).default;
   await write('other-src/routes/index.tsx', `export default () => <p>other project source</p>;`);

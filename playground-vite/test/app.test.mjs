@@ -25,11 +25,16 @@ test('TS playground renders routes, signed actions, lazy handlers and onLoad', a
   vm.runInContext('(function(event){' + button.getAttribute('hx-on:click') + '})', vm.createContext(window)).call(button, new window.Event('click'));
   assert.equal(button.textContent, 'clicked 1');
   await window.happyDOM.close();
+  const admin = await evaluateClientPage(clientOut, await (await request('/admin')).text());
+  const grouped = admin.document.querySelector('#admin-handler');
+  vm.runInContext('(function(event){' + grouped.getAttribute('hx-on:click') + '})', vm.createContext(admin)).call(grouped, new admin.Event('click'));
+  assert.equal(grouped.textContent, 'admin clicked');
+  await admin.happyDOM.close();
 });
 
 test('every emitted client chunk excludes the database and server runtime', async () => {
   const directory = path.resolve('dist/client/assets');
-  const chunks = (await readdir(directory)).filter(file => file.endsWith('.js'));
+  const chunks = (await readdir(directory)).filter(file => file.endsWith('.js') || file.endsWith('.map'));
   assert(chunks.length >= 2);
   const code = (await Promise.all(chunks.map(file => readFile(path.join(directory, file), 'utf8')))).join('\n');
   assert(code.includes('clicked'));

@@ -134,7 +134,7 @@ export const tsTarget: Target = {
       await mkdir(cache, { recursive: true });
       await cp(src, path.join(cache, "src"), { recursive: true });
       await symlink(path.join(packageDir, "node_modules"), path.join(cache, "node_modules"), "dir");
-      await writeFile(path.join(cache, "package.json"), '{"type":"module"}\n');
+      await writeFile(path.join(cache, "package.json"), '{"name":"recooler-conformance-app","type":"module"}\n');
       await writeFile(path.join(cache, "htmx-options.json"), JSON.stringify(scenario.ts?.htmxOptions ?? {}));
       let logs: string;
       try {
