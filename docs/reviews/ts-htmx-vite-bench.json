@@ -1,0 +1,998 @@
+{
+  "date": "2026-10-28T05:35:52.899Z",
+  "node": "v22.22.2",
+  "limits": {
+    "buildRatio": 6,
+    "linearity100to400": 5.5,
+    "editRatio": 6,
+    "editFloorMs": 100,
+    "editOverheadMs": 500,
+    "editOverheadRatio": 0.5,
+    "nodeEditMaxMs": 2500
+  },
+  "samples": [
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": true,
+      "ms": 98.72466600000007,
+      "bytes": 229101,
+      "gzipBytes": 18713,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": true,
+      "ms": 227.18399999999997,
+      "bytes": 355600,
+      "gzipBytes": 31647,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 59.51633300000003,
+      "bytes": 229101,
+      "gzipBytes": 18713,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 152.407334,
+      "bytes": 355600,
+      "gzipBytes": 31647,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 141.47541699999988,
+      "bytes": 355600,
+      "gzipBytes": 31647,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 57.58287500000006,
+      "bytes": 229101,
+      "gzipBytes": 18713,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 57.204750000000104,
+      "bytes": 229101,
+      "gzipBytes": 18713,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 141.81991700000026,
+      "bytes": 355600,
+      "gzipBytes": 31647,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": true,
+      "ms": 197.8038749999996,
+      "bytes": 814701,
+      "gzipBytes": 37132,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": true,
+      "ms": 522.1095409999998,
+      "bytes": 1280500,
+      "gzipBytes": 70198,
+      "load": [
+        6.0751953125,
+        5.0546875,
+        5.5107421875
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 185.16341600000032,
+      "bytes": 814701,
+      "gzipBytes": 37132,
+      "load": [
+        6.0751953125,
+        5.0546875,
+        5.5107421875
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 479.79854199999954,
+      "bytes": 1280500,
+      "gzipBytes": 70198,
+      "load": [
+        6.0751953125,
+        5.0546875,
+        5.5107421875
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 468.0829160000003,
+      "bytes": 1280500,
+      "gzipBytes": 70198,
+      "load": [
+        6.0751953125,
+        5.0546875,
+        5.5107421875
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 243.2741249999999,
+      "bytes": 814701,
+      "gzipBytes": 37132,
+      "load": [
+        6.0751953125,
+        5.0546875,
+        5.5107421875
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 191.65175,
+      "bytes": 814701,
+      "gzipBytes": 37132,
+      "load": [
+        6.0751953125,
+        5.0546875,
+        5.5107421875
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 527.7991250000005,
+      "bytes": 1280500,
+      "gzipBytes": 70198,
+      "load": [
+        6.0751953125,
+        5.0546875,
+        5.5107421875
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": true,
+      "ms": 470.49012500000026,
+      "bytes": 1985901,
+      "gzipBytes": 71810,
+      "load": [
+        5.98876953125,
+        5.0537109375,
+        5.50732421875
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": true,
+      "ms": 1151.4974169999987,
+      "bytes": 3130303,
+      "gzipBytes": 146798,
+      "load": [
+        6.0693359375,
+        5.0859375,
+        5.515625
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 454.971458,
+      "bytes": 1985901,
+      "gzipBytes": 71810,
+      "load": [
+        6.0693359375,
+        5.0859375,
+        5.515625
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 1167.9020420000015,
+      "bytes": 3130303,
+      "gzipBytes": 146798,
+      "load": [
+        6.0693359375,
+        5.0859375,
+        5.515625
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 1280.2415409999994,
+      "bytes": 3130303,
+      "gzipBytes": 146798,
+      "load": [
+        6.0693359375,
+        5.0859375,
+        5.515625
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 442.83000000000175,
+      "bytes": 1985901,
+      "gzipBytes": 71810,
+      "load": [
+        6.0693359375,
+        5.0859375,
+        5.515625
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 450.8342499999999,
+      "bytes": 1985901,
+      "gzipBytes": 71810,
+      "load": [
+        6.0693359375,
+        5.0859375,
+        5.515625
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 1179.9082500000004,
+      "bytes": 3130303,
+      "gzipBytes": 146798,
+      "load": [
+        6.6240234375,
+        5.21728515625,
+        5.55908203125
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": true,
+      "ms": 69.93070799999987,
+      "bytes": 239873,
+      "gzipBytes": 19432,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": true,
+      "ms": 149.24729200000002,
+      "bytes": 384572,
+      "gzipBytes": 32941,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 67.2352499999979,
+      "bytes": 239873,
+      "gzipBytes": 19432,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 150.58937499999593,
+      "bytes": 384572,
+      "gzipBytes": 32941,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 151.33391600000323,
+      "bytes": 384572,
+      "gzipBytes": 32941,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 64.68570800000452,
+      "bytes": 239873,
+      "gzipBytes": 19432,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 68.22258300000249,
+      "bytes": 239873,
+      "gzipBytes": 19432,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 149.78708400000323,
+      "bytes": 384572,
+      "gzipBytes": 32941,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": true,
+      "ms": 204.25220799999806,
+      "bytes": 847373,
+      "gzipBytes": 38100,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": true,
+      "ms": 502.6284999999989,
+      "bytes": 1385972,
+      "gzipBytes": 72780,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 203.11354199999914,
+      "bytes": 847373,
+      "gzipBytes": 38100,
+      "load": [
+        7.02099609375,
+        5.39697265625,
+        5.61474609375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 518.4438340000052,
+      "bytes": 1385972,
+      "gzipBytes": 72780,
+      "load": [
+        7.02099609375,
+        5.39697265625,
+        5.61474609375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 485.4347909999997,
+      "bytes": 1385972,
+      "gzipBytes": 72780,
+      "load": [
+        7.02099609375,
+        5.39697265625,
+        5.61474609375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 199.85079200000473,
+      "bytes": 847373,
+      "gzipBytes": 38100,
+      "load": [
+        7.02099609375,
+        5.39697265625,
+        5.61474609375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 213.03645799999504,
+      "bytes": 847373,
+      "gzipBytes": 38100,
+      "load": [
+        7.02099609375,
+        5.39697265625,
+        5.61474609375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 482.3608329999988,
+      "bytes": 1385972,
+      "gzipBytes": 72780,
+      "load": [
+        7.02099609375,
+        5.39697265625,
+        5.61474609375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": true,
+      "ms": 505.7598749999961,
+      "bytes": 2062373,
+      "gzipBytes": 73344,
+      "load": [
+        7.25927734375,
+        5.47314453125,
+        5.64013671875
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": true,
+      "ms": 1148.6552500000034,
+      "bytes": 3388775,
+      "gzipBytes": 152199,
+      "load": [
+        7.318359375,
+        5.5146484375,
+        5.65380859375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 473.35166700000264,
+      "bytes": 2062373,
+      "gzipBytes": 73344,
+      "load": [
+        7.318359375,
+        5.5146484375,
+        5.65380859375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 1142.7638329999972,
+      "bytes": 3388775,
+      "gzipBytes": 152199,
+      "load": [
+        7.318359375,
+        5.5146484375,
+        5.65380859375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 1129.0951669999995,
+      "bytes": 3388775,
+      "gzipBytes": 152199,
+      "load": [
+        7.318359375,
+        5.5146484375,
+        5.65380859375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 498.9993749999994,
+      "bytes": 2062373,
+      "gzipBytes": 73344,
+      "load": [
+        7.318359375,
+        5.5146484375,
+        5.65380859375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "baseline",
+      "warmup": false,
+      "ms": 485.29887499999313,
+      "bytes": 2062373,
+      "gzipBytes": 73344,
+      "load": [
+        7.318359375,
+        5.5146484375,
+        5.65380859375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "htmx",
+      "warmup": false,
+      "ms": 1202.4727080000011,
+      "bytes": 3388775,
+      "gzipBytes": 152199,
+      "load": [
+        7.13232421875,
+        5.505859375,
+        5.64990234375
+      ]
+    }
+  ],
+  "summaries": [
+    {
+      "count": 100,
+      "grouped": false,
+      "variants": {
+        "baseline": {
+          "ms": 57.58287500000006,
+          "bytes": 229101,
+          "gzipBytes": 18713
+        },
+        "htmx": {
+          "ms": 141.81991700000026,
+          "bytes": 355600,
+          "gzipBytes": 31647
+        }
+      },
+      "ratio": 2.4628835743265705
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "variants": {
+        "baseline": {
+          "ms": 191.65175,
+          "bytes": 814701,
+          "gzipBytes": 37132
+        },
+        "htmx": {
+          "ms": 479.79854199999954,
+          "bytes": 1280500,
+          "gzipBytes": 70198
+        }
+      },
+      "ratio": 2.5034915778227935
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "variants": {
+        "baseline": {
+          "ms": 450.8342499999999,
+          "bytes": 1985901,
+          "gzipBytes": 71810
+        },
+        "htmx": {
+          "ms": 1179.9082500000004,
+          "bytes": 3130303,
+          "gzipBytes": 146798
+        }
+      },
+      "ratio": 2.6171663976283983
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "variants": {
+        "baseline": {
+          "ms": 67.2352499999979,
+          "bytes": 239873,
+          "gzipBytes": 19432
+        },
+        "htmx": {
+          "ms": 150.58937499999593,
+          "bytes": 384572,
+          "gzipBytes": 32941
+        }
+      },
+      "ratio": 2.239738455646415
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "variants": {
+        "baseline": {
+          "ms": 203.11354199999914,
+          "bytes": 847373,
+          "gzipBytes": 38100
+        },
+        "htmx": {
+          "ms": 485.4347909999997,
+          "bytes": 1385972,
+          "gzipBytes": 72780
+        }
+      },
+      "ratio": 2.3899676319957126
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "variants": {
+        "baseline": {
+          "ms": 485.29887499999313,
+          "bytes": 2062373,
+          "gzipBytes": 73344
+        },
+        "htmx": {
+          "ms": 1142.7638329999972,
+          "bytes": 3388775,
+          "gzipBytes": 152199
+        }
+      },
+      "ratio": 2.3547629963082306
+    }
+  ],
+  "devSamples": [
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "baseline",
+      "runtime": "node",
+      "times": [
+        217.72679199999993,
+        295.2931669999998,
+        219.74629099999993
+      ],
+      "ms": 219.74629099999993,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": false,
+      "mode": "htmx",
+      "runtime": "node",
+      "times": [
+        402.4747090000001,
+        356.60641699999996,
+        371.5239159999992
+      ],
+      "ms": 371.5239159999992,
+      "load": [
+        5.82080078125,
+        4.98828125,
+        5.490234375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "baseline",
+      "runtime": "node",
+      "times": [
+        732.6285000000007,
+        606.307667000001,
+        571.9987920000003
+      ],
+      "ms": 606.307667000001,
+      "load": [
+        5.98876953125,
+        5.0537109375,
+        5.50732421875
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": false,
+      "mode": "htmx",
+      "runtime": "node",
+      "times": [
+        848.795250000001,
+        811.4402499999997,
+        811.1093339999989
+      ],
+      "ms": 811.4402499999997,
+      "load": [
+        5.98876953125,
+        5.0537109375,
+        5.50732421875
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "baseline",
+      "runtime": "node",
+      "times": [
+        1462.0382079999981,
+        1431.127207999998,
+        1361.3773330000004
+      ],
+      "ms": 1431.127207999998,
+      "load": [
+        6.25341796875,
+        5.16357421875,
+        5.5380859375
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": false,
+      "mode": "htmx",
+      "runtime": "node",
+      "times": [
+        1839.5432089999995,
+        1776.99525,
+        1810.4934169999979
+      ],
+      "ms": 1810.4934169999979,
+      "load": [
+        6.95361328125,
+        5.32666015625,
+        5.59326171875
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "baseline",
+      "runtime": "node",
+      "times": [
+        313.85237499999494,
+        304.8613750000004,
+        301.3637499999968
+      ],
+      "ms": 304.8613750000004,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 100,
+      "grouped": true,
+      "mode": "htmx",
+      "runtime": "node",
+      "times": [
+        416.81175000000076,
+        268.4168329999957,
+        294.59658299999865
+      ],
+      "ms": 294.59658299999865,
+      "load": [
+        7.197265625,
+        5.40380859375,
+        5.61865234375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "baseline",
+      "runtime": "node",
+      "times": [
+        821.1582080000007,
+        602.8774580000027,
+        595.1472500000018
+      ],
+      "ms": 602.8774580000027,
+      "load": [
+        7.02099609375,
+        5.39697265625,
+        5.61474609375
+      ]
+    },
+    {
+      "count": 400,
+      "grouped": true,
+      "mode": "htmx",
+      "runtime": "node",
+      "times": [
+        895.7750410000008,
+        745.8897920000018,
+        896.4895830000023
+      ],
+      "ms": 895.7750410000008,
+      "load": [
+        7.25927734375,
+        5.47314453125,
+        5.64013671875
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "baseline",
+      "runtime": "node",
+      "times": [
+        1675.2479170000006,
+        1481.9805419999975,
+        1676.3817909999998
+      ],
+      "ms": 1675.2479170000006,
+      "load": [
+        6.88134765625,
+        5.48046875,
+        5.64013671875
+      ]
+    },
+    {
+      "count": 1000,
+      "grouped": true,
+      "mode": "htmx",
+      "runtime": "node",
+      "times": [
+        1966.0003330000036,
+        1846.1493750000081,
+        1801.9523340000014
+      ],
+      "ms": 1846.1493750000081,
+      "load": [
+        6.69091796875,
+        5.4814453125,
+        5.63818359375
+      ]
+    }
+  ],
+  "passed": true
+}
