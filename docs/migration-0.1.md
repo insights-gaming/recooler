@@ -30,3 +30,55 @@
   without a page adapter. Custom parameter patterns must be nonempty valid regular
   expressions, and `[[rest]]` names cannot contain `{`.
 - Await `watchRoutes(...).close()` to finish any generation already in flight.
+
+## JSX pages
+
+Use `recooler/jsx` for the JSX page adapter and runtime:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "recooler/jsx"
+  }
+}
+```
+
+Until the `recooler/vite` plugin is implemented, explicitly set Vite's JSX
+transform import source too:
+
+```ts
+export default {
+  oxc: { jsx: { runtime: 'automatic', importSource: 'recooler/jsx' } },
+};
+```
+
+The Vite plugin must default `oxc.jsx.importSource` to `recooler/jsx` or warn when
+a different runtime is selected. The htmx transform relies on this runtime to
+remove Context values from intrinsic attributes, including props spreads.
+Precompiled dependencies need recompilation or aliases for their bundled engine
+runtime imports; aliases do not rewrite externalized dependencies. See the
+[JSX README](../packages/recooler/src/jsx/README.md) for the alias recipe and Node
+ESM bundling requirements.
+
+Import `RouteProps`, `RouteHead`, and `RouteHeadFn` explicitly from `recooler/jsx`;
+these are no longer ambient global types. Augment `RouteEnv` in that module to
+type the default route context's bindings and variables. `RouteProps.params` is a
+readonly snapshot captured when the page handler runs. Use it in deferred
+Suspense children, where Hono 5's `ctx.req.param()` is empty.
+
+A custom root's second argument remains `clientScript?: string` in 0.1.x. Read
+external module URLs from `props.scripts`; URL arrays never occupy the legacy
+string argument. The adapter no longer generates the inline onLoad script or
+serves `?script`. Extensions own their client entry URLs.
+
+Responses thrown inside ErrorBoundary now escape to the page handler, preserving
+their status, headers, and body (for example a 303 redirect). In 0.0.27 they became
+200 HTML containing `<pre>[object Response]</pre>`. Suspense follows the same rule
+without streaming; once streaming begins it logs Responses and renders its catch
+content because the HTTP status and headers are already sent. Default catches no
+longer expose errors or stack traces in HTML. Set `showStack` on a boundary or
+Suspense only when that output is desired.
+
+External module scripts execute after the entire Suspense stream finishes. Phase
+5 must account for this onLoad timing difference from the old inline script.
