@@ -112,7 +112,7 @@ The Farm plugin's 0.0.27 behaviour was settled through several rounds of adversa
 
 **Pages**
 - **Head chain:** root, then layouts from root to leaf, then the route. Each entry is resolved at runtime: a function extends the head so far, an object replaces it, and nullish is skipped. Every export form is recognised, because the TS runtime reads module namespaces.
-- **Head isolation:** head data is isolated per request. 0.0.27's shallow copy still lets deep mutations accumulate (§2).
+- **Head isolation:** plain head containers are copied per request to isolate mutations made by later head functions through `prev`. 0.0.27's shallow copy lets these deep mutations accumulate (§2).
 - **Default root:** `root?.default ?? DefaultRootHOC`. The default `<meta charset="utf-8">` is added only when no head meta declares a charset.
 
 **htmx transform**: §3.1 lists the behaviours to preserve, including the 0.0.27 additions.
@@ -234,10 +234,10 @@ The router logs a warning at startup for near-miss exports, e.g. `onget` or `OnP
 ```ts
 interface ResolvedRoute {
   path: string; file: string;
-  module: ModuleNs; layouts: ModuleNs[]; root?: ModuleNs;
-  layoutFiles: (string | undefined)[]; rootFile?: string;
-  middleware: MiddlewareHandler[];
-  middlewareModules: ModuleNs[]; middlewareFiles: (string | undefined)[];
+  module: ModuleNs; layouts: readonly ModuleNs[]; root?: ModuleNs;
+  layoutFiles: readonly (string | undefined)[]; rootFile?: string;
+  middleware: readonly MiddlewareHandler[];
+  middlewareModules: readonly ModuleNs[]; middlewareFiles: readonly (string | undefined)[];
   directory: string;
 }
 
@@ -263,7 +263,7 @@ interface CreateAppOptions<E extends Env = Env> {
 ```
 
 `createApp<E extends Env = Env>` returns `Hono<E>`. Extension and adapter hooks receive
-frozen route copies with frozen array containers. Adapters run only for own default exports
+frozen route copies with frozen array containers. Adapters run only for own function default exports
 and their returned handlers are validated. The original ordered extras argument is retained;
 named contributions let adapters decide collisions. `mergePageExtras` concatenates arrays
 and replaces scalar/object values in extension order without mutating inputs.
@@ -299,7 +299,7 @@ Most of this moves directly from 0.0.27's `src/helpers.ts`:
   - It handles a `Response` thrown during render.
   - Layouts without a default export don't wrap.
   - Its options replace `route_handler_factory` and `ResolvedTemplate`, and it includes `suspenseCleanupScriptMiddleware`.
-- **Head chain:** as in the reference behaviour. A head that resolves to something other than a function, a plain object or nullish (e.g. a Promise) is an error, not an empty head. Each request gets its own deep copy of every object entry in the chain (`structuredClone` of plain data), so neither `prev.metas[0].content += …` nor a mutated module-level constant can leak between requests.
+- **Head chain:** as in the reference behaviour. A head that resolves to something other than a function, a plain object or nullish (e.g. a Promise) is an error, not an empty head. Each request copies the plain objects and arrays in every applied head entry and function result, so mutations made by later head functions through `prev` (such as `prev.metas[0].content += …`) cannot leak between requests. Non-plain values retain their identity and rendering behavior. A function that mutates its own module constant or a shared non-plain value can still leak state.
 - **Exports:**
   - `ErrorBoundary`, which re-throws a `Response`
   - `Suspense`
@@ -307,7 +307,7 @@ Most of this moves directly from 0.0.27's `src/helpers.ts`:
   - `DefaultRootHOC`
   - the `global.d.ts` types `RouteProps`, `RouteHead` and `RouteHeadFn`
 - **Client scripts:**
-  - The root HOC gets `scripts: string[]` (URLs) from extensions instead of an inline `clientScript` string. *This breaks custom roots; keep accepting the string form for one release.*
+  - For 0.1.x the root HOC keeps its optional `clientScript?: string` second argument (never an array). Extensions supply external URL arrays through `props.scripts`; new roots read them there.
   - The page adapter emits `<body data-recooler-route="…">` (or a meta tag when the root renders its own body) and never an inline script, so it stays independent of htmx and needs no CSP nonce (§3.4).
 
 ## Part 3: htmx (`recooler/htmx`)
@@ -409,7 +409,7 @@ Either way:
 - **Never emit an origin-relative URL.** A root catch-all matches `//evil.example/x`, so the emitted URL must never start with `//` (or `/\`); prefix `/.` in that case. Add a conformance case.
 - **Mounts.** `route()` and `basePath()` are covered, because the pathname already contains the prefix. Hono 4's `app.mount()` and prefix-stripping proxies hide the prefix, so `htmx({ base })` supplies it. Without `base`, `mount` is documented as unsupported for actions.
 - **Owner route.** Actions post to the *rendering* route, not the module that defines them. 0.0.27 posted actions defined in a route module to that module's own path, so its middleware ran. A public page that renders a component exported from an `(admin)` route module now runs that action under the public chain. Document this in the migration guide, and add a conformance scenario.
-- **Hono 5 params.** The page adapter passes a params snapshot in `RouteProps`, because `c.req.param()` is empty in deferred Suspense children on Hono 5.
+- **Hono 5 params.** The page adapter passes a readonly `params` snapshot in `RouteProps`, captured at handler entry before awaiting the head, because `c.req.param()` is empty in deferred Suspense children on Hono 5.
 
 ### 3.4 Client scripts (D4)
 

@@ -29,7 +29,15 @@
       "types": "./dist/vite/index.d.ts",
       "default": "./dist/vite/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./jsx/jsx-runtime": {
+      "types": "./dist/jsx/jsx-runtime.d.ts",
+      "default": "./dist/jsx/jsx-runtime.js"
+    },
+    "./jsx/jsx-dev-runtime": {
+      "types": "./dist/jsx/jsx-dev-runtime.d.ts",
+      "default": "./dist/jsx/jsx-dev-runtime.js"
+    }
   },
   "bin": {
     "recooler-routes": "./dist/gen/cli.js"
@@ -40,7 +48,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.build.json && tsc -p test/jsx/consumer/tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "peerDependencies": {

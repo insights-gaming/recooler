@@ -108,3 +108,70 @@ Send `HX-Request: true`, a same-origin `Origin`, and
 URL migration when the htmx implementation lands. The legacy two-argument root
 compatibility opt-in, exact script string and route marker through `props.head`
 remain design work for that phase; see the inventory's plan gaps.
+
+## JSX pages
+
+Use `recooler/jsx` for the JSX page adapter and runtime:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "recooler/jsx"
+  }
+}
+```
+
+Until the `recooler/vite` plugin is implemented, explicitly set Vite's JSX
+transform import source too:
+
+```ts
+export default {
+  oxc: { jsx: { runtime: 'automatic', importSource: 'recooler/jsx' } },
+};
+```
+
+The Vite plugin must default `oxc.jsx.importSource` to `recooler/jsx` or warn when
+a different runtime is selected. The htmx transform relies on this runtime to
+remove Context values from intrinsic attributes, including props spreads.
+Precompiled dependencies need recompilation or aliases for their bundled engine
+runtime imports; aliases do not rewrite externalized dependencies. See the
+[JSX README](../packages/recooler/src/jsx/README.md) for the alias recipe and Node
+ESM bundling requirements.
+
+Import `RouteProps`, `RouteHead`, and `RouteHeadFn` explicitly from `recooler/jsx`;
+these are no longer ambient global types. Augment `RouteEnv` in that module to
+type the default route context's bindings and variables. `RouteProps.params` is a
+readonly snapshot captured when the page handler runs. Use it in deferred
+Suspense children, where Hono 5's `ctx.req.param()` is empty.
+
+Head exports and non-nullish head function results must now be plain objects
+(with `Object.prototype` or a null prototype, including ESM namespace objects).
+Invalid values throw a `TypeError` identifying their route, root, or layout source.
+This rejects class instances, objects created with `Object.create(proto)` for a
+custom prototype, objects from another realm (for example Node's `vm`), arrays,
+and strings. In 0.0.27, object exports were spread-copied and function results
+were used as-is. Return a plain object explicitly when migrating these values.
+Nullish exports still skip that head; nullish function results reset it to `{}`.
+
+Plain objects and ordinary arrays nested in a head are now copied to isolate
+request mutations. Nested non-plain values, including Array subclasses, remain
+shared by reference to preserve their methods and rendering behavior. Mutating
+these shared values or a head function's own module constants can still leak
+state between requests.
+
+A custom root's second argument remains `clientScript?: string` in 0.1.x. Read
+external module URLs from `props.scripts`; URL arrays never occupy the legacy
+string argument. The adapter no longer generates the inline onLoad script or
+serves `?script`. Extensions own their client entry URLs.
+
+Responses thrown inside ErrorBoundary now escape to the page handler, preserving
+their status, headers, and body (for example a 303 redirect). In 0.0.27 they became
+200 HTML containing `<pre>[object Response]</pre>`. Suspense follows the same rule
+without streaming; once streaming begins it logs Responses and renders its catch
+content because the HTTP status and headers are already sent. Default catches no
+longer expose errors or stack traces in HTML. Set `showStack` on a boundary or
+Suspense only when that output is desired.
+
+External module scripts execute after the entire Suspense stream finishes. Phase
+5 must account for this onLoad timing difference from the old inline script.
