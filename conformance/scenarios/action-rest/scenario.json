@@ -1,0 +1,74 @@
+{
+  "name": "action-rest: route params encoded in rendered action URLs and decoded by dispatch",
+  "source": "docs/reviews/0.0.27.md ac7b3f1/71634e4; docs/plans/typescript-rewrite.md htmx transform",
+  "requests": [
+    {
+      "name": "action 0 from /a%20b/c%23d",
+      "method": "POST",
+      "action": {
+        "page": "/a%20b/c%23d",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a b/c#d</p>"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "action 0 from /%C3%A9/a%3Fb",
+      "method": "POST",
+      "action": {
+        "page": "/%C3%A9/a%3Fb",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>\u00e9/a?b</p>"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    }
+  ]
+}

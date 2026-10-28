@@ -1,0 +1,392 @@
+{
+  "name": "playground: all 19 original playground test behaviours",
+  "source": "playground/test/app.test.mjs (19 cases; multi-request cases expanded)",
+  "farm": {
+    "client_banned_imports": [
+      "/lib/db"
+    ]
+  },
+  "requests": [
+    {
+      "name": "static route renders through the layout and root component",
+      "path": "/",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<!DOCTYPE html>",
+          "<div id=\"app\"><main data-layout=\"root\"><h1>home</h1>"
+        ]
+      }
+    },
+    {
+      "name": "root head object and layout head function build the title",
+      "path": "/",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<title>Playground - Recooler</title>"
+        ]
+      }
+    },
+    {
+      "name": "a charset declared by the root head is not duplicated",
+      "path": "/",
+      "expect": {
+        "status": 200,
+        "counts": {
+          "<meta charset=": 1
+        }
+      }
+    },
+    {
+      "name": "route head function runs last and sees the route params",
+      "path": "/posts/1",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<title>Hello world - Playground - Recooler</title>"
+        ]
+      }
+    },
+    {
+      "name": "[param] route matches a single segment",
+      "path": "/posts/42",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<h1>posts-id 42</h1>"
+        ]
+      }
+    },
+    {
+      "name": "[[catchall]] route matches multiple segments",
+      "path": "/posts/a/b",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<h1>posts-rest a/b</h1>"
+        ]
+      }
+    },
+    {
+      "name": "static route takes precedence over a [param] sibling",
+      "path": "/posts/new",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<h1>posts-new</h1>"
+        ]
+      }
+    },
+    {
+      "name": "unknown routes outside the catch-all are not found",
+      "path": "/nope",
+      "expect": {
+        "status": 404
+      }
+    },
+    {
+      "name": "group middleware applies to the group's routes only",
+      "path": "/admin",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<h1>admin</h1>"
+        ],
+        "headers": {
+          "x-group": "admin"
+        }
+      }
+    },
+    {
+      "name": "home has no admin group header",
+      "path": "/",
+      "expect": {
+        "status": 200,
+        "headers": {
+          "x-group": null
+        }
+      }
+    },
+    {
+      "name": "a page's form actions run before a same-shaped route of another group",
+      "method": "POST",
+      "action": {
+        "page": "/posts/7",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p id=\"liked\">liked</p>"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "a blocking group guard runs when a request falls through (draft action first)",
+      "method": "POST",
+      "action": {
+        "page": "/posts/new",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p id=\"drafted\">drafted</p>"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "a blocking group guard runs after fall-through /posts/new",
+      "path": "/posts/new",
+      "expect": {
+        "status": 401,
+        "body": "staff only"
+      },
+      "method": "POST"
+    },
+    {
+      "name": "staff header allows POST /posts/new",
+      "path": "/posts/new",
+      "expect": {
+        "status": 200,
+        "body": "staff post new"
+      },
+      "method": "POST",
+      "headers": {
+        "x-staff": "yes"
+      }
+    },
+    {
+      "name": "a blocking group guard runs after fall-through /posts/7",
+      "path": "/posts/7",
+      "expect": {
+        "status": 401,
+        "body": "staff only"
+      },
+      "method": "POST"
+    },
+    {
+      "name": "staff header allows POST /posts/7",
+      "path": "/posts/7",
+      "expect": {
+        "status": 200,
+        "body": "staff post 7"
+      },
+      "method": "POST",
+      "headers": {
+        "x-staff": "yes"
+      }
+    },
+    {
+      "name": "a blocking group guard runs after fall-through /admin",
+      "path": "/admin",
+      "expect": {
+        "status": 401,
+        "body": "staff only"
+      },
+      "method": "POST"
+    },
+    {
+      "name": "staff header allows POST /admin",
+      "path": "/admin",
+      "expect": {
+        "status": 200,
+        "body": "staff admin post"
+      },
+      "method": "POST",
+      "headers": {
+        "x-staff": "yes"
+      }
+    },
+    {
+      "name": "a blocking group guard runs when the app is mounted under a prefix",
+      "path": "/app/posts/7",
+      "expect": {
+        "status": 401
+      },
+      "method": "POST",
+      "mount": {
+        "type": "route",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "a blocking group guard runs again when the same request is dispatched again",
+      "path": "/posts/7",
+      "expect": {
+        "status": 401
+      },
+      "method": "POST",
+      "repeat": 2
+    },
+    {
+      "name": "form action returning JSX responds 200 with the rendered html",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {
+        "name": "Ada"
+      },
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p id=\"greeting\">hello Ada</p>"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "unknown form actions are rejected: nope",
+      "path": "/?action=nope",
+      "expect": {
+        "status": 404,
+        "body": "unknown action"
+      },
+      "method": "POST",
+      "form": {}
+    },
+    {
+      "name": "unknown form actions are rejected: constructor",
+      "path": "/?action=constructor",
+      "expect": {
+        "status": 404,
+        "body": "unknown action"
+      },
+      "method": "POST",
+      "form": {}
+    },
+    {
+      "name": "form action returning nothing responds 204",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "hx-post",
+        "index": 1
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 204,
+        "body": ""
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "hx-on:click handler is inlined as a client script without server-only code",
+      "path": "/",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "window.$handlers=",
+          "clicked ${"
+        ],
+        "matches": [
+          "<button id=\"counter\" hx-on:click=\"\\$handlers\\[[^\"]+\\]\\.call\\(this, event\\)\">",
+          "<script>(?:(?!server-only-db-module)[\\s\\S])+<\\/script>"
+        ],
+        "excludes": [
+          "import(\"../lib/db\")"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D4",
+          "reason": "TS serves module scripts in per-route chunks instead of an inline classic script.",
+          "ts": {
+            "status": 200,
+            "includes": [
+              "hx-on:click=",
+              "<script type=\"module\""
+            ],
+            "excludes": [
+              "server-only-db-module"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "pages without event handlers have no client script",
+      "path": "/admin",
+      "expect": {
+        "status": 200,
+        "excludes": [
+          "<script>"
+        ]
+      }
+    }
+  ]
+}
