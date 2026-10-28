@@ -67,6 +67,21 @@ type the default route context's bindings and variables. `RouteProps.params` is 
 readonly snapshot captured when the page handler runs. Use it in deferred
 Suspense children, where Hono 5's `ctx.req.param()` is empty.
 
+Head exports and non-nullish head function results must now be plain objects
+(with `Object.prototype` or a null prototype, including ESM namespace objects).
+Invalid values throw a `TypeError` identifying their route, root, or layout source.
+This rejects class instances, objects created with `Object.create(proto)` for a
+custom prototype, objects from another realm (for example Node's `vm`), arrays,
+and strings. In 0.0.27, object exports were spread-copied and function results
+were used as-is. Return a plain object explicitly when migrating these values.
+Nullish exports still skip that head; nullish function results reset it to `{}`.
+
+Plain objects and ordinary arrays nested in a head are now copied to isolate
+request mutations. Nested non-plain values, including Array subclasses, remain
+shared by reference to preserve their methods and rendering behavior. Mutating
+these shared values or a head function's own module constants can still leak
+state between requests.
+
 A custom root's second argument remains `clientScript?: string` in 0.1.x. Read
 external module URLs from `props.scripts`; URL arrays never occupy the legacy
 string argument. The adapter no longer generates the inline onLoad script or

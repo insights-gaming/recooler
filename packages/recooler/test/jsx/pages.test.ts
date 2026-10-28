@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { runInNewContext } from 'node:vm';
 import { createElement as h, dangerouslyPreventEscaping, Fragment, type Component, type ResolvedTemplateProps } from 'easy-jsx-html-engine';
 import { Hono, type Context } from 'hono';
 import { createApp, type DirNode, type Manifest, type ModuleNs, type RouterExtension, RouteValidationError } from '../../src/router/index.js';
@@ -65,6 +66,26 @@ describe('jsxPages', () => {
     expect(() => app({ default: value })).toThrow('page default export in routes/index.tsx is not a function');
   });
 
+  it.each(['root', 'outer', 'inner'])('uses router validation errors and the %s source filename at startup', kind => {
+    const tree = node({ default: Page }, [
+      { default: kind === 'outer' ? 42 : hoc('outer') },
+      { default: kind === 'inner' ? 42 : hoc('inner') },
+    ]);
+    tree.children[0]!.layoutFile = 'routes/outer/layout.tsx';
+    tree.children[0]!.children[0]!.layoutFile = 'routes/inner/layout.tsx';
+    const manifest: Manifest = { version: 1, tree,
+      root: { default: kind === 'root' ? 42 : hoc('root') }, rootFile: 'src/root.tsx' };
+    const create = () => createApp(manifest, { pages: jsxPages() });
+    expect(create).toThrow(RouteValidationError);
+    const source = kind === 'root' ? 'src/root.tsx' : `routes/${kind}/layout.tsx`;
+    expect(create).toThrow(`Invalid ${kind === 'root' ? 'root' : 'layout'} in ${source}: default export is not a function`);
+  });
+
+  it('labels invalid handwritten root/layout defaults when filenames are absent', () => {
+    expect(() => app({ default: Page }, { default: 42 })).toThrow('Invalid root in root (used by routes/index.tsx)');
+    expect(() => app({ default: Page }, undefined, [{ default: 42 }])).toThrow('Invalid layout in layout 1 (used by routes/index.tsx)');
+  });
+
   it('objects replace prior heads, nullish entries skip, function nullish results reset', async () => {
     const a = app({ default: Page, head: (_c: Context, prev: RouteHead) => ({ ...prev, title: `${prev.title}!` }) },
       { head: { title: 'root', links: [{ href: '/old' }] } }, [{ head: { title: 'replace' } }, { head: null }, {}]);
@@ -73,16 +94,16 @@ describe('jsxPages', () => {
     expect(await html(app({ default: Page, head: () => undefined }, { head: { title: 'old' } }))).not.toContain('<title>');
   });
 
-  it.each([Promise.resolve({}), [], new Date(), 'bad', 7, true, { then() {} }])('rejects invalid head exports (%s)', async head => {
+  it.each([Promise.resolve({}), [], new Date(), new (class Head { title = 'class'; })(), Object.create({ title: 'inherited' }), runInNewContext('({ title: "another realm" })'), 'bad', 7, true, { then() {} }])('rejects invalid head exports (%s)', async head => {
     const a = app({ default: Page, head });
     onPageError(a, err => { expect(err).toBeInstanceOf(TypeError); return new Response(err.message, { status: 500 }); });
     const res = await a.request('/');
     expect(res.status).toBe(500);
-    expect(await res.text()).toContain('Invalid head in routes/index.tsx');
+    expect(await res.text()).toBe('Head in routes/index.tsx: Invalid head: expected a plain object or nullish value');
   });
 
   it('rejects invalid head function results', async () => {
-    for (const head of [() => 'bad']) {
+    for (const head of [() => 'bad', () => [], () => new Date(), () => Object.create({ title: 'inherited' }), () => runInNewContext('({ title: "another realm" })')]) {
       const a = app({ default: Page, head });
       onPageError(a, err => new Response(err.name, { status: 500 }));
       const response = await a.request('/');
@@ -138,6 +159,39 @@ describe('jsxPages', () => {
     const namespaceURL = 'data:text/javascript,export const title = "namespace"';
     const namespace = await import(/* @vite-ignore */ namespaceURL);
     expect(await html(app({ default: Page, head: namespace }))).toContain('<title>namespace</title>');
+  });
+
+  it('preserves nested Array subclasses by reference, including their methods', async () => {
+    class Metas extends Array<{ name: string; content: string }> {
+      names() { return this.map(meta => meta.name).join(','); }
+    }
+    const metas = Metas.from([{ name: 'custom', content: 'value' }]);
+    const a = app({ default: Page, head: (_ctx: Context, prev: RouteHead) => {
+      expect(prev.metas).toBe(metas);
+      return { ...prev, title: (prev.metas as Metas).names() };
+    } }, { head: { metas } });
+    const result = await html(a);
+    expect(result).toContain('<title>custom</title>');
+    expect(result).toContain('<meta name="custom" content="value"/>');
+  });
+
+  it.each([TypeError, ReferenceError, RangeError, SyntaxError, URIError, EvalError, Error])('preserves %s head failures and their cause with one source label', async ErrorType => {
+    const failure = new ErrorType('head failed');
+    for (const module of [
+      { default: Page, get head() { throw failure; } },
+      { default: Page, head: { get title() { throw failure; } } },
+      { default: Page, head: () => { throw failure; } },
+    ]) {
+      const a = app(module);
+      onPageError(a, error => {
+        expect(error).toBeInstanceOf(ErrorType);
+        expect(error.cause).toBe(failure);
+        return new Response(error.message, { status: 500 });
+      });
+      const response = await a.request('/');
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe('Head in routes/index.tsx: head failed');
+    }
   });
 
   it('identifies head sources and wraps access/function failures with their cause', async () => {

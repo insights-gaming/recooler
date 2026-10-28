@@ -29,8 +29,9 @@ async, but exporting a Promise as `head` is an error. Head objects must be plain
 The chain starts at the last non-null object export: earlier functions are never
 called because that object would replace their result. The adapter copies plain
 objects and arrays in each object and function result, including nested
-meta/link/script props. Promises, URLs, engine elements and class instances are
-shared by reference so their rendering behavior is preserved. Copies isolate
+meta/link/script props. Promises, URLs, engine elements and class instances
+(including Array subclasses) are shared by reference so their rendering behavior
+is preserved. Copies isolate
 mutations made by later head functions through `prev`; a function that mutates
 its own module constant or a shared non-plain value can still leak state.
 
