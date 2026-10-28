@@ -77,6 +77,9 @@ try {
   for (const route of ['a', 'b']) await write(`src/routes/cleanup-${route}/index.tsx`, `${inc}
     export const head = { scripts: [{ src: '/htmx.js' }] };
     export const onLoad = ({ signal }) => {
+      document.querySelectorAll('.widget').forEach(node => node.remove());
+      const widget = document.createElement('div'); widget.className = 'widget'; document.body.append(widget);
+      signal.addEventListener('abort', () => widget.remove(), { once: true });
       inc('cleanupLoads${route.toUpperCase()}'); (globalThis.cleanupLog ??= []).push('${route} load');
       const drop = () => inc('cleanupDrops${route.toUpperCase()}'); window.addEventListener('cleanup-drop', drop, { signal });
       signal.addEventListener('abort', () => {
@@ -86,6 +89,7 @@ try {
     export default () => <><a id="cleanup-tob" href="/cleanup-b" hx-boost="true">B</a>
       <button id="cleanup-open" hx-get="/cleanup-fragment" hx-target="#cleanup-modal">open</button>
       <button id="cleanup-push" hx-get="/cleanup-fragment" hx-push-url="true" hx-target="#cleanup-modal">push</button>
+      <button id="cleanup-replace" hx-get="/cleanup-clear" hx-replace-url="/cleanup-replaced" hx-target="#cleanup-modal">replace</button>
       <button id="cleanup-async" hx-get="/cleanup-async" hx-target="#cleanup-modal">async</button>
       <button id="cleanup-clear" hx-get="/cleanup-clear" hx-target="#cleanup-modal">clear</button><div id="cleanup-modal"/></>;`);
   await write('src/routes/cleanup-fragment/index.tsx', `${inc}
@@ -101,10 +105,30 @@ try {
       window.addEventListener('async-drop', () => inc('asyncDrops'), { signal });
       signal.addEventListener('abort', () => { inc('cleanupAsyncs'); globalThis.cleanupLog.push('async abort'); });
       await new Promise(resolve => { globalThis.finishCleanup = resolve; });
-      window.addEventListener('async-drop', () => inc('asyncLateDrops'), { signal });
       inc('asyncResolved');
+      if (signal.aborted) return;
+      window.addEventListener('async-drop', () => inc('asyncLateDrops'), { signal });
     };
     export default () => <p id="cleanup-pending">pending</p>;`);
+  await write('src/routes/cleanup-fetch/index.tsx', `
+    export const head = { scripts: [{ src: '/htmx.js' }] };
+    export const onLoad = async ({ signal }) => {
+      globalThis.fetchStarted = true;
+      try { await fetch('/cleanup-pending-fetch', { signal }); }
+      catch (error) {
+        globalThis.fetchAbort = { sameReason: error === signal.reason, domException: error instanceof DOMException, name: error.name };
+        throw error;
+      }
+    };
+    export default () => <a id="fetch-away" href="/b" hx-boost="true">away</a>;`);
+  await write('src/routes/cleanup-throw/index.tsx', `
+    export const head = { scripts: [{ src: '/htmx.js' }] };
+    export const onLoad = async ({ signal }) => {
+      await new Promise(resolve => { globalThis.finishThrow = resolve; });
+      signal.throwIfAborted();
+      globalThis.lateResource = true;
+    };
+    export default () => <a id="throw-away" href="/b" hx-boost="true">away</a>;`);
   server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     try {
@@ -117,6 +141,7 @@ try {
       }
       requests.push(req.method + ' ' + url.pathname);
       if (url.pathname === '/relocate') { res.setHeader('HX-Location', '/c'); return res.end(); }
+      if (url.pathname === '/cleanup-pending-fetch') { res.on('close', () => res.end()); return; }
       if (url.pathname === '/cleanup-clear') return res.end('<p id="cleanup-empty">empty</p>');
       if (url.pathname.startsWith('/m/')) { res.statusCode = url.pathname === '/m/before' ? 200 : 204; return res.end(url.pathname === '/m/before' ? '<p>done</p>' : ''); }
       const response = await app.fetch(new Request(new URL(req.url, origin), { headers: req.headers }), { RECOOLER_SECRET: 'browser-test' });
@@ -216,10 +241,12 @@ try {
     await page.close();
     // Teardown: boosts and cached Back retire old listeners before destination onLoad.
     const cleanup = await open('/cleanup-a');
+    assert.equal(await cleanup.locator('.widget').count(), 1);
     await cleanup.click('#cleanup-tob'); await cleanup.waitForFunction(() => globalThis.cleanupLoadsB === 1);
     assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a abort', 'b load']);
     await cleanup.goBack(); await cleanup.waitForFunction(() => globalThis.cleanupLoadsA === 2); await sleep(80);
     assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a abort', 'b load', 'b abort', 'a load']);
+    assert.equal(await cleanup.locator('.widget').count(), 1, 'Back removes restored widget copies');
     await cleanup.evaluate(() => window.dispatchEvent(new Event('cleanup-drop')));
     assert.deepEqual(await cleanup.evaluate(() => [globalThis.cleanupDropsA, globalThis.cleanupDropsB ?? 0]), [1, 0]);
     await cleanup.click('#cleanup-open'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 1);
@@ -229,11 +256,17 @@ try {
     await cleanup.click('#cleanup-push'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 2);
     assert.equal(new URL(cleanup.url()).pathname, '/cleanup-fragment');
     assert.equal(await cleanup.evaluate(() => globalThis.cleanupLoadsA), 2);
+    assert.equal(await cleanup.locator('.widget').count(), 1, 'partial push retains the live widget');
+    await cleanup.click('#cleanup-replace');
+    await cleanup.waitForFunction(() => location.pathname === '/cleanup-replaced');
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupLoadsA), 2);
+    assert.equal(await cleanup.locator('.widget').count(), 1, 'partial replace retains the live widget');
     await cleanup.evaluate(() => window.dispatchEvent(new Event('cleanup-drop')));
     assert.equal(await cleanup.evaluate(() => globalThis.cleanupDropsA), 2);
     await cleanup.goBack(); await cleanup.waitForFunction(() => globalThis.cleanupLoadsA === 3);
     assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog.slice(-3)), ['fragment abort', 'a abort', 'a load']);
     assert.equal(count('/cleanup-a'), 1, 'partial push Back uses the history snapshot');
+    assert.equal(await cleanup.locator('.widget').count(), 1, 'partial history restoration is idempotent');
     // Async listeners are removed whether the promise settles live or after removal.
     for (const finishLive of [true, false]) {
       const previous = await cleanup.evaluate(() => globalThis.cleanupAsyncs ?? 0);
@@ -258,6 +291,20 @@ try {
     assert.deepEqual(cleanup.errors, ['abort failed']);
     assert.deepEqual(await cleanup.evaluate(() => globalThis.unhandled), []);
     await cleanup.close();
+    // Routine navigation aborts fetch and throwIfAborted without pageerror.
+    const fetching = await open('/cleanup-fetch');
+    await fetching.waitForFunction(() => globalThis.fetchStarted);
+    await fetching.click('#fetch-away'); await fetching.waitForFunction(() => globalThis.loadsB === 1);
+    await fetching.waitForFunction(() => globalThis.fetchAbort);
+    assert.deepEqual(await fetching.evaluate(() => globalThis.fetchAbort), { sameReason: true, domException: true, name: 'AbortError' });
+    assert.deepEqual(fetching.errors, []); assert.deepEqual(await fetching.evaluate(() => globalThis.unhandled), []);
+    await fetching.close();
+    const throwing = await open('/cleanup-throw');
+    await throwing.click('#throw-away'); await throwing.waitForFunction(() => globalThis.loadsB === 1);
+    await throwing.evaluate(() => globalThis.finishThrow()); await sleep(50);
+    assert.equal(await throwing.evaluate(() => globalThis.lateResource), undefined);
+    assert.deepEqual(throwing.errors, []); assert.deepEqual(await throwing.evaluate(() => globalThis.unhandled), []);
+    await throwing.close();
     // Native modules hold DCL while initial handler assets are unavailable.
     block = new Promise(r => { release = () => { block = undefined; r(); }; });
     const early = await browser.newPage(); let dclFired = false; early.on('domcontentloaded', () => { dclFired = true; });

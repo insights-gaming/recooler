@@ -41,6 +41,12 @@ export interface RouteHeadFn<TContext = RouteContext> {
   (ctx: TContext, prev: RouteHead): RouteHead | null | undefined | PromiseLike<RouteHead | null | undefined>;
 }
 
+export interface RouteLoadContext {
+  signal: AbortSignal;
+}
+
+export type RouteOnLoad = (context: RouteLoadContext) => unknown;
+
 /** The string argument is retained for one release for legacy clientScript users. */
 export type RootHOC = (Content: Component<RouteProps>, clientScript?: string) => Component<RouteProps>;
 export type LayoutHOC = (Content: Component<RouteProps>) => Component<RouteProps>;

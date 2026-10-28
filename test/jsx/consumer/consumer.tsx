@@ -1,5 +1,5 @@
 import '@insights-gaming/recooler/vite/client';
-import { DefaultRootHOC, ErrorBoundary, Suspense, jsxPages, type RouteHead, type RouteHeadFn, type RouteProps } from '@insights-gaming/recooler/jsx';
+import { DefaultRootHOC, ErrorBoundary, Suspense, jsxPages, type RouteHead, type RouteHeadFn, type RouteLoadContext, type RouteOnLoad, type RouteProps } from '@insights-gaming/recooler/jsx';
 import type { Context } from 'hono';
 
 export const head: RouteHead = { title: 'typed', metas: [{ charset: 'utf-8' }] };
@@ -45,3 +45,15 @@ const actionTypes = <form hx-post={(ctx, payload) => {
   return [element, event.type];
 }} />;
 void actionTypes;
+
+export const onLoad: RouteOnLoad = ({ signal }) => {
+  const typed: AbortSignal = signal;
+  window.addEventListener('drop', () => {}, { signal: typed });
+  // @ts-expect-error the context has no cleanup callback
+  signal.cleanup();
+  return () => {};
+};
+export async function asyncOnLoad({ signal }: RouteLoadContext) {
+  await Promise.resolve();
+  signal.throwIfAborted();
+}

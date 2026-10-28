@@ -367,15 +367,17 @@ body swaps while destination slices load.
 A route's `onLoad({ signal })` is called at DOMContentLoaded, or immediately when the document
 is no longer loading. It sees the complete DOM and is never awaited: asynchronous
 or never-resolving onLoad work cannot disable handlers or hold readiness. A rejected
-onLoad promise is sent to `reportError` (console.error where unavailable).
+onLoad promise is sent to `reportError` (console.error where unavailable), except
+its aborted signal's reason or a fetch `DOMException` named `AbortError` after abort.
 The signal belongs to that marker instance and aborts once when the marker leaves
 the document or its route/version changes. Register listeners with `{ signal }`,
 or use an abort listener to release other resources. The return value is ignored.
-Retired signals abort in reverse initialization order, fragment before page,
+Retired signals abort in reverse initialization order,
 before any new marker's onLoad in the same pass, including boosts and history
 restoration. Abort listener errors do not stop other retirements or onLoad calls.
-Full page unload does not abort signals. Async onLoad work uses the same signal;
-listeners added after it has aborted are not installed.
+Full page unload does not abort signals. After each await, check
+`if (signal.aborted) return;` or call `signal.throwIfAborted()` before creating resources.
+An abort listener added after abort never fires; `{ signal }` listeners are not installed.
 Root/layout `onLoad` warns and does not run. Do not assume onLoad precedes htmx's
 own DOMContentLoaded listener or processing of streamed chunks.
 
@@ -660,28 +662,47 @@ Route `onLoad` runs after the DOM is ready. Register listeners with the marker's
 signal so they are removed when it retires on a swap or Back:
 
 ```ts
-export function onLoad({ signal }) {
+import type { RouteOnLoad } from '@insights-gaming/recooler/jsx';
+
+export const onLoad: RouteOnLoad = ({ signal }) => {
   window.addEventListener('drop', onDrop, { signal });
+};
+```
+
+If `build.target` is lowered below Safari 15 / Chrome 90 / Firefox 86, the `{ signal }` listener option is ignored.
+
+The return value is ignored, including functions or promises of functions.
+Readiness never waits for async onLoad work. After each await, check for abort
+before creating resources or registering abort listeners:
+
+```ts
+import type { RouteLoadContext } from '@insights-gaming/recooler/jsx';
+
+export async function onLoad({ signal }: RouteLoadContext) {
+  const response = await fetch('/api/widget', { signal });
+  signal.throwIfAborted();
+  const data = await response.json();
+  signal.throwIfAborted();
+  const widget = createWidget(data);
+  signal.addEventListener('abort', () => widget.destroy(), { once: true });
 }
 ```
 
-The return value is ignored, including functions or promises of functions.
-Readiness never waits for async onLoad work. Use the signal for listeners added
-before or after an await; an already aborted signal prevents their installation.
 Root/layout `onLoad` must move to an application-wide script or to the owning
 page. Do not wait again for a DOM readiness event that has already fired.
 
-DOM changes made by `onLoad` must be idempotent or undone before history save.
-htmx saves its history snapshot before swapping; retirement happens afterward.
-Back restores DOM added by onLoad and runs onLoad again. Check for existing DOM,
-or undo changes in an `htmx:beforeHistorySave` listener registered with the signal:
+DOM changes made by `onLoad` must be idempotent. htmx saves its history snapshot
+before retirement; Back restores DOM added by onLoad and runs onLoad again.
+Remove restored copies before adding a fresh widget, then remove it on abort:
 
 ```ts
-export function onLoad({ signal }) {
+import type { RouteOnLoad } from '@insights-gaming/recooler/jsx';
+
+export const onLoad: RouteOnLoad = ({ signal }) => {
+  document.querySelectorAll('.widget').forEach(node => node.remove());
   const widget = document.createElement('div');
   widget.className = 'widget';
   document.body.append(widget);
-  document.addEventListener('htmx:beforeHistorySave', () => widget.remove(), { signal });
-  signal.addEventListener('abort', () => widget.remove());
-}
+  signal.addEventListener('abort', () => widget.remove(), { once: true });
+};
 ```

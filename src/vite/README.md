@@ -264,15 +264,20 @@ Handlers run immediately when their slice registers, independent of marker
 completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
 Route onLoad runs at DOMContentLoaded or immediately if parsing has finished,
 sees the complete DOM, and is never awaited. Rejections go to reportError (with a
-console.error fallback). It receives { signal }, an AbortSignal for that marker
+console.error fallback), except the aborted signal's reason or a fetch DOMException
+named AbortError after abort. It receives { signal }, an AbortSignal for that marker
 instance. Register window/document listeners with { signal }; use an abort listener
 to release other resources. The return value is ignored. Root/layout onLoad stays ignored.
 
 ```ts
-export function onLoad({ signal }) {
+import type { RouteOnLoad } from '@insights-gaming/recooler/jsx';
+
+export const onLoad: RouteOnLoad = ({ signal }) => {
   window.addEventListener('drop', onDrop, { signal });
-}
+};
 ```
+
+If `build.target` is lowered below Safari 15 / Chrome 90 / Firefox 86, the `{ signal }` listener option is ignored.
 
 The entry exports init() and observes afterSwap, afterSettle and historyRestore.
 Only client-bearing pages get a trailing template[data-recooler-marker] with route
@@ -280,16 +285,41 @@ and version. It survives table parsing and htmx 1 history; handler-free pages em
 no marker. Body attributes are never a fallback. New markers run their own route
 onLoad once; unchanged markers do not rerun, and history restoration does rerun.
 When a marker leaves the document or its route/version changes, its signal aborts
-once. init() aborts retired instances in reverse initialization order, fragment
-before page, before invoking any new marker's onLoad. DOM changes are also observed.
+once. init() aborts retired instances in reverse initialization order, before
+invoking any new marker's onLoad. DOM changes are also observed.
 Abort listener errors do not block other retirements or onLoad calls. Full page
-unload does not abort signals. Async onLoad work uses the same signal: listeners
-added after it has aborted are not installed.
+unload does not abort signals. After each await, check `if (signal.aborted) return;`
+or call `signal.throwIfAborted()` before creating resources. An abort listener added
+after abort never fires; { signal } listeners are not installed.
 
-DOM changes made by onLoad must be idempotent or undone before htmx saves its
-history snapshot. Retirement happens after that snapshot; Back restores those
-changes and runs onLoad again. Undo them in an htmx:beforeHistorySave listener
-registered with { signal }, or check for existing DOM before adding it.
+```ts
+import type { RouteLoadContext } from '@insights-gaming/recooler/jsx';
+
+export async function onLoad({ signal }: RouteLoadContext) {
+  const response = await fetch('/api/widget', { signal });
+  signal.throwIfAborted();
+  const data = await response.json();
+  signal.throwIfAborted();
+  const widget = createWidget(data);
+  signal.addEventListener('abort', () => widget.destroy(), { once: true });
+}
+```
+
+DOM changes made by `onLoad` must be idempotent. htmx saves its history snapshot
+before retirement; Back restores DOM added by onLoad and runs onLoad again.
+Remove restored copies before adding a fresh widget, then remove it on abort:
+
+```ts
+import type { RouteOnLoad } from '@insights-gaming/recooler/jsx';
+
+export const onLoad: RouteOnLoad = ({ signal }) => {
+  document.querySelectorAll('.widget').forEach(node => node.remove());
+  const widget = document.createElement('div');
+  widget.className = 'widget';
+  document.body.append(widget);
+  signal.addEventListener('abort', () => widget.remove(), { once: true });
+};
+```
 
 Only confirm is canceled/deferred while handlers load. All other missing handlers,
 including config-request/before-request, drop events and leave defaults untouched. Dev warns for dropped events. Native preventDefault guards can

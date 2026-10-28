@@ -90,8 +90,8 @@ function invoke(id, scope, element, event) {
   if (fn) return (scope === null ? fn : fn(scope)).call(element, event);
 }
 async function initializeNode(node) {
+  prune();
   const key = signature(node);
-  if (instances.has(node) && instances.get(node).key !== key) prune();
   if (completed.get(node) === key) return;
   const existing = jobs.get(node);
   if (existing?.key === key) return existing.promise;
@@ -106,15 +106,21 @@ async function initializeNode(node) {
     if (missing.length) await Promise.all(missing.map(load));
     const values = (page?.slices ?? []).map(id => modules.get(id));
     if (values.some(value => value instanceof Promise)) await Promise.all(values);
+    prune();
     if (!current(node, instance) || started.get(node) === key) return;
     started.set(node, key);
     instances.delete(node); instances.set(node, instance);
     const value = page?.onLoad && modules.get(page.onLoad);
     const module = value instanceof Promise ? await value : value;
     if (typeof module?.onLoad === 'function') {
+      const signal = instance.controller.signal;
+      const failed = error => {
+        if (signal.aborted && (error === signal.reason || error instanceof DOMException && error.name === 'AbortError')) return;
+        report(error);
+      };
       try {
-        Promise.resolve(module.onLoad({ signal: instance.controller.signal })).catch(report);
-      } catch (error) { report(error); }
+        Promise.resolve(module.onLoad({ signal })).catch(failed);
+      } catch (error) { failed(error); }
     }
     if (current(node, instance)) completed.set(node, key);
   };
