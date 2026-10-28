@@ -1,18 +1,11 @@
-interface ServerConfig {
-  consumer: 'server' | 'client';
-  build: { ssr?: boolean | string; rolldownOptions: { input?: unknown } };
+interface Environment {
+  name: string;
+  config: { consumer: 'server' | 'client' };
 }
 
-/** CF v1 leaves an idle server beside its configured Worker. Entry points, not
- * names or object iteration order, identify the server that owns the app. */
-export function serverEnvironment(environments: Record<string, ServerConfig>, explicit?: string): string {
-  const servers = Object.entries(environments).filter(([, config]) => config.consumer === 'server');
-  if (explicit) {
-    if (!servers.some(([name]) => name === explicit)) throw new Error(`recooler: serverEnvironment ${JSON.stringify(explicit)} is not a server environment`);
-    return explicit;
-  }
-  const configured = servers.filter(([, config]) => config.build.rolldownOptions.input || typeof config.build.ssr === 'string');
-  const candidates = configured.length ? configured : servers;
-  if (candidates.length !== 1) throw new Error(`recooler: cannot select a server environment (${candidates.map(([name]) => name).join(', ') || 'none'}); set serverEnvironment`);
-  return candidates[0]![0];
+/** Selection happens on import, so idle SSR/Worker/test environments are harmless. */
+export function serverEnvironment(environment: Environment, selected?: string, explicit?: string): string {
+  if (environment.config.consumer === 'client') throw new Error('recooler: virtual:recooler/app is server-only');
+  const name = explicit ?? selected ?? environment.name;
+  return name;
 }

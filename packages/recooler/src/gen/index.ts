@@ -46,7 +46,7 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
   async function readModule(file: string): Promise<ModuleNs> {
     const source = await readFile(file, 'utf8');
     const parsed = parseSync(file, source);
-    for (const error of parsed.errors) errors.push(`${slash(file)}: ${error.message}`);
+    for (const error of parsed.errors) errors.push(`${display(file)}: ${error.message}`);
     const namespace: ModuleNs = Object.create(null);
     for (const exp of parsed.module.staticExports) for (const entry of exp.entries) {
       const name = entry.exportName.kind === 'Default' ? 'default' : entry.exportName.name;
@@ -65,7 +65,7 @@ export async function renderRoutes(options: GenerateOptions = {}): Promise<Omit<
     const routes = entries.filter(e => e.isFile() && routeFile.test(e.name));
     const layouts = entries.filter(e => e.isFile() && layoutFile.test(e.name));
     for (const [kind, files] of [['route', routes], ['layout', layouts]] as const) {
-      if (files.length > 1) errors.push(`only one ${kind} file may be used per directory, found:\n  ${files.map(f => slash(path.join(dir, f.name))).join(', ')}`);
+      if (files.length > 1) errors.push(`only one ${kind} file may be used per directory, found:\n  ${files.map(f => display(path.join(dir, f.name))).join(', ')}`);
     }
     for (const entry of entries) {
       const file = path.join(dir, entry.name);

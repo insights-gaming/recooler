@@ -8,7 +8,6 @@ import { build, createServer, createBuilder } from 'vite';
 import { cloudflare } from '@cloudflare/vite-plugin';
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
 import { recooler } from '../../dist/vite/index.js';
-import { serverEnvironment } from '../../dist/vite/environment.js';
 
 const execute = promisify(execFile);
 const packageDir = fileURLToPath(new URL('../../', import.meta.url));
@@ -30,7 +29,7 @@ try {
   await write('src/routes/index.tsx', routeSource);
   await write('src/entry.ts', `import app from 'virtual:recooler/app';\napp.onError(error => Response.json({ stack: error.stack }, { status: 500 }));\nexport default app;\n`);
   const base = {
-    root, configFile: false, logLevel: 'warn',
+    root, configFile: false, logLevel: 'warn', mode: 'production',
     plugins: recooler(),
     build: { ssr: 'src/entry.ts', outDir: 'dist/server', minify: false, sourcemap: true, rolldownOptions: { output: { entryFileNames: 'app.mjs' } } },
   };
@@ -40,16 +39,16 @@ try {
     base.plugins = [cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false }), ...recooler()];
     base.build = { minify: false, sourcemap: true };
     const builder = await createBuilder(base);
-    const selected = serverEnvironment(Object.fromEntries(Object.entries(builder.environments).map(([name, env]) => [name, env.config])));
+    const selected = 'recooler_custom_worker';
     assert.equal(selected, 'recooler_custom_worker');
-    assert.notEqual(selected, Object.values(builder.environments).find(e => e.config.consumer === 'server').name);
     await builder.buildApp();
     assert.match(await readFile(path.join(root, builder.environments[selected].config.build.outDir, 'index.js'), 'utf8'), /recooler integration/);
   } else {
     // An actual vite build CLI invocation, using the installed public subpath.
     await write('vite.config.mjs', `import { recooler } from 'recooler/vite';\nexport default { plugins: recooler(), build: ${JSON.stringify(base.build)} };\n`);
-    await execute(process.execPath, [path.join(packageDir, 'node_modules/vite/bin/vite.js'), 'build', root, '--config', path.join(root, 'vite.config.mjs')], { cwd: root });
+    await execute(process.execPath, [path.join(packageDir, 'node_modules/vite/bin/vite.js'), 'build', root, '--mode', 'production', '--config', path.join(root, 'vite.config.mjs')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' } });
     const bundle = path.join(root, 'dist/server/app.mjs');
+    assert.doesNotMatch(await readFile(bundle, 'utf8'), /fileName:\s*["']\//);
     const { default: app } = await import(pathToFileURL(bundle));
     assert.equal((await app.fetch(new Request('http://test/'))).status, 200);
     assert.match(await (await app.fetch(new Request('http://test/'))).text(), /<h1>recooler integration<\/h1>/);

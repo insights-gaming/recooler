@@ -56,13 +56,14 @@ with deployment: local preview and deployed builds can need different profiles.
 ```ts
 import { defineConfig } from 'vite';
 import { cloudflare } from '@cloudflare/vite-plugin';
+import { recooler } from 'recooler/vite';
 import { deploymentProfiles } from './build-profiles'; // private, explicit maps
 
 export default defineConfig(({ mode }) => {
   const profile = deploymentProfiles[mode];
   if (!profile) throw new Error(`Unknown deployment mode: ${mode}`);
   return {
-    plugins: [cloudflare()], // add the recooler plugin when porting the app
+    plugins: [cloudflare(), ...recooler()],
     define: { ...profile.defines },
   };
 });
@@ -122,18 +123,15 @@ Use `recooler/jsx` for the JSX page adapter and runtime:
 }
 ```
 
-Until the `recooler/vite` plugin is implemented, explicitly set Vite's JSX
-transform import source too:
-
-```ts
-export default {
-  oxc: { jsx: { runtime: 'automatic', importSource: 'recooler/jsx' } },
-};
-```
-
-The Vite plugin must default `oxc.jsx.importSource` to `recooler/jsx` or warn when
-a different runtime is selected. The htmx transform relies on this runtime to
+Use `plugins: recooler()` from `recooler/vite` to generate routes and import
+`virtual:recooler/app` from your server entry. With Cloudflare, use
+`plugins: [cloudflare(), ...recooler()]` and retain the platform builder.
+The plugin defaults JSX to `recooler/jsx` per file, respects nested/referenced
+tsconfigs, file pragmas and explicit OXC or legacy esbuild configuration, and
+warns for other effective runtimes. The htmx transform relies on this runtime to
 remove Context values from intrinsic attributes, including props spreads.
+See the [Vite integration](../packages/recooler/src/vite/README.md) for environment
+selection, dependency bundling and augmenting the virtual app's Bindings.
 Precompiled dependencies need recompilation or aliases for their bundled engine
 runtime imports; aliases do not rewrite externalized dependencies. See the
 [JSX README](../packages/recooler/src/jsx/README.md) for the alias recipe and Node

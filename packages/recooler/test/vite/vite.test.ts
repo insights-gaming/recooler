@@ -1,8 +1,5 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { createLogger, resolveConfig } from 'vite';
@@ -13,49 +10,48 @@ const execute = promisify(execFile);
 beforeAll(async () => {
   await execute(process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.build.json'], { cwd: fileURLToPath(new URL('../../', import.meta.url)) });
 });
-const configured = (consumer: 'server' | 'client', input?: string) => ({ consumer, build: { rolldownOptions: { input } } });
-
 describe('server environment selection', () => {
-  test('selects the configured Worker, independent of names and ordering', () => {
-    expect(serverEnvironment({ unused: configured('server'), arbitrary: configured('server', 'worker.ts'), browser: configured('client', 'client.ts') })).toBe('arbitrary');
-    expect(serverEnvironment({ another: configured('server') })).toBe('another');
-  });
-  test('rejects ambiguity and validates explicit selections', () => {
-    const environments = { one: configured('server', 'a.ts'), two: configured('server', 'b.ts'), browser: configured('client') };
-    expect(() => serverEnvironment(environments)).toThrow('set serverEnvironment');
-    expect(serverEnvironment(environments, 'two')).toBe('two');
-    expect(() => serverEnvironment(environments, 'browser')).toThrow('not a server environment');
+  const env = (name: string, consumer: 'server' | 'client' = 'server') => ({ name, config: { consumer } });
+  test('selects on import and honours the override', () => {
+    expect(serverEnvironment(env('__vitest__'))).toBe('__vitest__');
+    expect(serverEnvironment(env('worker'))).toBe('worker');
+    expect(serverEnvironment(env('worker'), undefined, 'worker')).toBe('worker');
+    expect(() => serverEnvironment(env('browser', 'client'))).toThrow('server-only');
+    expect(serverEnvironment(env('other'), 'worker')).toBe('worker');
+    expect(serverEnvironment(env('other'), undefined, 'worker')).toBe('worker');
   });
 });
 
-test('defaults JSX, respects user/tsconfig import sources and warns for direct engine use', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'recooler-config-'));
+test('keeps Vite JSX configuration and legacy esbuild conversion intact', async () => {
   const warnings: string[] = [];
   const logger = createLogger('silent');
   logger.warn = message => { warnings.push(message); };
-  const config = { root, configFile: false as const, plugins: recooler(), customLogger: logger };
-  try {
-    const defaults = await resolveConfig(config, 'build');
-    expect(defaults.oxc).toMatchObject({ jsx: { runtime: 'automatic', importSource: 'recooler/jsx' } });
-    expect(defaults.ssr.noExternal).toEqual(expect.arrayContaining(['recooler', 'easy-jsx-html-engine']));
-    const custom = await resolveConfig({ ...config, oxc: { jsx: { importSource: 'custom-jsx' } }, ssr: { noExternal: true } }, 'build');
-    expect(custom.oxc).toMatchObject({ jsx: { importSource: 'custom-jsx' } });
-    expect(custom.ssr.noExternal).toBe(true);
-    await writeFile(path.join(root, 'base.json'), '{"compilerOptions":{"jsxImportSource":"easy-jsx-html-engine"}}');
-    await writeFile(path.join(root, 'tsconfig.json'), '{ // JSONC and extends\n "extends":"./base.json" }');
-    const tsconfig = await resolveConfig(config, 'build');
-    expect(tsconfig.oxc).toMatchObject({ jsx: { importSource: 'easy-jsx-html-engine' } });
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('use jsx importSource "recooler/jsx"');
-  } finally { await rm(root, { recursive: true, force: true }); }
+  const config = { configFile: false as const, plugins: recooler(), customLogger: logger, build: { ssr: true } };
+  const defaults = await resolveConfig(config, 'build');
+  expect(defaults.environments.ssr!.resolve.noExternal).toEqual(expect.arrayContaining(['recooler', 'easy-jsx-html-engine']));
+  const custom = await resolveConfig({ ...config, oxc: { jsx: { importSource: 'custom-jsx' } }, ssr: { noExternal: true }, environments: { server: { consumer: 'server' } } }, 'build');
+  expect(custom.oxc).toMatchObject({ jsx: { importSource: 'custom-jsx' } });
+  expect(custom.environments.ssr!.resolve.noExternal).toBe(true);
+  expect(custom.environments.server!.resolve.noExternal).toEqual(expect.arrayContaining(['recooler', 'easy-jsx-html-engine']));
+  expect(warnings.some(w => w.includes('custom-jsx'))).toBe(true);
+  const legacy = await resolveConfig({ ...config, esbuild: { jsx: 'automatic', jsxImportSource: 'hono/jsx', jsxInject: 'import { h } from "x"' } }, 'build');
+  expect(legacy.oxc).toMatchObject({ jsx: { importSource: 'hono/jsx' }, jsxInject: 'import { h } from "x"' });
+  expect(warnings.some(w => w.includes('Both esbuild and oxc'))).toBe(false);
 });
 
 for (const runtime of ['plain', 'cloudflare']) {
   test(`real ${runtime} build and dev request${runtime === 'plain' ? ', route watch and SSR source map' : ''}`, async () => {
     const result = await execute(process.execPath, [fileURLToPath(new URL('./integration.mjs', import.meta.url)), runtime], {
       timeout: 120000, maxBuffer: 8 * 1024 * 1024,
-      env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
+      env: { ...process.env, NODE_ENV: 'production', WRANGLER_SEND_METRICS: 'false' },
     });
     expect(result.stdout).toContain('"devRequest":true');
   }, 130000);
 }
+
+test('Vitest, custom server dependencies, per-file JSX and dev generation regressions', async () => {
+  const result = await execute(process.execPath, [fileURLToPath(new URL('./regressions.mjs', import.meta.url))], {
+    timeout: 120000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+  });
+  expect(result.stdout).toContain('"regressions":true');
+}, 130000);

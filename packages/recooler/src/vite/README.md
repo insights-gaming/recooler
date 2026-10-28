@@ -37,17 +37,43 @@ The Cloudflare plugin serves the Worker entry automatically.
 `routes: { check: true }` compares committed output instead of writing it.
 The standalone `routes(options)` export remains usable for API-only apps.
 
-JSX defaults to OXC's automatic runtime with `importSource: 'recooler/jsx'`.
-An explicit `oxc.jsx` setting takes precedence; a project's tsconfig
-`jsxImportSource` (including JSONC/extends) is also respected. Using
-`easy-jsx-html-engine` directly warns because it bypasses the Context-filtering
-runtime wrapper. Per-file JSX pragmas remain under the compiler's control.
-`recooler` and `easy-jsx-html-engine` are added to `ssr.noExternal`: the engine's
-extensionless internal imports cannot run as native Node ESM.
+JSX defaults to the automatic `recooler/jsx` runtime per file. The plugin adds
+pragmas only when the file's own tsconfig and pragmas do not select a source or
+classic/preserved JSX. Solution-style tsconfig references, nested configs,
+JSONC/extends and explicit `oxc.jsx` settings are respected. When `oxc` is unset,
+Vite converts legacy `esbuild` options, including `jsxInject`, as usual. Any
+other effective runtime warns because it bypasses request-bound Context filtering.
+
+Every server-consumer environment gets `resolve.noExternal` entries for
+`recooler` and `easy-jsx-html-engine`: the engine's extensionless internal imports
+cannot run as native Node ESM. A [vitefu dependency crawl](https://github.com/svitejs/vitefu)
+also bundles packages declaring either package in `dependencies` or
+`peerDependencies`, keeping the JSX runtime in the same bundle. Declare consumed
+packages in the app's package.json. Undeclared dependencies and packages that
+hide their runtime dependency cannot be discovered; add those packages to the
+server environment's `resolve.noExternal` manually. Bundling does not rewrite
+precompiled imports of a different JSX runtime; recompile or alias those imports
+as described in the [JSX README](../jsx/README.md).
 
 With `@cloudflare/vite-plugin`, keep that plugin's normal configuration and
-builder. The configured server entry identifies the Worker environment; an
-unused server environment is ignored. Names are never assumed. If multiple
-server entries exist, specify `serverEnvironment` explicitly. Importing the
-virtual app from another environment is an error. This does not change
-`builder.buildApp` or require `sharedPlugins`.
+builder. Selection is lazy: the first server environment importing the virtual
+app is selected; `serverEnvironment` overrides that name when needed. Idle SSR
+and auxiliary Worker environments do not force configuration. All server
+consumers, including Vitest's SSR transforms, may import the app; browser imports
+are rejected. In Cloudflare v1, an environment's name is its Worker name with
+hyphens replaced by underscores: `main-worker` becomes `main_worker`. This does
+not change `builder.buildApp` or require `sharedPlugins`.
+
+Dev generation errors are logged once per distinct diagnostic and sent to Vite's
+error overlay (including clients connecting after a startup error). Importing the
+virtual app throws that diagnostic until generation succeeds; failed or recovered
+generation invalidates the app so requests cannot silently use a stale route table.
+
+The virtual app uses the same augmentable `RouteEnv` as page components:
+
+```ts
+import 'recooler/jsx';
+declare module 'recooler/jsx' {
+  interface RouteEnv { Bindings: { API_KEY: string } }
+}
+```

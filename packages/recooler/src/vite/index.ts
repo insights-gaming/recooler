@@ -1,22 +1,47 @@
 import path from 'node:path';
-import type { Plugin } from 'vite';
-import { getTsconfig, parseTsconfig } from 'get-tsconfig';
+import { normalizePath, searchForWorkspaceRoot } from 'vite';
+import type { Plugin, ViteDevServer } from 'vite';
+import { crawlFrameworkPkgs } from 'vitefu';
 import { generateRoutes } from '../gen/index.js';
 import type { GenerateOptions } from '../gen/index.js';
 import { locations } from '../gen/locations.js';
 import { serverEnvironment } from './environment.js';
+import { jsxDefaults } from './jsx.js';
+
+const appId = 'virtual:recooler/app';
+const resolvedAppId = '\0' + appId;
 
 /** Thin Vite integration; gen and runtime declarations do not depend on Vite. */
 export function routes(options: GenerateOptions = {}): Plugin {
+  return routePlugin(options);
+}
+
+function routePlugin(options: GenerateOptions, changed?: (error?: Error) => void): Plugin {
   let cwd = options.cwd;
   let serve = false;
   let stop: (() => void) | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let queue = Promise.resolve();
-  const generate = () => generateRoutes({ ...options, cwd });
-  const enqueue = (report?: (error: unknown) => void) => {
-    const pending = queue.then(generate).then(() => {});
+  let lastError: string | undefined;
+  const enqueue = (server?: ViteDevServer) => {
+    const pending = queue.then(async () => {
+      try {
+        await generateRoutes({ ...options, cwd });
+        changed?.();
+        lastError = undefined;
+      } catch (cause) {
+        const error = cause instanceof Error ? cause : new Error(String(cause));
+        changed?.(error);
+        if (!server) throw error;
+        if (lastError !== error.message) {
+          server.config.logger.error(error.message);
+          if (server.ws.clients.size) server.ws.send({ type: 'error', err: { message: error.message, stack: error.stack ?? '', plugin: 'recooler:routes' } });
+        }
+        lastError = error.message;
+      }
+    });
     queue = pending.catch(() => {});
-    return report ? pending.catch(report) : pending;
+    return pending;
   };
   return {
     name: 'recooler:routes',
@@ -25,19 +50,27 @@ export function routes(options: GenerateOptions = {}): Plugin {
     async configureServer(server) {
       const roots = locations({ ...options, cwd });
       const rootFile = path.join(roots.srcDir, 'root.tsx');
-      const report = (error: unknown) => server.config.logger.error(String(error));
       server.watcher.add([roots.routesDir, rootFile]);
       const update = (file: string) => {
         if (file === roots.out) return;
         const relative = path.relative(roots.routesDir, file);
         if (file !== rootFile && (relative.startsWith('..' + path.sep) || relative === '..' || path.isAbsolute(relative))) return;
-        void enqueue(report);
+        clearTimeout(timer);
+        timer = setTimeout(() => { void enqueue(server); }, 25);
       };
+      const connection = (socket: { send: (payload: string) => void }) => {
+        if (lastError) socket.send(JSON.stringify({ type: 'error', err: { message: lastError, stack: '', plugin: 'recooler:routes' } }));
+      };
+      server.ws.on('connection', connection);
       const events = ['add', 'unlink', 'addDir', 'unlinkDir', 'change'] as const;
-      server.watcher.on('add', update).on('unlink', update).on('addDir', update).on('unlinkDir', update).on('change', update);
-      stop = () => { for (const event of events) server.watcher.off(event, update); };
+      for (const event of events) server.watcher.on(event, update);
+      stop = () => {
+        clearTimeout(timer);
+        for (const event of events) server.watcher.off(event, update);
+        server.ws.off('connection', connection);
+      };
       server.httpServer?.once('close', () => stop?.());
-      await enqueue(report);
+      await enqueue(server);
     },
     async closeBundle() { stop?.(); await queue; },
   };
@@ -46,52 +79,67 @@ export function routes(options: GenerateOptions = {}): Plugin {
 export interface RecoolerOptions {
   /** Generation, watch and --check use the same options as routes(). */
   routes?: GenerateOptions;
-  /** Required only when multiple server entries are configured. */
+  /** Override the first server environment that imports the virtual app. */
   serverEnvironment?: string;
 }
 
-const appId = 'virtual:recooler/app';
-const resolvedAppId = '\0' + appId;
-
-/** JSX server integration. Future htmx plugins can contribute extensions and a
- * client environment without replacing routes() or the platform's buildApp. */
+/** JSX server integration. htmx remains a separate transform/runtime layer. */
 export function recooler(options: RecoolerOptions = {}): Plugin[] {
   let manifest: string;
-  let server: string;
+  let selected: string | undefined;
+  let generationError: Error | undefined;
+  let devServer: ViteDevServer | undefined;
+  let noExternal = ['recooler', 'easy-jsx-html-engine'];
+  const generated = (error?: Error) => {
+    const previous = generationError?.message;
+    generationError = error;
+    if (previous === error?.message) return;
+    for (const environment of Object.values(devServer?.environments ?? {})) {
+      const module = environment.moduleGraph.getModuleById(resolvedAppId);
+      if (module) {
+        environment.moduleGraph.invalidateModule(module);
+        environment.hot.send({ type: 'full-reload' });
+      }
+    }
+    if (previous && !error) devServer?.ws.send({ type: 'full-reload' });
+  };
   const app: Plugin = {
     name: 'recooler:app',
-    config(config) {
-      // Returning defaults lets Vite merge user/environment overrides normally.
-      const jsx = config.oxc === false ? undefined : config.oxc?.jsx;
+    async config(config, env) {
       const root = path.resolve(config.root ?? process.cwd());
-      const tsconfig = config.tsconfig
-        ? parseTsconfig(path.resolve(root, config.tsconfig))
-        : getTsconfig(root)?.config;
-      const importSource = tsconfig?.compilerOptions?.jsxImportSource ?? 'recooler/jsx';
-      return {
-        oxc: config.oxc === false ? false : { jsx: typeof jsx === 'object'
-          ? { runtime: 'automatic', importSource, ...jsx }
-          : jsx ?? { runtime: 'automatic', importSource } },
-        ssr: { noExternal: ['recooler', 'easy-jsx-html-engine'] },
-      };
+      const crawled = await crawlFrameworkPkgs({
+        root, workspaceRoot: searchForWorkspaceRoot(root), isBuild: env.command === 'build',
+        isFrameworkPkgByJson(pkg) {
+          return ['dependencies', 'peerDependencies'].some(field =>
+            ['recooler', 'easy-jsx-html-engine'].some(name => pkg[field]?.[name]));
+        },
+      });
+      noExternal = [...new Set([...noExternal, ...crawled.ssr.noExternal])];
+    },
+    configEnvironment(_name, config) {
+      if ((config.consumer ?? (_name === 'client' ? 'client' : 'server')) !== 'server') return;
+      const existing = config.resolve?.noExternal;
+      if (existing === true) return;
+      const entries = existing ? [existing].flat() : [];
+      return { resolve: { noExternal: noExternal.filter(name => !entries.includes(name)) } };
     },
     configResolved(config) {
-      manifest = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root }).out;
-      server = serverEnvironment(config.environments, options.serverEnvironment);
-      const jsx = config.oxc === false ? undefined : config.oxc?.jsx;
-      if (typeof jsx === 'object' && jsx.importSource === 'easy-jsx-html-engine') {
-        config.logger.warn('recooler: use jsx importSource "recooler/jsx" instead of "easy-jsx-html-engine" for request-bound JSX rendering');
-      }
+      manifest = normalizePath(locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root }).out);
+      selected = undefined;
     },
+    configureServer(server) { devServer = server; },
     resolveId(id) {
       if (id !== appId) return;
-      if (this.environment.name !== server) throw new Error(`recooler: ${appId} belongs to server environment ${JSON.stringify(server)}, not ${JSON.stringify(this.environment.name)}`);
+      selected = serverEnvironment(this.environment, selected, options.serverEnvironment);
       return resolvedAppId;
     },
     load(id) {
       if (id !== resolvedAppId) return;
+      if (generationError) throw generationError;
       return `import { createApp } from 'recooler/router';\nimport { jsxPages } from 'recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\nexport default createApp(manifest, { pages: jsxPages() });\n`;
     },
   };
-  return [routes(options.routes), app];
+  // Wire invalidation before configureServer's initial generation can fail.
+  const generator = routePlugin(options.routes ?? {}, generated);
+  return [app, generator, jsxDefaults()];
 }
