@@ -34,23 +34,13 @@ const report = error => typeof globalThis.reportError === 'function' ? globalThi
 const markers = () => [...document.querySelectorAll('[data-recooler-marker]')];
 const signature = node => node.dataset.recoolerRoute + '@' + node.dataset.recoolerVersion;
 const current = (node, instance) => instances.get(node) === instance && node.isConnected && signature(node) === instance.key;
-function cleanup(instance) {
-  const fn = instance.cleanup;
-  instance.cleanup = undefined;
-  if (fn) { try { Promise.resolve(fn()).catch(report); } catch (error) { report(error); } }
-}
 function prune() {
-  for (const [node, instance] of instances) {
+  for (const [node, instance] of [...instances].reverse()) {
     if (current(node, instance)) continue;
     instances.delete(node);
     jobs.delete(node); started.delete(node); completed.delete(node);
-    cleanup(instance);
+    try { instance.controller.abort(); } catch (error) { report(error); }
   }
-}
-function retain(node, instance, value) {
-  if (typeof value !== 'function') return;
-  instance.cleanup = value;
-  if (!current(node, instance)) cleanup(instance);
 }
 function reloadOnce(key, message) {
   try {
@@ -101,11 +91,12 @@ function invoke(id, scope, element, event) {
 }
 async function initializeNode(node) {
   const key = signature(node);
+  if (instances.has(node) && instances.get(node).key !== key) prune();
   if (completed.get(node) === key) return;
   const existing = jobs.get(node);
   if (existing?.key === key) return existing.promise;
   if (!checkVersion(node)) return;
-  const instance = instances.get(node) ?? { key };
+  const instance = instances.get(node) ?? { key, controller: new AbortController() };
   instances.set(node, instance);
   const page = routes[node.dataset.recoolerRoute];
   const run = async () => {
@@ -117,13 +108,12 @@ async function initializeNode(node) {
     if (values.some(value => value instanceof Promise)) await Promise.all(values);
     if (!current(node, instance) || started.get(node) === key) return;
     started.set(node, key);
+    instances.delete(node); instances.set(node, instance);
     const value = page?.onLoad && modules.get(page.onLoad);
     const module = value instanceof Promise ? await value : value;
     if (typeof module?.onLoad === 'function') {
       try {
-        const result = module.onLoad();
-        if (typeof result === 'function') retain(node, instance, result);
-        else Promise.resolve(result).then(value => retain(node, instance, value)).catch(report);
+        Promise.resolve(module.onLoad({ signal: instance.controller.signal })).catch(report);
       } catch (error) { report(error); }
     }
     if (current(node, instance)) completed.set(node, key);
@@ -213,7 +203,6 @@ globalThis.$rc = dispatch;
 for (const args of globalThis.$rq ?? []) dispatch(...args, true);
 delete globalThis.$rq;
 for (const name of ['htmx:afterSwap', 'htmx:afterSettle', 'htmx:historyRestore']) document.addEventListener(name, init);
-document.addEventListener('htmx:beforeHistorySave', () => queueMicrotask(prune));
 new MutationObserver(prune).observe(document, { childList: true, subtree: true, attributes: true,
   attributeFilter: ['data-recooler-route', 'data-recooler-version'] });
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });

@@ -76,26 +76,34 @@ try {
     export default props => <Suspense rid={props.rid} fallback={<p id="fallback">waiting</p>}><Child/></Suspense>;`);
   for (const route of ['a', 'b']) await write(`src/routes/cleanup-${route}/index.tsx`, `${inc}
     export const head = { scripts: [{ src: '/htmx.js' }] };
-    export const onLoad = () => {
+    export const onLoad = ({ signal }) => {
       inc('cleanupLoads${route.toUpperCase()}'); (globalThis.cleanupLog ??= []).push('${route} load');
-      const drop = () => inc('cleanupDrops${route.toUpperCase()}'); window.addEventListener('cleanup-drop', drop);
-      return () => {
-        window.removeEventListener('cleanup-drop', drop); globalThis.cleanupLog.push('${route} cleanup');
-        if (globalThis.throwCleanup) { globalThis.throwCleanup = false; throw new Error('cleanup failed'); }
-      };
+      const drop = () => inc('cleanupDrops${route.toUpperCase()}'); window.addEventListener('cleanup-drop', drop, { signal });
+      signal.addEventListener('abort', () => {
+        globalThis.cleanupLog.push('${route} abort');
+      });
     };
     export default () => <><a id="cleanup-tob" href="/cleanup-b" hx-boost="true">B</a>
       <button id="cleanup-open" hx-get="/cleanup-fragment" hx-target="#cleanup-modal">open</button>
+      <button id="cleanup-push" hx-get="/cleanup-fragment" hx-push-url="true" hx-target="#cleanup-modal">push</button>
       <button id="cleanup-async" hx-get="/cleanup-async" hx-target="#cleanup-modal">async</button>
       <button id="cleanup-clear" hx-get="/cleanup-clear" hx-target="#cleanup-modal">clear</button><div id="cleanup-modal"/></>;`);
   await write('src/routes/cleanup-fragment/index.tsx', `${inc}
-    export const onLoad = () => { inc('cleanupFragmentLoads'); globalThis.cleanupLog.push('fragment load');
-      return () => { inc('cleanupFragments'); globalThis.cleanupLog.push('fragment cleanup'); }; };
+    export const onLoad = ({ signal }) => { inc('cleanupFragmentLoads'); globalThis.cleanupLog.push('fragment load');
+      signal.addEventListener('abort', () => { inc('cleanupFragments'); globalThis.cleanupLog.push('fragment abort');
+        if (globalThis.throwCleanup) { globalThis.throwCleanup = false; throw new Error('abort failed'); }
+      });
+      signal.addEventListener('abort', () => inc('fragmentAbortFollowers')); };
     export default () => <p id="cleanup-fragment">fragment</p>;`);
   await write('src/routes/cleanup-async/index.tsx', `${inc}
-    export const onLoad = () => { inc('cleanupAsyncLoads'); return new Promise(resolve => {
-      globalThis.finishCleanup = () => resolve(() => { inc('cleanupAsyncs'); globalThis.cleanupLog.push('async cleanup'); });
-    }); };
+    export const onLoad = async ({ signal }) => {
+      inc('cleanupAsyncLoads');
+      window.addEventListener('async-drop', () => inc('asyncDrops'), { signal });
+      signal.addEventListener('abort', () => { inc('cleanupAsyncs'); globalThis.cleanupLog.push('async abort'); });
+      await new Promise(resolve => { globalThis.finishCleanup = resolve; });
+      window.addEventListener('async-drop', () => inc('asyncLateDrops'), { signal });
+      inc('asyncResolved');
+    };
     export default () => <p id="cleanup-pending">pending</p>;`);
   server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -209,25 +217,45 @@ try {
     // Teardown: boosts and cached Back retire old listeners before destination onLoad.
     const cleanup = await open('/cleanup-a');
     await cleanup.click('#cleanup-tob'); await cleanup.waitForFunction(() => globalThis.cleanupLoadsB === 1);
-    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a cleanup', 'b load']);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a abort', 'b load']);
     await cleanup.goBack(); await cleanup.waitForFunction(() => globalThis.cleanupLoadsA === 2); await sleep(80);
-    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a cleanup', 'b load', 'b cleanup', 'a load']);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a abort', 'b load', 'b abort', 'a load']);
     await cleanup.evaluate(() => window.dispatchEvent(new Event('cleanup-drop')));
     assert.deepEqual(await cleanup.evaluate(() => [globalThis.cleanupDropsA, globalThis.cleanupDropsB ?? 0]), [1, 0]);
     await cleanup.click('#cleanup-open'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 1);
     await cleanup.click('#cleanup-clear'); await cleanup.waitForFunction(() => globalThis.cleanupFragments === 1);
     assert.equal(await cleanup.evaluate(() => globalThis.cleanupLoadsA), 2, 'fragment removal retains the surrounding page');
-    await cleanup.click('#cleanup-async'); await cleanup.waitForFunction(() => globalThis.cleanupAsyncLoads === 1);
-    await cleanup.evaluate(() => globalThis.__recooler_ready);
-    await cleanup.click('#cleanup-clear'); await cleanup.waitForSelector('#cleanup-empty');
-    await cleanup.evaluate(() => globalThis.finishCleanup()); await cleanup.waitForFunction(() => globalThis.cleanupAsyncs === 1);
-    await cleanup.click('#cleanup-open'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 2);
+    // Partial push-url keeps the page live until Back restores the full snapshot.
+    await cleanup.click('#cleanup-push'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 2);
+    assert.equal(new URL(cleanup.url()).pathname, '/cleanup-fragment');
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupLoadsA), 2);
+    await cleanup.evaluate(() => window.dispatchEvent(new Event('cleanup-drop')));
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupDropsA), 2);
+    await cleanup.goBack(); await cleanup.waitForFunction(() => globalThis.cleanupLoadsA === 3);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog.slice(-3)), ['fragment abort', 'a abort', 'a load']);
+    assert.equal(count('/cleanup-a'), 1, 'partial push Back uses the history snapshot');
+    // Async listeners are removed whether the promise settles live or after removal.
+    for (const finishLive of [true, false]) {
+      const previous = await cleanup.evaluate(() => globalThis.cleanupAsyncs ?? 0);
+      await cleanup.click('#cleanup-async'); await cleanup.waitForFunction(n => globalThis.cleanupAsyncLoads === n + 1, previous);
+      await cleanup.evaluate(() => globalThis.__recooler_ready);
+      if (finishLive) { await cleanup.evaluate(() => globalThis.finishCleanup()); await cleanup.waitForFunction(() => globalThis.asyncResolved === 1); }
+      await cleanup.evaluate(() => window.dispatchEvent(new Event('async-drop')));
+      assert.deepEqual(await cleanup.evaluate(() => [globalThis.asyncDrops, globalThis.asyncLateDrops]), finishLive ? [1, 1] : [2, 1]);
+      await cleanup.click('#cleanup-clear'); await cleanup.waitForFunction(n => globalThis.cleanupAsyncs === n + 1, previous);
+      if (!finishLive) { await cleanup.evaluate(() => globalThis.finishCleanup()); await cleanup.waitForFunction(() => globalThis.asyncResolved === 2); }
+      await cleanup.evaluate(() => window.dispatchEvent(new Event('async-drop')));
+      assert.deepEqual(await cleanup.evaluate(() => [globalThis.asyncDrops, globalThis.asyncLateDrops]), finishLive ? [1, 1] : [2, 1]);
+    }
+    await cleanup.click('#cleanup-open'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 3);
     await cleanup.evaluate(() => { globalThis.throwCleanup = true; });
+    // B's module is already registered: retirement must happen synchronously in init.
     await cleanup.click('#cleanup-tob'); await cleanup.waitForFunction(() => globalThis.cleanupLoadsB === 2); await sleep(80);
-    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog.slice(-3)), ['a cleanup', 'fragment cleanup', 'b load']);
-    assert.equal(await cleanup.evaluate(() => globalThis.cleanupFragments), 2);
-    assert.equal(await cleanup.evaluate(() => globalThis.cleanupAsyncs), 1);
-    assert.deepEqual(cleanup.errors, ['cleanup failed']);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog.slice(-3)), ['fragment abort', 'a abort', 'b load']);
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupFragments), 3);
+    assert.equal(await cleanup.evaluate(() => globalThis.fragmentAbortFollowers), 3);
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupAsyncs), 2);
+    assert.deepEqual(cleanup.errors, ['abort failed']);
     assert.deepEqual(await cleanup.evaluate(() => globalThis.unhandled), []);
     await cleanup.close();
     // Native modules hold DCL while initial handler assets are unavailable.

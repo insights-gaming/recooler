@@ -264,22 +264,32 @@ Handlers run immediately when their slice registers, independent of marker
 completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
 Route onLoad runs at DOMContentLoaded or immediately if parsing has finished,
 sees the complete DOM, and is never awaited. Rejections go to reportError (with a
-console.error fallback). It may return a cleanup function, or a promise resolving
-to one; other return values are ignored. Return a function that removes listeners
-on window/document or releases other page resources. Root/layout onLoad stays ignored.
+console.error fallback). It receives { signal }, an AbortSignal for that marker
+instance. Register window/document listeners with { signal }; use an abort listener
+to release other resources. The return value is ignored. Root/layout onLoad stays ignored.
+
+```ts
+export function onLoad({ signal }) {
+  window.addEventListener('drop', onDrop, { signal });
+}
+```
 
 The entry exports init() and observes afterSwap, afterSettle and historyRestore.
 Only client-bearing pages get a trailing template[data-recooler-marker] with route
 and version. It survives table parsing and htmx 1 history; handler-free pages emit
 no marker. Body attributes are never a fallback. New markers run their own route
 onLoad once; unchanged markers do not rerun, and history restoration does rerun.
-When a marker leaves the document or its route/version changes, its cleanup runs
-once. init() cleans up retired markers before invoking any new marker's onLoad,
-including boosts, fragment swaps and Back. DOM changes are also observed; htmx's
-beforeHistorySave queues a check after the outgoing history DOM detaches, without
-retiring markers retained by a partial navigation. A cleanup resolving after its
-marker retires runs immediately. Cleanup errors use the same reportError path and
-do not block other cleanups or onLoad calls. Full page unload does not run cleanups.
+When a marker leaves the document or its route/version changes, its signal aborts
+once. init() aborts retired instances in reverse initialization order, fragment
+before page, before invoking any new marker's onLoad. DOM changes are also observed.
+Abort listener errors do not block other retirements or onLoad calls. Full page
+unload does not abort signals. Async onLoad work uses the same signal: listeners
+added after it has aborted are not installed.
+
+DOM changes made by onLoad must be idempotent or undone before htmx saves its
+history snapshot. Retirement happens after that snapshot; Back restores those
+changes and runs onLoad again. Undo them in an htmx:beforeHistorySave listener
+registered with { signal }, or check for existing DOM before adding it.
 
 Only confirm is canceled/deferred while handlers load. All other missing handlers,
 including config-request/before-request, drop events and leave defaults untouched. Dev warns for dropped events. Native preventDefault guards can
