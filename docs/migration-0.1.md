@@ -177,9 +177,9 @@ content because the HTTP status and headers are already sent. Default catches no
 longer expose errors or stack traces in HTML. Set `showStack` on a boundary or
 Suspense only when that output is desired.
 
-External module scripts execute after the entire Suspense stream finishes. The
-client entry waits for document parsing before onLoad, including legacy dynamic
-imports. See the browser-handler section for startup and swap-window semantics.
+Async route modules register handlers during Suspense streaming. An identical
+deferred module guarantees registration before DOMContentLoaded. The client waits
+for DOMContentLoaded before onLoad, including legacy dynamic imports. See the browser-handler section for startup and swap-window semantics.
 
 
 ## htmx action URLs and security (D3/D6/D7)
@@ -295,6 +295,7 @@ not read a client manifest. Serve client output at that base; ensure deployment
 caches distinguish the version query. Keep old hashed lazy chunks available for
 cached HTML during rolling deployments. The entry's route map and all chunks
 are public; lazy loading is a performance choice, not a confidentiality boundary.
+Route module names hash `route.file`; those names are guessable, not secrets.
 
 The htmx extension contributes `props.scripts: string[]` only for page routes
 reaching function handlers or a route `onLoad`. New roots render these URLs:
@@ -309,15 +310,23 @@ export default Content => props => <html>
 </html>;
 ```
 
-The adapter places Recooler's static modules in the Content slot for every root,
-including legacy roots. DefaultRootHOC avoids emitting these twice; other script
-URLs retain their normal root rendering. Dependency modulepreloads go in the
-head with DefaultRootHOC and in Content with a custom root. Preserve Content.
-Its first element is a hidden `<span data-recooler-marker="true"
-data-recooler-route="/users/:id" data-recooler-version="…">`. Unlike a leading
-meta, it survives htmx 1's DOMParser history restoration. Initialization reads
-all these markers, never the possibly stale body attribute. Routes use manifest
-patterns, without a mount prefix, rather than concrete request paths.
+The adapter places Recooler's startup scripts in the Content slot for every root,
+including legacy roots. Preserve Content. An external classic
+`assets/recooler-gate.js` script runs first and blocks the parser until its tiny
+confirm gate is installed. It needs no inline script or unsafe-eval permission.
+Each route module and client entry appears as an early async module and as an
+identical deferred module URL. The browser module map evaluates each URL once:
+the async copy registers during streaming, and the deferred copy guarantees
+registration before DOMContentLoaded. DefaultRootHOC avoids adding another copy;
+other script URLs retain their normal rendering. Dependency modulepreloads go in
+the head with DefaultRootHOC and in Content with a custom root.
+
+Only routes with client code get a trailing `<template data-recooler-marker="true"
+data-recooler-route="/users/:id" data-recooler-version="…"></template>` in Content.
+It survives htmx 1's DOMParser history restoration, works inside tables, and leaves
+the page's first child unchanged. Handler-free fragments get no marker or scripts.
+Initialization reads all these markers, never the possibly stale body attribute.
+Routes use manifest patterns, without a mount prefix, rather than request paths.
 
 Legacy roots that inline their second `clientScript?: string` argument must
 explicitly enable `recooler({ htmx: { legacyClientScript: true } })`. That string
@@ -331,13 +340,18 @@ inline string or `props.scripts`. Default roots always render the external URLs.
 The shim needs your existing inline-script CSP policy. Migrate off it in 0.1.x.
 
 Load the classic htmx script before the module entry (for example, a non-async
-script in the head). Static route modules import only that route's reachable
-handler slices. They register synchronously after parsing the complete HTML
-stream and before DOMContentLoaded, when htmx first processes the page. This also
-works with Suspense streaming and legacy roots. Initial load has no event queue.
-A synchronous route `onLoad` runs before htmx initializes; an async onLoad's
-synchronous portion runs then, and deferred confirm handlers await its completion.
-Root/layout `onLoad` warns and does not run.
+script in the head). Static route modules import only the route's reachable
+handler slices. **A handler runs as soon as its slice has registered**, including
+inside streamed chunks processed with `resolvedScriptMiddleware: s =>
+s + '.forEach(htmx.process)'`. Loaded root/layout handlers remain usable across
+body swaps while destination slices load.
+
+A route's `onLoad()` is called at DOMContentLoaded, or immediately when the document
+is no longer loading. It sees the complete DOM and is never awaited: asynchronous
+or never-resolving onLoad work cannot disable handlers or hold readiness. A rejected
+onLoad promise is sent to `reportError` (console.error where unavailable).
+Root/layout `onLoad` warns and does not run. Do not assume onLoad precedes htmx's
+own DOMContentLoaded listener or processing of streamed chunks.
 
 After swaps, `init()` loads missing slices for **every** marker currently in the
 DOM, then runs each new marker's owning route onLoad once. A fragment from another
@@ -349,7 +363,7 @@ use this same path; unchanged markers do not rerun onLoad. Ready handlers on the
 surrounding page continue to run while another fragment loads or fails.
 
 During the short swap loading window, only `htmx:confirm` is canceled and deferred.
-After onLoad, handlers share the original request's `detail.issueRequest(true)`
+After registration, handlers share the original request's `detail.issueRequest(true)`
 continuation, preserving cancellation and avoiding an automatic continuation if a
 handler already called it. Detached targets are skipped. `htmx:configRequest` and
 `htmx:beforeRequest` handlers run late: their preventDefault cannot cancel a request
@@ -357,17 +371,25 @@ already in progress, and mutations to request configuration are not guaranteed t
 affect that request. There is no safe public continuation for those events.
 
 Other events, including native click/submit/keydown/paste/drop and htmx response,
-swap and settle events, are dropped while their route initializes. They never
+swap and settle events, are dropped until their handler registers. They never
 cancel native defaults, re-dispatch native events, or restart an htmx request.
-Development warns for dropped events except htmx:load (a normal lifecycle event).
+Development warns for every dropped event, including htmx:load.
 Dropping avoids running stale lifecycle callbacks or late cancellation-dependent
-side effects. Once ready, handlers run normally with the original event. htmx's
+side effects. Once registered, handlers run normally with the original event. htmx's
 own listeners may ignore defaultPrevented; Recooler adds no replacement requests.
 Already-string hx-on attributes keep their behavior and unsafe-eval CSP needs.
-With htmx 1.9.12, synchronous load triggers can precede that version's wildcard
-listener installation; use `load delay:1ms` when that htmx behavior matters.
+The external gate captures confirms and defers their dispatch by one microtask,
+so htmx 1.9.12 can install hx-on listeners before a synchronous load confirm runs.
+It then uses the public issueRequest continuation once. Confirms that arrive
+before the module entry are held until registration; detached targets are skipped.
 
-`globalThis.__recooler_ready` tracks the latest init, including awaited onLoad.
+**Native preventDefault guards can be bypassed during the post-swap loading window.**
+This includes non-boosted links/forms, href="#" anchors and key/paste/drop guards.
+Use `htmx:confirm` for request gating. A click/submit guard cannot cancel a default
+if its handler has not arrived; development warnings expose those dropped events.
+
+`globalThis.__recooler_ready` tracks registration and invocation of onLoad for the
+latest init; it does not wait for onLoad promises.
 Import failures are observed, evicted and retried with a fresh module URL (native
 imports cache failures). A second failure attempts one sessionStorage-guarded reload
 per client version; persistent failure reports a console error. Later init calls

@@ -131,6 +131,20 @@ export default {
   server = await createServer({ root, configFile }); await server.listen();
   const devOrigin = `http://127.0.0.1:${server.httpServer.address().port}`;
   const devHtml = await (await fetch(devOrigin + '/')).text();
+  const devGate = await fetch(devOrigin + '/assets/recooler-gate.js');
+  assert.equal(devGate.status, 200);
+  assert.match(devGate.headers.get('content-type'), /javascript/);
+  const gateCode = await devGate.text();
+  assert(gateCode.includes('recooler: dropped '));
+  // Exercise the shipped dev gate before registration: missing native handlers
+  // leave defaults alone and make the loading window visible to developers.
+  const warnings = [];
+  const gateWindow = { document: { addEventListener() {} }, console: { warn: text => warnings.push(text) } };
+  vm.runInNewContext(gateCode, gateWindow);
+  let prevented = false;
+  gateWindow.$rc('missing', null, {}, { type: 'click', preventDefault() { prevented = true; } });
+  assert.equal(prevented, false);
+  assert.deepEqual(warnings, ['recooler: dropped click while route handlers load']);
   const devEntry = devHtml.match(/<script[^>]*src="([^"]*virtual:recooler\/client[^"]*)"/)[1];
   const initial = await (await fetch(new URL(devEntry, devOrigin))).text();
   assert(initial.includes('recooler-handlers'));

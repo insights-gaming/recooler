@@ -6,10 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { createBuilder } from 'vite';
-import { cloudflare } from '@cloudflare/vite-plugin';
 import { JSDOM } from 'jsdom';
 import { recooler } from '../../dist/vite/index.js';
 const { Miniflare, convertV4MiniflareOptions } = createRequire(import.meta.resolve('@cloudflare/vite-plugin'))('miniflare');
+const beta = process.argv[2] === 'beta';
+const platform = beta ? new URL('../../../../spikes/phase1/node_modules/cloudflare-vite-beta/dist/index.mjs', import.meta.url).href : import.meta.resolve('@cloudflare/vite-plugin');
+const { cloudflare } = await import(platform);
 const packageDir = fileURLToPath(new URL('../../', import.meta.url));
 await mkdir(path.join(packageDir, '.cache'), { recursive: true });
 const root = await mkdtemp(path.join(packageDir, '.cache/client-proxy-'));
@@ -20,7 +22,8 @@ const originalRun = vm.runInContext;
 try {
   await write('package.json', JSON.stringify({ name: 'proxy-admin', type: 'module' }));
   await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
-  await write('wrangler.json', JSON.stringify({ name: 'admin_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: ['nodejs_als'] }));
+  if (beta) await write('cloudflare.config.ts', `export default { worker: { name: 'admin_worker', entrypoint: './src/entry.ts', compatibilityDate: '2026-10-20', compatibilityFlags: ['nodejs_als'] } };`);
+  else await write('wrangler.json', JSON.stringify({ name: 'admin_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: ['nodejs_als'] }));
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('public/assets/htmx.js', await readFile(fileURLToPath(import.meta.resolve('htmx.org/dist/htmx.js')), 'utf8'));
   await write('front-assets/assets/recooler-client.js', `globalThis.WRONG_FRONT_ENTRY = true;`);
@@ -33,7 +36,7 @@ try {
     if (legacy) await write('src/root.tsx', `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
       export default (Content, clientScript) => props => <html><head><script src="/_admin/assets/htmx.js"/>{props.preloads.map(href => <link rel="modulepreload" href={href}/>)}</head><body><Content {...props}/><script>{dangerouslyPreventEscaping(clientScript ?? '')}</script></body></html>;`);
     const builder = await createBuilder({ root, configFile: false, logLevel: 'silent', base: '/_admin/',
-      plugins: [cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false }), ...recooler({ serverEnvironment: 'admin_worker', htmx: { legacyClientScript: legacy, base: '/_admin' } })],
+      plugins: [cloudflare({ ...(beta ? { viteEnvironment: { name: 'admin_worker' }, types: { generate: false } } : { configPath: path.join(root, 'wrangler.json') }), persistState: false, inspectorPort: false }), ...recooler({ serverEnvironment: 'admin_worker', htmx: { legacyClientScript: legacy, base: '/_admin' } })],
       environments: { client: { build: { minify: false } } } });
     await builder.buildApp();
     const serverOut = builder.environments.admin_worker.config.build.outDir;
@@ -55,6 +58,12 @@ try {
     assert.match(await (await fetch(origin + '/assets/recooler-client.js')).text(), /WRONG_FRONT_ENTRY/);
     const html = await (await fetch(origin + '/_admin/')).text();
     assert.match(html, legacy ? /import\("\/_admin\/assets\/recooler-client.js\?v=/ : /src="\/_admin\/assets\/recooler-client.js\?v=/);
+    const gate = html.match(/<script src="([^"]*recooler-gate\.js[^"]*)"/)[1];
+    assert(gate.startsWith('/_admin/assets/'));
+    const gateResponse = await fetch(origin + gate);
+    assert.equal(gateResponse.status, 200);
+    assert.match(gateResponse.headers.get('content-type'), /javascript/);
+    assert((await gateResponse.text()).includes('__recooler_gate'));
     const preloads = [...html.matchAll(/rel="modulepreload" href="([^"]+)"/g)].map(m => m[1]);
     assert(preloads.length);
     for (const url of preloads) { assert(url.startsWith('/_admin/assets/')); const response = await fetch(origin + url); assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /javascript/); }
@@ -103,5 +112,5 @@ try {
     window.close(); window = undefined; vm.runInContext = originalRun;
     await mf.dispose(); mf = undefined;
   }
-  console.log(JSON.stringify({ clientProxy: true, serviceBinding: true, viteBase: true, preloads: true, legacy: true }));
+  console.log(JSON.stringify({ clientProxy: true, beta, serviceBinding: true, viteBase: true, preloads: true, legacy: true }));
 } finally { vm.runInContext = originalRun; window?.close(); await mf?.dispose(); await rm(root, { recursive: true, force: true }); }

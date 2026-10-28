@@ -25,7 +25,7 @@
             "status": 200,
             "includes": [
               "<!DOCTYPE html>",
-              "<div id=\"app\"><span hidden data-recooler-marker=\"true\" data-recooler-route=\"/\"",
+              "<template data-recooler-marker=\"true\" data-recooler-route=\"/\"",
               "<main data-layout=\"root\"><h1>home</h1>"
             ]
           }

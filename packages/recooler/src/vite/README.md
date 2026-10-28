@@ -225,41 +225,45 @@ Unsliced dependencies retain mappings without embedded source contents, includin
 when they have tree-shaken server exports. Public entry lookup keys are opaque.
 Client chunks are public performance units; bans remain an application boundary.
 
-Initial pages include static `assets/recooler-route-<opaque route hash>.js?v=<version>`
-modules. Each route entry imports its own slices, sharing dependencies with other
-entries. The server computes names from route.file without a client manifest.
-The stable general entry is still `assets/recooler-client.js?v=<version>`.
-Content includes these module scripts even with a legacy root, plus dependency
-modulepreloads for custom roots. Synchronous registration and route onLoad happen
-after the entire HTML stream parses and before htmx's DOMContentLoaded startup.
-There is no initial event queue.
+Initial pages include `assets/recooler-route-<route hash>.js?v=<version>` modules.
+Each imports its own reachable slices and shares dependencies with other entries.
+Names hash route.file and are guessable; public chunks are not a confidentiality
+boundary. The general entry is `assets/recooler-client.js?v=<version>`.
 
-The entry exports `init()` and observes afterSwap, afterSettle and historyRestore.
-Every hidden `[data-recooler-marker]` span contributes its own route and version;
-body attributes are never a fallback. Spans survive htmx 1's DOMParser history
-cache. New fragment markers load their slices and run their owning route onLoad.
-Repeated scripts/events share jobs and run onLoad once per marker. Replacing a
-marker, including on history restore, reruns onLoad. Root/layout onLoad does not run.
+Content starts with a parser-blocking external `assets/recooler-gate.js`, then
+async and deferred copies of the same client/route module URLs. The module map
+evaluates each once. Async modules register during Suspense streaming, including
+consumer renderers calling `.forEach(htmx.process)`; deferred copies still guarantee
+registration before DOMContentLoaded. Keep modulepreloads and the Content slot.
+The external gate needs no inline script. It captures confirms, waits one microtask
+for htmx 1's synchronous-load hx-on listener installation, then uses the public
+issueRequest continuation. Confirms received before the entry loads are held.
 
-During lazy swap initialization, only htmx:confirm is canceled and deferred, using
-its public issueRequest(true) continuation after onLoad. ConfigRequest/beforeRequest
-handlers run late without cancellation or request restart; changes may miss the
-request. All other early events are dropped, leaving native and htmx defaults
-untouched. Dev warns except for htmx:load. This avoids stale callbacks and late
-cancellation-dependent side effects. No click/submit redispatch or htmx.ajax replay
-exists. Once initialized, handlers receive the original event normally. Detached
-targets are skipped and errors are reported independently.
+Handlers run immediately when their slice registers, independent of marker
+completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
+Route onLoad runs at DOMContentLoaded or immediately if parsing has finished,
+sees the complete DOM, and is never awaited. Rejections go to reportError (with a
+console.error fallback). Root/layout onLoad stays ignored.
 
-`globalThis.__recooler_ready` settles after the current initialization. Failed imports
-are evicted and retried with a fresh URL, then attempt one guarded reload per client
-version. Persistent failure reports an error without unhandled rejection; another
-init can recover. Version mismatches reload once per HTML/client version pair,
-then report an error and refuse handler dispatch. SessionStorage guards prevent loops.
+The entry exports init() and observes afterSwap, afterSettle and historyRestore.
+Only client-bearing pages get a trailing template[data-recooler-marker] with route
+and version. It survives table parsing and htmx 1 history; handler-free pages emit
+no marker. Body attributes are never a fallback. New markers run their own route
+onLoad once; unchanged markers do not rerun, and history restoration does rerun.
 
-For custom createApp entries, pass clientModules and clientPreloads alongside clients
-and clientEntry from virtual:recooler/htmx. The legacyClientScript opt-in still supplies
-import(entry).then(m=>m.init()), including cached imports; static scripts in Content
-now provide the first-load ordering guarantee. Load classic htmx before these modules.
+Only confirm is canceled/deferred while handlers load. Both kebab and camel spellings
+of config-request/before-request run late without cancellation or request restart;
+changes may miss the request. All other missing handlers drop events and leave
+defaults untouched. Dev warns for dropped events. Native preventDefault guards can
+be bypassed during a post-swap loading window; use htmx:confirm to gate requests.
+No native click/submit replay exists. Detached targets are skipped.
+
+__recooler_ready tracks registration and onLoad invocation, not async onLoad
+completion. Failed imports retry with a fresh URL, then attempt one guarded reload
+per client version. Version mismatch reloads once per HTML/client version pair.
+Custom createApp entries pass clientModules/clientPreloads alongside clients and
+clientEntry. legacyClientScript still supplies import(entry).then(m=>m.init()).
+Load classic htmx before the module scripts. See the migration guide for details.
 
 Bans, exact server input slicing, dev fs authorization, redacted maps, and opaque
 lookup keys remain enforced. Dropped slice comments are removed even with minify:false.

@@ -126,9 +126,9 @@ try {
     await build(legacy);
     assets = []; requests = [];
     const page = await open();
-    assert.deepEqual(await page.evaluate(() => globalThis.order.slice(0, 2)), ['onLoad', 'DCL']);
-    const dcl = await page.evaluate(() => globalThis.atDCL); assert(dcl.handlers > 0); assert.equal(dcl.loads, 1);
-    assert((await page.evaluate(() => globalThis.processed)).every(x => x.handlers > 0 && x.loads === 1));
+    assert.deepEqual(await page.evaluate(() => [...globalThis.order].sort()), ['DCL', 'onLoad']);
+    const dcl = await page.evaluate(() => globalThis.atDCL); assert(dcl.handlers > 0); assert.equal(await page.evaluate(() => globalThis.loadsA), 1);
+    assert((await page.evaluate(() => globalThis.processed)).every(x => x.handlers > 0));
     assert(!assets.some(x => x.includes('rc_retry=')));
     assert.equal(await page.evaluate(() => globalThis.$rq), undefined);
     // replay.mjs: one request per htmx owner, plus native checkbox/key/paste/drop defaults.
@@ -151,6 +151,7 @@ try {
     assert.equal(await page.evaluate(() => globalThis.saves), 1);
     await page.evaluate(() => globalThis.__recooler_client.init()); assert.equal(await page.evaluate(() => globalThis.editLoads), 1);
     assert.equal(await page.locator('[data-recooler-marker]').count(), 2);
+    const confirmsBeforeBoost = await page.evaluate(() => globalThis.rootConfirms ?? 0);
     // Settle-loop: body lifecycle listeners and a delayed destination cause one GET, no replay.
     block = new Promise(r => { release = () => { block = undefined; r(); }; });
     await page.click('#tob'); await page.waitForSelector('#handler'); await sleep(80);
@@ -163,6 +164,13 @@ try {
     release(); await page.waitForFunction(() => globalThis.loadsB === 1); await sleep(300);
     assert.equal(count('/b'), 1); assert.equal(await page.evaluate(() => globalThis.loadsB), 1);
     assert.equal(count('/m/config'), 1, JSON.stringify({ requests, errors: page.errors, state: await page.evaluate(() => ({ configs: globalThis.configs, rootConfirms: globalThis.rootConfirms, befores: globalThis.befores, html: document.body.innerHTML })) })); assert.equal(count('/m/request'), 1);
+    assert.equal(await page.evaluate(() => globalThis.configs), 1);
+    assert.equal(await page.evaluate(() => globalThis.befores), 1);
+    if (legacy) {
+      assert.equal(await page.evaluate(() => globalThis.bodySwaps), 3);
+      assert.equal(await page.evaluate(() => globalThis.bodySettles), 3);
+      assert.equal(await page.evaluate(() => globalThis.rootConfirms), confirmsBeforeBoost + 8, 'boost and all seven destination request confirms use the loaded root handler');
+    }
     for (const endpoint of ['late-post', 'late-form', 'late-link', 'late-after', 'late-before']) assert.equal(count('/m/' + endpoint), 1);
     await page.click('#handler'); assert.equal(await page.evaluate(() => globalThis.destinationClicks), 1);
     // hist / hist-modern: A -> B -> C -> Back must initialize B on B's DOM.
@@ -181,12 +189,12 @@ try {
     assert.equal(await early.evaluate(() => globalThis.loadsA), 1); await early.close();
     // Streamed Suspense: browser executes engine scripts before deferred handler modules and DCL.
     const stream = await open('/stream');
-    await stream.waitForSelector('#streamed'); assert.deepEqual(await stream.evaluate(() => globalThis.order.slice(0, 2)), ['onLoad', 'DCL']);
+    await stream.waitForSelector('#streamed'); assert.deepEqual(await stream.evaluate(() => globalThis.order.slice(0, 2)), ['DCL', 'onLoad']);
     await stream.click('#streamed'); assert.equal(await stream.evaluate(() => globalThis.streamClicks), 1);
-    assert.equal((await stream.evaluate(() => globalThis.atDCL)).loads, 1);
+    assert.equal(await stream.evaluate(() => globalThis.streamLoads), 1);
     assert((await stream.evaluate(() => globalThis.atDCL)).handlers > 0);
     const processing = await stream.evaluate(() => globalThis.streamProcessing);
-    assert(processing.length > 0); assert(processing.every(x => x.handlers > 0 && x.loads === 1));
+    assert(processing.length > 0); assert(processing.every(x => x.handlers > 0));
     assert.deepEqual(stream.errors, []);
     await stream.close();
     // HX-Location and push-url run destination onLoad once despite inserted module scripts.

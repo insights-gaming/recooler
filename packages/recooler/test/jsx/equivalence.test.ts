@@ -33,7 +33,7 @@ for (const [i, path] of ['/', '/nested/42?x=1', '/replace'].entries()) {
     expect(res.status).toBe(200);
     const actual = await res.text();
     const routePattern = i === 1 ? '/nested/:id' : path;
-    expect(actual).toBe(expected.replace('<body>', `<body data-recooler-route="${routePattern}"><span hidden data-recooler-marker="true" data-recooler-route="${routePattern}"></span>`));
+    expect(actual).toBe(expected.replace('<body>', `<body data-recooler-route="${routePattern}">`));
   });
 }
 
@@ -42,8 +42,7 @@ it('matches a custom root, removing only the legacy inline client script and add
   expect(expected).toContain('<script>(()=>{document.title="loaded";})()</script>');
   const app = createApp({ version: 1, root, tree: dir('', '/', customIndex) }, { pages: jsxPages() });
   const actual = await (await app.request('/')).text();
-  expect(actual).toBe(expected.replace('<script>(()=>{document.title="loaded";})()</script>', '')
-    .replace('<div id="app">', '<div id="app"><span hidden data-recooler-marker="true" data-recooler-route="/"></span>'));
+  expect(actual).toBe(expected.replace('<script>(()=>{document.title="loaded";})()</script>', ''));
 });
 
 for (const [name, module, expected] of [

@@ -34,7 +34,7 @@
             "status": 200,
             "includes": [
               "<title>Layout|page</title>",
-              "<body data-recooler-route=\"/\"><span hidden data-recooler-marker=\"true\" data-recooler-route=\"/\"></span><p>bare page</p></body>"
+              "<body data-recooler-route=\"/\"><p>bare page</p></body>"
             ],
             "trace": [],
             "counts": {

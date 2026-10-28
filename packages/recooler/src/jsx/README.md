@@ -141,16 +141,17 @@ export default function Root(Content: Component<RouteProps>) {
 }
 ```
 
-For every root, the adapter puts a hidden span with `data-recooler-marker="true"`
-and `data-recooler-route="…"` at the beginning of Content, followed by Recooler's
-static module scripts. Custom roots also get dependency modulepreloads there.
-This survives body swaps and htmx 1's DOMParser history restore, which moves a
-leading meta into head. The route is a manifest pattern, without mount prefix.
-Initialization reads every marker to support cross-route fragments; it never
-falls back to the stale body attribute. Keep the Content slot intact. Static
-modules register before DOMContentLoaded even in a legacy root and streamed page.
-A repeated module URL does not rerun registration; init deduplicates onLoad by
-marker identity, and runs the fragment's own route onLoad on insertion.
+For roots with client code, Content starts with a parser-blocking external confirm
+gate and async/deferred copies of identical client and route module URLs. The
+module map evaluates each URL once; async registration works during streaming and
+the deferred copy guarantees registration before DOMContentLoaded. Custom roots
+also get dependency modulepreloads. Keep Content intact.
+
+A trailing template[data-recooler-marker] carries route/version metadata only on
+client-bearing routes. It survives tables and htmx 1's DOMParser history restore.
+Handler-free pages emit no marker. Route values are manifest patterns without mount
+prefixes. Initialization reads every marker, never a stale body attribute; it runs
+the owning route's onLoad once per marker, including cross-route fragments.
 
 For one release an extension may still provide `page.clientScript: string`.
 It is passed to legacy custom roots as the second argument, and is available as
@@ -162,14 +163,14 @@ extension. Suspense's engine-generated inline scripts are separate from client
 entry scripts. The resolved template and cleanup script are configurable through
 the options below; the engine loader script is fixed.
 
-External module scripts run after the entire Suspense stream has parsed.
-Static route modules register handlers and call synchronous onLoad before
-DOMContentLoaded and htmx startup, recovering 0.0.27's first-load ordering.
-Legacy dynamic imports wait for parsing while the static scripts provide startup
-registration. After swaps, init loads every new marker and runs its owning onLoad.
-Only confirm can defer its request; other event policies are in the migration guide.
-Use `htmx.legacyClientScript: true` explicitly for roots that inline the second
-argument.
+Handlers become usable as soon as their slice registers. Route onLoad waits until
+DOMContentLoaded (or runs immediately if parsing has finished) and sees the full
+DOM. Its promise is not awaited; errors reach reportError. Root/layout handlers
+already registered remain usable during body swaps. Only confirm can safely defer
+its request while modules load. The external gate also handles htmx 1's synchronous
+load-confirm listener timing. Native guards may be bypassed before registration;
+see the migration guide. Enable htmx.legacyClientScript explicitly for roots that
+inline the second argument.
 
 ## Rendering options
 
