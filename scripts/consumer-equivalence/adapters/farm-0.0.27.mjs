@@ -22,7 +22,7 @@ export function catalogFromEntries(entries) {
     for (const id of entry.handler.actionIds || []) route.actions.push({ method: entry.method, id });
     if (entry.handler.kind === 'page') route.page = entry.handler;
   }
-  return { catalog: { routes: [...routes.values()], middlewarePrefixes: entries.filter(x => x.handler.kind === 'middleware').map(x => x.path) }, diagnostics };
+  return { catalog: { middleware: entries.filter(e => e.handler.kind === 'middleware').map(e => ({path: e.path, file: e.handler.file, export: e.handler.export})), routes: [...routes.values()], middlewarePrefixes: entries.filter(x => x.handler.kind === 'middleware').map(x => x.path) }, diagnostics };
 }
 export function actionUrl(request) {
   const url = new URL(request.path, 'http://localhost');

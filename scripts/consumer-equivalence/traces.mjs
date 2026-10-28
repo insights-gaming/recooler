@@ -49,23 +49,27 @@ export function generateRequests(catalog, options = {}) {
 }
 
 // Deliberately narrow substitutions; never remove entire heads, scripts or layouts.
-export function normalizeHtml(html) {
+export function normalizeHtml(html, canonicalActionId = id => id) {
   return html
+    .replace(/(recooler-(?:client\.js|route-[a-f0-9]+\.js)\?v=)[a-f0-9]{20}(?=["'&\s<])/g, '$1<build>')
+    .replace(/(recooler-slice-)[a-f0-9]{20}(-\d+\.js)/g, '$1<build>$2')
+    .replace(/(data-recooler-version=")[a-f0-9]{20}("?)/g, '$1<build>$2')
     .replace(/<meta\b(?=[^>]*\sname="recooler-route"(?=\s|\/?>))[^>]*\/?\s*>/gi, '')
     .replace(/\sdata-recooler-route(?=[\s/>=])(?:="[^"]*")?/g, '')
-    .replace(/((?:\?|&amp;|&)(?:action|sig|signature)=)[^"'\s<>&]*/g, '$1<volatile>')
+    .replace(/((?:\?|&amp;|&)(action|sig|signature)=)([^"'\s<>&]*)/g, (_, prefix, key, value) =>
+      prefix + (key === 'action' ? encodeURIComponent(canonicalActionId(decodeURIComponent(value))) : '<volatile>'))
     .replace(/(\bid="s:[prs])\d+("|')/g, '$1<stream>$2')
     .replace(/(suspense\.tp\()\d+(\))/g, '$1<stream>$2');
 }
 export const comparedHeaders = ['location', 'content-type', 'content-disposition', 'cache-control', 'allow', 'vary',
   'hx-refresh', 'hx-push-url', 'hx-replace-url', 'hx-redirect', 'hx-location', 'hx-trigger', 'hx-trigger-after-settle', 'hx-trigger-after-swap'];
-export function responseRecord(response) {
+export function responseRecord(response, canonicalActionId) {
   const headers = Object.fromEntries(comparedHeaders.filter(key => Object.hasOwn(response.headers || {}, key)).map(key => [key, response.headers[key]]));
   const isHtml = /\btext\/html\b/i.test(headers['content-type'] || '');
   return { status: response.status, headers,
     ...(response.error ? { error: response.error, ...(Object.hasOwn(response, 'errorMessage') ? { errorMessage: response.errorMessage } : {}),
       ...(response.returnedType ? { returnedType: response.returnedType } : {}) } :
-      isHtml ? { htmlDigest: createHash('sha256').update(normalizeHtml(response.body)).digest('hex') } :
+      isHtml ? { htmlDigest: createHash('sha256').update(normalizeHtml(response.body, canonicalActionId)).digest('hex') } :
         { bodyBase64: response.bodyBase64 ?? Buffer.from(response.body || '').toString('base64') }) };
 }
 async function resolvedCase(adapter, request) {
@@ -94,7 +98,7 @@ export async function captureTraces(adapter, requests, baseline) {
     if (responses.length !== cases.length || (plain && plain.length !== cases.length)) throw new Error('Incomplete dispatch batch');
     for (const [index, request] of cases.entries()) {
       const response = responses[index];
-      const trace = { request, invoked: response.invoked, ...responseRecord(response),
+      const trace = { request, invoked: response.invoked, ...responseRecord(response, adapter.canonicalActionId),
         diagnostics: { console: response.errors || [], ...(response.returnedConstructor ? { returnedConstructor: response.returnedConstructor } : {}) } };
       if (plain) {
         trace.baselineStatus = plain[index].status;
@@ -128,7 +132,7 @@ export function compareTraces(expected, actual, entries = []) {
   const allowedFields = new Set(['invoked', 'status', 'headers', 'bodyBase64', 'htmlDigest', 'error', 'errorMessage', 'returnedType']);
   for (const entry of entries) {
     if (!entry.reason?.trim() || !entry.case || !Array.isArray(entry.fields) || !entry.fields.length ||
-      entry.fields.some(field => !allowedFields.has(field))) throw new Error('Expected differences require an exact case, supported fields and a reason');
+      entry.fields.some(field => !allowedFields.has(field) || !entry.values?.[field]?.before || !entry.values?.[field]?.after)) throw new Error('Expected differences require an exact case, supported value-pinned fields and a reason');
   }
   const used = new Set(), differences = [], accepted = [];
   for (let index = 0; index < Math.max(expected.length, actual.length); index++) {
@@ -136,12 +140,28 @@ export function compareTraces(expected, actual, entries = []) {
     if (isDeepStrictEqual(before, after)) continue;
     const fields = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter(field => !isDeepStrictEqual(before?.[field], after?.[field]));
     const unresolved = fields.filter(field => {
-      const match = entries.findIndex(entry => isDeepStrictEqual(entry.case, before?.request) && entry.fields.includes(field));
+      const match = entries.findIndex(entry => isDeepStrictEqual(entry.case, before?.request) && entry.fields.includes(field) && isDeepStrictEqual(entry.values[field].before, pinValue(before?.[field])) && isDeepStrictEqual(entry.values[field].after, pinValue(after?.[field])));
       if (match < 0) return true;
-      used.add(match); accepted.push({ index, field, reason: entries[match].reason }); return false;
+      used.add(`${match}:${field}`); accepted.push({ index, field, reason: entries[match].reason }); return false;
     });
     if (unresolved.length) differences.push({ index, fields: unresolved, expected: before, actual: after });
   }
-  const unused = entries.filter((_, index) => !used.has(index));
+  const unused = entries.flatMap((entry, index) => { const fields = entry.fields.filter(field => !used.has(`${index}:${field}`)); return fields.length ? [{ ...entry, fields }] : []; });
   return { equal: differences.length === 0 && unused.length === 0, differences, accepted, unused };
+}
+
+// Hash the complete JSON value, distinguishing absent fields from null.
+export function pinValue(value) {
+  return value === undefined ? { missing: true } : { sha256: createHash('sha256').update(JSON.stringify(value)).digest('hex') };
+}
+export function canonicalCatalog(catalog) {
+  const path = value => value === '/*' ? '*' : value;
+  return {
+    routes: catalog.routes.map(route => ({ path: route.path,
+      methods: (route.methods.includes('ALL') ? ['ALL'] : [...new Set(route.methods)]).sort(),
+      actions: [...new Map(route.actions.map(action => [JSON.stringify(action), action])).values()].sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+      page: route.page ? Object.fromEntries(['root', 'layouts', 'module', 'heads'].map(key => [key, route.page[key]])) : null,
+    })).sort((a,b) => a.path.localeCompare(b.path)),
+    middleware: catalog.middleware ? catalog.middleware.map(mw => ({ ...mw, path: path(mw.path) })) : catalog.middlewarePrefixes.map(path),
+  };
 }

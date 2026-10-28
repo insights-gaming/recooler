@@ -31,15 +31,31 @@ export async function load({ packageRoot, packageOut, spec, mode = 'probe' }) {
       if (!routes.has(entry.path)) routes.set(entry.path, { path: entry.path, methods: [], actions: entry.actions.map(({ method, id }) => ({ method, id })), page: entry.handler.kind === 'page' ? entry.handler : null });
       routes.get(entry.path).methods.push(entry.method);
     }
-    return { ...app, ...(mode === 'probe' ? { catalog: { routes: [...routes.values()], middlewarePrefixes: entries.filter(e => e.handler.kind === 'middleware').map(e => e.path) }, diagnostics: { entries } } : {}),
+    return { ...app, ...(mode === 'probe' ? { catalog: { middleware: entries.filter(e => e.handler.kind === 'middleware').map(e => ({path: e.path, file: e.handler.file, export: e.handler.export})), routes: [...routes.values()], middlewarePrefixes: entries.filter(e => e.handler.kind === 'middleware').map(e => e.path) }, diagnostics: { entries } } : {}),
+      canonicalActionId(id) { return canonicalActionId(entries, id); },
       actionUrl(request) {
-        const matches = entries.filter(entry => entry.path === request.action.routeId && entry.routeId);
-        const route = matches.find(entry => entry.actions?.some(action => action.id === request.action.actionId && action.method === request.action.method)) || matches[0];
-        if (!route) throw new Error(`Unknown action route template: ${request.action.routeId}`);
-        const action = route.actions?.find(action => action.id === request.action.actionId && action.method === request.action.method);
-        return signActionUrl({ ...request.action, routeId: route.routeId, actionId: action?.runtimeId || request.action.actionId }, secret);
+        return resolveActionUrl(entries, request, secret);
       } };
   } catch (error) { await app.dispose(); throw error; }
 }
 // 0.1 composes terminal handlers using Hono finalization semantics.
 export const fixtureOutcomes = { undefinedHandlerStatus: 500 };
+
+export function canonicalActionId(entries, id) {
+  const matches = new Set(entries.flatMap(entry => (entry.actions || []).filter(action => action.runtimeId === id || action.id === id).map(action => action.id)));
+  if (matches.size > 1) throw new Error(`Ambiguous canonical action ID: ${id}`);
+  return matches.size ? [...matches][0] : id;
+}
+export function resolveActionUrl(entries, request, secret) {
+  const matches = new Map();
+  for (const entry of entries) {
+    if (entry.path !== request.action.routeId || !entry.routeId) continue;
+    for (const action of entry.actions || []) {
+      if (action.id === request.action.actionId && action.method === request.action.method && action.runtimeId) {
+        matches.set(JSON.stringify([entry.routeId, action.runtimeId, action.namespace, action.base, action.moduleHash]), { routeId: entry.routeId, actionId: action.runtimeId, namespace: action.namespace, base: action.base, moduleHash: action.moduleHash });
+      }
+    }
+  }
+  if (matches.size !== 1) throw new Error(`Expected one action match, found ${matches.size}: ${request.action.actionId}`);
+  return signActionUrl({ ...request.action, ...[...matches.values()][0] }, secret);
+}

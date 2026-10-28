@@ -126,13 +126,18 @@ For `text/html`, SHA-256 covers the UTF-8 body after these explicit substitution
 
 1. Remove `data-recooler-route` attributes and the corresponding route-marker
    meta tag. The new client loader adds this bookkeeping, absent in 0.0.27.
-2. Replace only query values of `action`, `sig` and `signature` with a token.
-   Preserve the URL path, parameter names, other values, scope and surrounding
-   attribute/HTML. Target action encodings and per-dispatch signatures may differ;
-   dispatched action identity and order still compare through runtime labels.
+2. Canonicalize every `action` query value through the adapter's runtime-to-source
+   identity map. Legacy IDs are the canonical package-relative source IDs; the 0.1
+   adapter maps runtime IDs to those IDs. Re-encode with `encodeURIComponent`.
+   Only `sig` and `signature` values become `<volatile>`. Action changes remain
+   significant in all responses, including otherwise identical cases. Paths,
+   parameter names, scopes and surrounding HTML remain significant.
 3. Replace numeric engine stream IDs in `id="s:pN"`, `s:rN`, `s:sN`, and
    `suspense.tp(N)` with a stream token; these are stream bookkeeping. Keep all
    Suspense placeholders, templates, scripts and resolved content.
+4. Replace only the 20-hex build cache token in recooler client/route URLs, slice
+   filenames and `data-recooler-version`. Instrumentation changes the module graph
+   and therefore this token. Keep route hashes, slice indices and every script tag.
 
 Whitespace, business text, head elements, layout markup, root/client scripts
 and external script URLs remain significant. Dropping a head, layout or script
@@ -149,7 +154,13 @@ in `traces.mjs` is the authoritative implementation.
   {
     "package": "admin",
     "case": { "path": "/example", "method": "POST", "kind": "known-action", "variant": "plain", "headers": {}, "body": "value=sample" },
-    "fields": ["status", "bodyBase64"],
+    "fields": ["status"],
+    "values": {
+      "status": {
+        "before": { "sha256": "27badc983df1780b60c2b3fa9d3a19a00e46aac798451f0febdca52920faaddf" },
+        "after": { "sha256": "d26eae87829adde551bf4b852f9da6b8c3c2db9b65b8b68870632a2db5f53e00" }
+      }
+    },
     "reason": "Reviewed intentional CSRF rejection in the new runtime"
   }
 ]
@@ -159,8 +170,12 @@ Copy `case` verbatim from a private trace's `request`, including any `action`
 metadata. Matching is deep exact equality; no wildcards or broad route rules.
 Fields may only be `invoked`, `status`, `headers`, `bodyBase64`, `htmlDigest`,
 `error`, `errorMessage`, `returnedType`. Each entry needs a non-empty reason.
+Each field requires `values[field].before` and `.after`: `pinValue(value)` from
+`traces.mjs` returns SHA-256 of the exact `JSON.stringify(value)` bytes, or
+`{ "missing": true }` for an absent field. This distinguishes missing from null.
+No case/field-only allowances are accepted. A changed value is unexplained again.
 Every accepted field difference and reason is saved. Unlisted differences,
-unknown fields and unused/stale entries fail comparison. An empty file allows
+unknown fields and unused/stale fields fail comparison. An empty file allows
 nothing. Never use this mechanism to suppress unexplained regressions.
 
 ## Private options and probes
@@ -259,7 +274,12 @@ Additional private per-package options are:
 - `actionSecret`: a nonempty synthetic test key, required outside fixtures.
   It is injected into request bindings, never compiled into the application.
 - `secretBinding`: binding name, default `RECOOLER_SECRET`, matching the port.
-- `mode`: Vite mode, default `equivalence`.
+- `mode`: Vite mode, default `equivalence`. Use the port's actual preview or
+  production mode. `defines` overrides are rejected for this adapter: the consumer
+  config must supply its authoritative mode profile.
+- `cloudflareEnv`: sets `CLOUDFLARE_ENV` before loading Vite config so environment
+  bindings/vars/secrets and the build mode agree. Baseline Farm `defines` should
+  be derived from that same profile, rather than independently maintained maps.
 - `viteConfig`: package-relative config path, otherwise `.ts` then `.mts`.
 - `runtimePackageRoot`: optional dependency host for the shared Wrangler/
   Miniflare runtime. Use the **same Miniflare 4 installation** for both captures
@@ -274,8 +294,47 @@ Worker uses the same signed dispatch hook and independent runtime. Fixture
 runtimes use separate Node worker threads so persistent action registries and
 stream globals cannot leak between baseline and probe.
 
-Builds use a fixed **test-only** UUID cache token in both modes so client entry
-URLs are byte-comparable for instrumentation parity. Production builds retain
-Recooler's normal per-build token. The 0.1 fixture explicitly checks Hono's 500
-finalization response for an undefined terminal handler, while the Farm fixture
-continues to check its legacy non-Response/HEAD failure outcome.
+Framework build tokens are normalized narrowly as documented above. Production
+builds retain their normal content-derived tokens. The 0.1 fixture explicitly
+checks Hono finalization and a rendered form with nested captured values. It
+submits the rendered URL and asserts the exact captured values in the result.
+Both modes use independent runtimes; missing or ambiguous action URL mappings
+throw before replay. The signing metadata includes namespace, base and module hash.
+
+Catalog comparison is independent of response allowances. Route paths, canonical
+actions, page provenance and ordered middleware source labels must agree.
+Methods/actions are sorted and duplicate actions removed; `ALL` subsumes redundant
+method registrations (including the legacy router catch-all's extra GET).
+Only the root middleware spelling `/*` becomes `*`; other prefixes are retained.
+A catalog mismatch fails the run even if every response difference is allowed.
+
+## Reproducible HTML audit and browser smoke
+
+```sh
+node scripts/consumer-equivalence/audit.mjs \
+  /private/tmp/baseline/farm-0.0.27.json \
+  /private/tmp/candidate/recooler-0.1.json /private/tmp/html-audit
+node scripts/consumer-equivalence/browser-smoke.mjs http://127.0.0.1:8787 \
+  /private/tmp/browser-profile.json /private/tmp/browser-results.json
+```
+
+The audit reloads the saved probe builds/options and replays the complete ordered
+history. Every replayed response record must match its snapshot. It saves every
+changed HTML/HTML-as-text response, raw SHA-256 hashes, reviewed hashes and
+unresolved indices under the private output directory. Its explicit framework
+review rules remove known client delivery wrappers, compare handler IDs, preserve
+capture data, and reconcile empty signing scopes and underscore path encoding.
+This review layer never changes the actual comparison digest or allowlist.
+An optional fourth argument supplies private exact literal review substitutions:
+`[{"side":"after","find":"exact reviewed HTML","replace":"","reason":"why"}]`.
+Rule hashes and application counts are saved; unused rules fail the audit.
+Status/CSRF/scope changes remain listed for separate classification.
+
+The Chromium runner accepts private `steps` with `action` equal to `goto` (`path`),
+`click` (`selector`, optional `acceptDialog`), `wait` (`expression`), `assert`
+(`expression`, exact `value`), or `back`. Each step may have a `name`.
+`resources` can serve local stub files with `url` (Playwright glob), `file`, and
+`contentType`. `assetPrefix` requires successful asset loads beneath that prefix.
+It records completed checks, local 404s, assets and uncaught exceptions. Use it
+with both real Workers, synthetic auth/services and stable DOM assertions. Never
+ship test-only routes or real credentials in public fixtures or private patches.

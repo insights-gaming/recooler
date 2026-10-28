@@ -1,8 +1,9 @@
 import { mkdtemp, mkdir, readFile, writeFile, realpath } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { spawn } from 'node:child_process';
 import { join, resolve, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { captureTraces, generateRequests, traceCounts, comparisonRecord, compareTraces } from './traces.mjs';
+import { captureTraces, generateRequests, traceCounts, comparisonRecord, compareTraces, canonicalCatalog } from './traces.mjs';
 const adapters = { 'farm-0.0.27': () => import('./adapters/farm-0.0.27.mjs'), 'recooler-0.1': () => import('./adapters/recooler-0.1.mjs') };
 
 const args = process.argv.slice(2);
@@ -82,6 +83,9 @@ for (const name of ['router', 'admin']) {
       actionIds: new Set(app.catalog.routes.flatMap(route => route.actions.map(action => action.id))).size,
       actionRoutePairs: app.catalog.routes.reduce((count, route) => count + route.actions.length, 0), dispatch: traceCounts(snapshot.traces) };
     if (comparison) {
+      snapshot.catalogComparison = { expected: canonicalCatalog(comparison.packages[name].catalog, name), actual: canonicalCatalog(snapshot.catalog, name) };
+      snapshot.catalogComparison.equal = isDeepStrictEqual(snapshot.catalogComparison.expected, snapshot.catalogComparison.actual);
+      if (!snapshot.catalogComparison.equal) { console.log(`${name}: catalog mismatch`); process.exitCode = 1; }
       const expected = comparisonRecord(comparison.packages[name]);
       const actual = comparisonRecord(snapshot);
       snapshot.comparison = compareTraces(expected, actual, expectedDifferences.filter(entry => entry.package === name));

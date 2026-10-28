@@ -120,10 +120,10 @@ The plugin intentionally accepts a binding name rather than a literal secret.
 Custom entries configure `htmx({ secret })` themselves and can import the graph:
 
 ```ts
-import { table, clients, clientEntry, namespace } from 'virtual:recooler/htmx';
+import { table, clients, clientEntry, clientPreloads, clientModules, namespace } from 'virtual:recooler/htmx';
 import { htmx } from 'recooler/htmx';
 // createApp(manifest, { pages: jsxPages(), extensions: [htmx({
-//   table, clients, clientEntry, namespace, secret: env => env.RECOOLER_SECRET,
+//   table, clients, clientEntry, clientPreloads, clientModules, namespace, secret: env => env.RECOOLER_SECRET,
 // })] });
 ```
 

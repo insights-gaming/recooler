@@ -471,7 +471,7 @@ import { createApp } from 'recooler/router';
 import { jsxPages, type RouteEnv } from 'recooler/jsx';
 import { htmx } from 'recooler/htmx';
 import { manifest } from './routes.gen';
-import { table, clients, clientEntry, namespace } from 'virtual:recooler/htmx';
+import { table, clients, clientEntry, clientPreloads, clientModules, namespace } from 'virtual:recooler/htmx';
 
 const pages = jsxPages({
   ResolvedTemplate: /* your existing resolved-template component */ undefined,
@@ -480,7 +480,7 @@ const pages = jsxPages({
 export default createApp<RouteEnv>(manifest, {
   pages,
   extensions: [htmx<RouteEnv>({
-    table, clients, clientEntry, namespace,
+    table, clients, clientEntry, clientPreloads, clientModules, namespace,
     secret: env => env.RECOOLER_SECRET,
     legacyClientScript: true, // only when the root still inlines argument two
   })],
@@ -559,3 +559,47 @@ capture data. Test real captured submissions using the complete rendered URL or
 an explicit synthetic scope, and keep any raw-probe difference narrowly listed
 in the private equivalence expectations. Never reuse cached 0.0.27 action IDs
 or URLs: compiler source roots may also change their module-ID prefix.
+
+
+### Service proxies, generated environments and CI
+
+Give an admin Worker behind a service-binding proxy its external Vite prefix,
+for example `base: '/_admin/'`. A routing-only Worker should use
+`recooler({ htmx: false })` to avoid emitting a competing client entry. Vite base
+controls asset URLs; confirm what path the receiving asset store expects. If the
+proxy preserves page paths that already include the prefix, strip the prefix only
+for its asset requests before calling the admin service. Test both Workers together
+and fetch the entry, route modules, preloads and lazy chunks through the front URL.
+Do not infer asset reachability from a successful individual Worker build.
+
+Set `CLOUDFLARE_ENV` for build, dev and preview so Cloudflare selects the intended
+bindings, vars and secret files. Derive mode-specific Vite `define` values from
+the application's existing manifest/config generator, including workflow names
+and deployment-only flags; avoid a second hand-copied map. Vite's `preview` mode
+can select a Cloudflare `develop` environment; those names need not be identical.
+Build CI Workers with `CLOUDFLARE_ENV=production vite build --mode production`, then
+deploy the generated config identified by `.wrangler/deploy/config.json`.
+A legacy `wrangler deploy --define FLAG:1` cannot replace a define already folded
+by Vite: preserve that override in the Vite deployment profile too. Keep generation
+deterministic and verify the generator leaves the committed files unchanged.
+
+For manifest-generated secret types, add `RECOOLER_SECRET` to `secrets.required`
+(or the corresponding generator declaration), regenerate environment types, and
+use those types in `RouteEnv`. A hand-written ambient augmentation can make a
+missing deployment secret look correctly configured. Provision it in the selected
+local and deployed environments. Keep any package release-age exceptions narrow,
+version-pinned and listed for the application's owner to approve.
+
+Migrate all dev entry points, including custom multi-Worker launchers. A Vite
+server for one package does not start its service-binding dependency closure.
+A build-then-Wrangler launcher must use emitted configs for migrated Workers and
+state whether source changes rebuild automatically. Keep decryption and local
+secret loading attached to the selected environment. Remove root Farm configs,
+unused PostCSS patches, old platform-package exclusions and duplicate build-tool
+dependencies; set client-environment `build.minify` explicitly when server output
+remains unminified.
+
+Route `onLoad` runs after the DOM is ready. Register listeners directly and make
+repeat initialization safe for boosts and Back. Root/layout `onLoad` must move to
+an application-wide script or to the owning page. Do not wait again for an event
+that has already fired, and do not accumulate listeners on each navigation.

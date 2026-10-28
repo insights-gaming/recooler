@@ -17,6 +17,7 @@ if (!['baseline', 'probe'].includes(mode)) throw new Error('Unknown mode');
 crypto.randomUUID = () => '00000000-0000-4000-8000-000000000001';
 syncBuiltinESMExports();
 const spec = JSON.parse(await readFile(optionsFile, 'utf8'));
+if (spec.cloudflareEnv) process.env.CLOUDFLARE_ENV = spec.cloudflareEnv;
 process.chdir(packageRoot);
 const require = createRequire(join(packageRoot, 'package.json'));
 const viteRequire = fixture ? createRequire(join(repo, 'packages/recooler/package.json')) : require;
@@ -76,7 +77,8 @@ if (fixture) {
 config.plugins = [mode === 'probe' && instrumentation, ...config.plugins];
 config.root = packageRoot;
 config.configFile = false;
-config.define = { ...config.define, ...spec.defines };
+config.mode = spec.mode || 'equivalence';
+if (!fixture && spec.defines && Object.keys(spec.defines).length) throw new Error('Vite equivalence uses the port mode profile; define overrides are forbidden');
 config.logLevel = 'warn';
 // Build through the platform's builder, then read its actual environment outDirs.
 const builder = await createBuilder(config);
@@ -91,4 +93,4 @@ for (const environment of Object.values(builder.environments)) {
 await builder.buildApp();
 if (mode === 'probe' && !instrumented) throw new Error('No instrumented createApp import');
 await mkdir(dirname(output), { recursive: true });
-await writeFile(join(dirname(output), `${mode}-build.json`), JSON.stringify({ recooler: '0.1.0', vite: JSON.parse(await readFile(viteRequire.resolve('vite/package.json'), 'utf8')).version, testBuildId: '00000000-0000-4000-8000-000000000001', instrumentation: mode === 'probe', explicitDefines: spec.defines || {}, environments: Object.fromEntries(Object.entries(builder.environments).map(([name, env]) => [name, { consumer: env.config.consumer, outDir: relative(dirname(output), env.config.build.outDir) }])) }, null, 2) + '\n');
+await writeFile(join(dirname(output), `${mode}-build.json`), JSON.stringify({ recooler: '0.1.0', vite: JSON.parse(await readFile(viteRequire.resolve('vite/package.json'), 'utf8')).version, testBuildId: '00000000-0000-4000-8000-000000000001', instrumentation: mode === 'probe', resolvedDefines: config.define || {}, mode: config.mode, cloudflareEnv: process.env.CLOUDFLARE_ENV, environments: Object.fromEntries(Object.entries(builder.environments).map(([name, env]) => [name, { consumer: env.config.consumer, outDir: relative(dirname(output), env.config.build.outDir) }])) }, null, 2) + '\n');

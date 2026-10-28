@@ -1,7 +1,7 @@
 // Bundled only into private probe Workers. Namespace slots retain source provenance.
 import { createApp as originalCreateApp, resolveRoutes } from 'recooler/router';
 import { htmx as originalHtmx } from 'recooler/htmx';
-import { getActionRegistry } from 'recooler/htmx/runtime';
+import { getActionRegistry, findRegisteredAction } from 'recooler/htmx/runtime';
 export * from 'recooler/router';
 export * from 'recooler/htmx';
 
@@ -68,7 +68,7 @@ export function createApp(manifest, options = {}) {
       for (const config of actionOptions) for (const module of config.table[route.file] || []) {
         for (const [method, table] of Object.entries(getActionRegistry(config.namespace).get(module) || {})) {
           methods.add(method);
-          for (const id of Object.keys(table)) actions.push({ method, id: `src/${id}`, runtimeId: id });
+          for (const id of Object.keys(table)) actions.push({ method, id: `src/${id}`, runtimeId: id, namespace: config.namespace, base: (config.base ?? "").replace(/\/$/, ""), moduleHash: findRegisteredAction([module], method, id, config.namespace).moduleHash });
         }
       }
     }
