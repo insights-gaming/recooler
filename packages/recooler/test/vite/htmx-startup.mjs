@@ -96,5 +96,17 @@ export default createApp(manifest, { pages: jsxPages(), extensions: [htmx({ tabl
   await write('package.json', '{"name":"different-ancestor","type":"module"}');
   assert.equal((await graph(await compile())).namespace, nearest, 'use the nearest package rather than an ancestor');
   await assert.rejects(() => compile(root, { htmx: { namespace: '' } }), /namespace must be nonempty/);
-  console.log(JSON.stringify({ warmup: true, manifestFirst: true, stableIdentity: true, samePathReplay: true, transformVersion: true }));
+  // The nearest unnamed package is an app boundary, even with a named ancestor.
+  for (const pkg of [{ type: 'module' }, { name: '', type: 'module' }, { name: '  ', type: 'module' }]) {
+    await write('src/package.json', JSON.stringify(pkg));
+    await assert.rejects(() => compile(), /set htmx.namespace or a nonempty package.json name/);
+    await assert.rejects(() => createServer({ root, configFile: false, logLevel: 'silent', plugins: recooler(),
+      server: { middlewareMode: true, ws: false } }), /set htmx.namespace or a nonempty package.json name/);
+  }
+  assert.equal((await graph(await compile(root, { htmx: { namespace: 'explicit-app' } }))).namespace, explicit);
+  server = await createServer({ root, configFile: false, logLevel: 'silent', plugins: recooler({ htmx: { namespace: 'unnamed-dev' } }),
+    server: { middlewareMode: true, ws: false } });
+  assert.equal((await server.environments.ssr.runner.import('/src/entry.ts')).default instanceof Object, true);
+  await server.close(); server = undefined;
+  console.log(JSON.stringify({ unnamedPackages: true, warmup: true, manifestFirst: true, stableIdentity: true, samePathReplay: true, transformVersion: true }));
 } finally { await server?.close(); await rm(directory, { recursive: true, force: true }); }

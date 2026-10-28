@@ -17,7 +17,7 @@ const compile = async (extra = {}, options = {}) => {
   return { load: () => import(pathToFileURL(path.join(root, outDir, 'app.mjs'))), code: await readFile(path.join(root, outDir, 'app.mjs'), 'utf8') };
 };
 try {
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await write('src/routes/index.tsx', `export default () => <form hx-post={() => 'signed'}/>;`);
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');

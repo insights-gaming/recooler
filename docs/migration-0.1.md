@@ -70,7 +70,11 @@ export default defineConfig(({ mode }) => {
 ```
 
 Select the Wrangler environment as well as the matching Vite mode, for example
-`CLOUDFLARE_ENV=production vite build --mode production`. Keep production and local
+`CLOUDFLARE_ENV=production vite build --mode production`. Select `CLOUDFLARE_ENV`
+for development and preview builds too, and use the matching environment when
+running preview (for example `CLOUDFLARE_ENV=staging vite build --mode staging`
+then `CLOUDFLARE_ENV=staging vite preview`, or `CLOUDFLARE_ENV=staging vite dev
+--mode staging`). Vite mode alone does not select a Wrangler environment. Keep production and local
 profiles separate and verify their emitted constants. Upgrade workspace catalog
 entries to the pinned Vite target, and run the existing test suite against the new
 catalog resolution.
@@ -103,6 +107,11 @@ Group middleware must see the matched route parameters. Plain-prefix auth must
 also protect method-only routes, catch-alls and unmatched requests under its
 prefix. After-next middleware must still see `ctx.error` and `ctx.finalized` and
 may throw `HTTPException` with a response returned by `app.onError`.
+
+Hono's after-next behavior remains observable: if an inner handler returns
+`undefined`, middleware using `return await next()` still yields a Context object
+in 0.1. Return an explicit Response when one is required; this migration does
+not change that Hono behavior.
 
 See the action URL and CSRF migration below for manual action requests, and
 the browser-handler section for client loading and the legacy-root opt-in.
@@ -178,15 +187,16 @@ imports. See the browser-handler section for early-event queue semantics.
 Configure `htmx({ table, secret })` from `recooler/htmx` as a `createApp` extension
 alongside `jsxPages()`. The reachability table maps manifest `route.file` IDs to
 registered action-bearing module IDs, including roots, layouts and shared static
-imports. The table is static; D5 development uses `invalidateAll` and a full SSR
-reload to re-evaluate the virtual table and recreate `createApp`. Getter mode is
+imports. The table is static; development invalidates the virtual table and reloads the
+server runner to recreate `createApp`, retaining unchanged transforms. Getter mode is
 unsupported. Register actions before `createApp`: `actionUrl` throws if an action uses a method
 that was not reserved on the rendering route at app creation. Recreate the app
-after registering a new method. The Vite integration will provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+after registering a new method. The Vite integration generates this table; see the [runtime interface](../packages/recooler/src/htmx/README.md).
 
 **D6: all action URLs are now signed**, including actions without captures. The
-signature covers the receiving route file, exact pathname, HTTP method, action
-ID and serialized scope. Pages cached before this switch contain incompatible
+signature covers the app/environment namespace, external action base, defining
+module's versioned source hash, receiving route file, exact pathname, HTTP method,
+action ID and serialized scope. Pages cached before this switch contain incompatible
 URLs: invalidate those pages and have users refresh them before submitting.
 Unknown, unsigned, tampered and replayed-to-another-path URLs fall through after
 route middleware and normally return 404 without running an action. A guard's
@@ -196,13 +206,20 @@ env.ACTION_SECRET`; env functions are cached per env object identity in a WeakMa
 Use a new env object or recreate the app to rotate a key within the same env. Missing/empty secrets fail startup or the first request
 with actions. `secret: false` now throws; use `secret: { unsafeUnsigned: true }` only for local
 development. This disables D6 replay protection (including unused barrel actions)
-while retaining CSRF and reachability checks. The Phase 4b Vite plugin must reject
+while retaining CSRF and reachability checks. The Vite plugin rejects
 this mode in production using the exported `unsafeUnsignedMarker` on the extension.
-Each `htmx()` creation in this mode logs a runtime warning. The marker is a runtime
-property, so the plugin must evaluate the built server entry to check it.
-The plugin must also provide a stable per-project namespace to both
-`registerActions(moduleId, methods, namespace)` and `htmx({ namespace, ... })`; the
-default namespace remains shared for compatibility with current transform output.
+Each `htmx()` creation in this mode logs a runtime warning. The production guard also covers custom entries. The Vite plugin derives app
+identity from the nearest package.json name and package-relative source directory,
+then includes the server environment (plus a per-server nonce in dev). An unnamed
+package must set `recooler({ htmx: { namespace: 'my-app' } })` or add a package name;
+build and dev startup fail otherwise. Use distinct identities for separate apps.
+
+The virtual app's default `RECOOLER_SECRET` must be provisioned like any other
+required secret: set it in `.dev.vars` for local Workers, provision it as a Worker
+secret for deployment, or set `process.env.RECOOLER_SECRET` on Node. Provision the
+configured `htmx.secretBinding` instead if overridden. Cloudflare v2 also needs a
+secret declaration in `worker.env`. Use separate secrets for separate apps and
+deployments; the build does not generate or embed a secret.
 
 **D7: action requests require `HX-Request: true`**, including mutating GET actions.
 They also require acceptable Fetch Metadata or Origin. Manual requests should
@@ -237,6 +254,27 @@ The lower-level `actionScope` helper now requires the ambient rendering binding;
 `configureActions` is replaced by per-extension secrets. The Phase 5 client
 extension now supplies `page.scripts`, loads route slices and invokes onLoad as
 described below; each slice registers its own handlers.
+
+## Workers behind a path-prefix proxy
+
+When a front Worker proxies `/_admin/*` to a second Worker through a service
+binding and strips `/_admin`, set Vite `base: '/_admin/'` in the second app:
+
+```ts
+export default defineConfig({
+  base: '/_admin/',
+  plugins: [cloudflare(), ...recooler({ htmx: { base: '/_admin' } })],
+});
+```
+
+Vite `base` controls the public client entry, lazy slice imports, modulepreloads
+and the legacy inline `import()` URL. `htmx.base` separately restores the stripped
+prefix on signed action URLs. Keep the second Worker's own client build output
+attached to its asset binding. The front Worker must forward every `/_admin/*`
+request, including `/_admin/assets/*`, to that Worker before serving its own
+assets. The second Worker then receives `/assets/*` and serves its own entry and
+chunks. Do not copy the second app's files into the front Worker's asset set.
+Use a rooted base with a trailing slash; relative Vite bases fall back to `/`.
 
 ## Browser handlers and custom roots (Phase 5)
 
@@ -303,20 +341,26 @@ submit via requestSubmit(submitter), and anchor/button clicks via click().
 Config-request/before-request can restart through htmx.ajax's exposed request
 configuration. Events without a continuation/configuration stay cancelled and
 warn. currentTarget and other dispatch-time state are unavailable on replay.
-One throwing handler is reported without dropping the rest. Already-string
+With htmx 1.9.12, use `hx-trigger="load delay:1ms"` when load-triggered requests
+rely on `hx-on:*` cancellation: that version installs wildcard listeners after
+processing synchronous load triggers. One throwing handler is reported without dropping the rest. Already-string
 hx-on attributes and their unsafe-eval CSP requirements remain unchanged.
 
 The entry exports init(), runs on start, and initializes new content on
-htmx:afterSettle (boost/marker changes) and htmx:historyRestore. Both default
+htmx:afterSettle for any changed marker (including HX-Location, hx-push-url and
+boost navigation) and htmx:historyRestore. Duplicate events for one marker share
+one initialization. Both default
 and custom roots include their route/version marker inside the Content slot,
 so body swaps discover the new route. The legacy import explicitly calls init()
 after cached imports too. Root/layout onLoad is not invoked. Modules reachable
 only through server dynamic imports remain outside the static route graph.
 Custom roots can render props.preloads as modulepreload links to reduce latency.
 
-Client maps default off and minification defaults on; set these explicitly in
-environments.client.build to override. Public slice maps redact removed source
-and comments without changing positions. Unsliced dependencies omit embedded
+Client source maps are off by default and minification defaults on. Set
+`environments.client.build.sourcemap: true` to publish maps; these expose only
+the redacted client slices, with removed server source and comments blanked
+without changing positions. This also applies to inline maps. Set minify in
+`environments.client.build` to override it. Unsliced dependencies omit embedded
 source contents. The content-derived version is reproducible, embedded in the
 entry and checked against the page; mismatches reload before dispatch.
 

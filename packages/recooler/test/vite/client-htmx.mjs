@@ -7,6 +7,7 @@ import { createBuilder } from 'vite';
 import { JSDOM } from 'jsdom';
 import vm from 'node:vm';
 import { recooler } from '../../dist/vite/index.js';
+const htmxPackage = process.argv[2] === '1' ? 'htmx-1' : 'htmx.org';
 const packageDir = fileURLToPath(new URL('../../', import.meta.url));
 await mkdir(path.join(packageDir, '.cache'), { recursive: true });
 const root = await mkdtemp(path.join(packageDir, '.cache/client-htmx-'));
@@ -48,7 +49,7 @@ vm.runInContext = (code, context, options) => new vm.Script(code, { ...options,
 }).runInContext(context);
 let release, gate, requests = [];
 try {
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/root.tsx', `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
@@ -68,17 +69,19 @@ try {
     </>;`);
   await write('src/routes/b/index.tsx', `export const onLoad = () => { globalThis.bLoads = (globalThis.bLoads ?? 0) + 1; };
     export default () => <><button id="b" hx-on:click={function() { this.textContent = 'B handler'; }}>B</button><a id="back" href="/">A</a></>;`);
+  // htmx 1 installs wildcard hx-on listeners after processing synchronous load
+  // triggers. Its documented delay modifier gives those listeners one tick.
   await write('src/routes/load/index.tsx', `export const onLoad = () => { globalThis.loadReady = true; };
     export default () => <>
-      <div hx-get="/load-confirm" hx-trigger="load" hx-swap="none" hx-on--confirm={function(event) { event.preventDefault(); if (confirm('load?')) event.detail.issueRequest(true); }}/>
-      <div hx-get="/load-config" hx-trigger="load" hx-swap="none" hx-on--config-request={() => { globalThis.configCalls = (globalThis.configCalls ?? 0) + 1; }}/>
-      <div hx-get="/load-before" hx-trigger="load" hx-swap="none" hx-on--before-request={() => { globalThis.beforeCalls = (globalThis.beforeCalls ?? 0) + 1; }}/>
+      <div hx-get="/load-confirm" hx-trigger="load${htmxPackage === 'htmx-1' ? ' delay:1ms' : ''}" hx-swap="none" hx-on--confirm={function(event) { event.preventDefault(); if (confirm('load?')) event.detail.issueRequest(true); }}/>
+      <div hx-get="/load-config" hx-trigger="load${htmxPackage === 'htmx-1' ? ' delay:1ms' : ''}" hx-swap="none" hx-on--config-request={() => { globalThis.configCalls = (globalThis.configCalls ?? 0) + 1; }}/>
+      <div hx-get="/load-before" hx-trigger="load${htmxPackage === 'htmx-1' ? ' delay:1ms' : ''}" hx-swap="none" hx-on--before-request={() => { globalThis.beforeCalls = (globalThis.beforeCalls ?? 0) + 1; }}/>
     </>;`);
   const builder = await createBuilder({ root, configFile: false, logLevel: 'silent', plugins: recooler({ htmx: { legacyClientScript: true } }),
     environments: { client: { build: { minify: false } } }, ssr: { noExternal: true }, build: { ssr: 'src/entry.ts', outDir: 'server', minify: false, rolldownOptions: { output: { entryFileNames: 'app.mjs' } } } });
   await builder.buildApp();
   let app = (await import(pathToFileURL(path.join(root, 'server/app.mjs')))).default;
-  const htmx = await readFile(fileURLToPath(import.meta.resolve('htmx.org/dist/htmx.js')), 'utf8');
+  const htmx = await readFile(fileURLToPath(import.meta.resolve(htmxPackage + '/dist/htmx.js')), 'utf8');
   server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url, origin);
@@ -87,6 +90,7 @@ try {
         if (gate) await gate;
         res.setHeader('Content-Type', 'text/javascript'); return res.end(await readFile(path.join(root, 'dist/client', url.pathname), 'utf8'));
       }
+      if (url.pathname === '/relocate') { res.setHeader('HX-Location', JSON.stringify({ path: '/c', target: 'body', swap: 'innerHTML' })); return res.end(); }
       if (['/destroy', '/continue', '/submitted', '/load-confirm', '/load-config', '/load-before'].includes(url.pathname)) {
         requests.push(url.pathname); res.statusCode = 204; return res.end();
       }
@@ -104,6 +108,7 @@ try {
         // These fixtures use plain identifier ids; jsdom lacks CSS.escape.
         window.CSS = { escape: value => String(value) };
         window.HTMLElement.prototype.scrollIntoView = () => {};
+        window.scrollTo = () => {};
         // jsdom requires the optional XPath result type that browsers default.
         const evaluate = window.XPathExpression.prototype.evaluate;
         window.XPathExpression.prototype.evaluate = function(node, type = 0, result = null) { return evaluate.call(this, node, type, result); };
@@ -160,7 +165,8 @@ try {
   window.document.querySelector('#back').click();
   await until(() => window.loads === 2 && window.document.querySelector('#after'), 'cached legacy import initializes A again');
   window.document.body.dispatchEvent(new window.CustomEvent('htmx:historyRestore', { bubbles: true }));
-  await until(() => window.loads === 3, 'history restore onLoad');
+  await window.__recooler_ready;
+  assert.equal(window.loads, 2, 'duplicate lifecycle events do not repeat onLoad');
   const loadWindow = await open(true, '/load');
   loadWindow.accept = true;
   assert.equal(requests.length, 0, 'load-triggered confirm/config/before events cannot send before loading');
@@ -190,10 +196,17 @@ try {
   assert.equal(requests.filter(p => p === '/continue').length, 1, 'body and element listeners share one continuation');
   await rm(path.join(root, 'src/root.tsx'));
   await write('src/routes/index.tsx', `export const head = { scripts: [{ src: '/htmx.js' }] };
-    export const onLoad = () => { globalThis.modernA = true; };
-    export default () => <a id="modern-boost" href="/b" hx-boost="true">B</a>;`);
+    export const onLoad = () => { globalThis.modernA = (globalThis.modernA ?? 0) + 1; };
+    export default () => <>
+      <a id="modern-boost" href="/b" hx-boost="true">B</a>
+      <button id="location" hx-get="/relocate">HX-Location</button>
+      <button id="push" hx-get="/d" hx-push-url="true" hx-target="body" hx-swap="innerHTML">push</button>
+    </>;`);
   await write('src/routes/b/index.tsx', `export const onLoad = () => { globalThis.modernB = true; };
     export default () => <button id="modern-b" hx-on:click={function() { this.textContent = 'modern B'; }}>B</button>;`);
+  for (const route of ['c', 'd']) await write('src/routes/' + route + '/index.tsx', `
+    export const onLoad = () => { globalThis.${route}Loads = (globalThis.${route}Loads ?? 0) + 1; };
+    export default () => <button id="${route}" hx-on:click={function() { this.textContent = '${route} handler'; }}/>;`);
   const modernBuilder = await createBuilder({ root, configFile: false, logLevel: 'silent', plugins: recooler({ htmx: {} }),
     ssr: { noExternal: true }, build: { ssr: 'src/entry.ts', outDir: 'server', rolldownOptions: { output: { entryFileNames: 'app.mjs' } } } });
   await modernBuilder.buildApp();
@@ -207,7 +220,29 @@ try {
   assert.equal(modern.document.querySelector('body meta[name="recooler-route"]').content, '/b');
   modern.document.querySelector('#modern-b').click();
   assert.equal(modern.document.querySelector('#modern-b').textContent, 'modern B');
-  console.log(JSON.stringify({ realHtmx: true, boost: true, legacyImport: true, confirm: true, submit: true, link: true, replayErrors: true }));
+  for (const [trigger, route] of [['location', 'c'], ['push', 'd']]) {
+    const swapped = await open(false);
+    await until(() => swapped.modernA === 1, 'initial modern route');
+    const oldBody = swapped.document.body;
+    swapped.document.querySelector('#' + trigger).click();
+    await until(() => swapped[route + 'Loads'] === 1 && swapped.location.pathname === '/' + route, trigger + ' navigation');
+    await swapped.__recooler_ready;
+    assert.equal(swapped.document.body, oldBody, 'body content replaced by real htmx');
+    assert.equal(swapped.document.body.dataset.recoolerRoute, '/', 'body attribute remains stale');
+    assert.equal(swapped.document.querySelector('body meta[name="recooler-route"]').content, '/' + route);
+    swapped.document.querySelector('#' + route).click();
+    assert.equal(swapped.document.querySelector('#' + route).textContent, route + ' handler');
+    // Restore htmx's real history cache rather than synthesizing its event.
+    swapped.history.back();
+    await until(() => swapped.modernA === 2 && swapped.document.querySelector('#location'), 'real history restore');
+    // In-place marker changes must also initialize, even when the node survives.
+    const marker = swapped.document.querySelector('body meta[name="recooler-route"]') ?? swapped.document.querySelector('meta[name="recooler-route"]') ?? swapped.document.body;
+    if (marker.tagName === 'META') marker.content = '/' + route;
+    else marker.dataset.recoolerRoute = '/' + route;
+    swapped.document.body.dispatchEvent(new swapped.CustomEvent('htmx:afterSettle', { bubbles: true }));
+    await until(() => swapped[route + 'Loads'] === 2, 'in-place marker route change');
+  }
+  console.log(JSON.stringify({ realHtmx: true, htmxPackage, hxLocation: true, pushUrl: true, historyRestore: true, boost: true, legacyImport: true, confirm: true, submit: true, link: true, replayErrors: true }));
 } catch (error) { console.error('REAL HTMX FAILURE', error); throw error; } finally {
   release?.();
   await new Promise(resolve => setTimeout(resolve, 50));

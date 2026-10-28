@@ -26,9 +26,13 @@ const version = ${JSON.stringify(version)};
 const handlers = globalThis.$handlers ??= Object.create(null);
 const modules = new Map();
 const report = error => typeof globalThis.reportError === 'function' ? globalThis.reportError(error) : console.error(error);
-let active, pending, loading = true, resuming;
+let active, activeRoute, activeVersion, pending, loading = true, resuming;
 const marker = () => document.querySelector('body meta[name="recooler-route"]') ?? document.querySelector('meta[name="recooler-route"]') ?? document.body;
 const routeOf = node => node?.content ?? node?.dataset.recoolerRoute;
+const changed = () => {
+  const node = marker();
+  return node !== active || routeOf(node) !== activeRoute || node?.dataset.recoolerVersion !== activeVersion;
+};
 function checkVersion(node) {
   const expected = node?.dataset.recoolerVersion;
   if (expected && version && expected !== version) {
@@ -42,7 +46,7 @@ const queue = (...args) => {
 };
 globalThis.$rc = (id, scope, element, event) => {
   if (resuming?.elements.has(element) && resuming.type === event.type) return;
-  if (loading || marker() !== active) { queue(id, scope, element, event); return; }
+  if (loading || changed()) { queue(id, scope, element, event); return; }
   checkVersion(active);
   const fn = handlers[id];
   if (!fn) throw new Error('recooler: handler is not loaded for this route: ' + id);
@@ -93,11 +97,13 @@ async function replay(records) {
 async function initialize() {
   if (document.readyState === 'loading') await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
   const node = marker();
-  if (node === active) return pending;
+  if (!changed()) return pending;
   checkVersion(node);
   active = node;
+  const route = activeRoute = routeOf(node);
+  const pageVersion = activeVersion = node?.dataset.recoolerVersion;
+  const current = () => marker() === node && routeOf(node) === route && node?.dataset.recoolerVersion === pageVersion;
   loading = true;
-  const route = routeOf(node);
   const page = Object.hasOwn(routes, route) ? routes[route] : undefined;
   pending = (async () => {
     await Promise.all((page?.slices ?? []).map(async id => {
@@ -105,9 +111,10 @@ async function initialize() {
       await modules.get(id);
     }));
     // A later swap can finish before an earlier dynamic import.
-    if (marker() !== node) return;
+    if (!current()) return;
     const onLoad = page?.onLoad && (await modules.get(page.onLoad))?.onLoad;
     if (typeof onLoad === 'function') { try { await onLoad(); } catch (error) { report(error); } }
+    if (!current()) return;
     loading = false;
     const queued = globalThis.$rq ?? [];
     globalThis.$rq = [];
@@ -121,10 +128,10 @@ async function initialize() {
   return pending;
 }
 export function init() { return globalThis.__recooler_ready = initialize(); }
-document.addEventListener('htmx:afterSettle', event => {
-  if (event.detail?.boosted || event.detail?.requestConfig?.boosted || marker() !== active) init().catch(report);
+document.addEventListener('htmx:afterSettle', () => {
+  if (changed()) init().catch(report);
 });
-document.addEventListener('htmx:historyRestore', () => { active = undefined; init().catch(report); });
+document.addEventListener('htmx:historyRestore', () => { init().catch(report); });
 ${dev ? `globalThis.__recooler_entry_loaded = true;` : ''}
 export const ready = init();
 `;

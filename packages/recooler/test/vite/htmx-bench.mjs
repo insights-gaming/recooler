@@ -27,7 +27,7 @@ const limits = { buildRatio: 6, linearity100to400: 5.5, editRatio: 6, editFloorM
 try {
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await write('tsconfig.json', '{"compilerOptions":{"target":"ES2022","module":"ESNext"}}');
   await write('wrangler.json', JSON.stringify({ name: 'bench_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: ['nodejs_als'] }));
   await write('.dev.vars', 'RECOOLER_SECRET=benchmark-request-key');

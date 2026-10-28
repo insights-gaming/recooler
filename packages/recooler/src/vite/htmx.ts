@@ -30,12 +30,15 @@ function appIdentity(srcDir: string): readonly string[] {
   for (;;) {
     try {
       const pkg = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
-      return [typeof pkg.name === 'string' ? pkg.name : '', normalizePath(path.relative(directory, srcDir))];
+      if (typeof pkg.name !== 'string' || !pkg.name.trim()) {
+        throw new Error(`recooler: ${path.join(directory, 'package.json')} has no package name; set htmx.namespace or a nonempty package.json name`);
+      }
+      return [pkg.name, normalizePath(path.relative(directory, srcDir))];
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
     const parent = path.dirname(directory);
-    if (parent === directory) return ['', normalizePath(path.relative(directory, srcDir))];
+    if (parent === directory) throw new Error('recooler: no package.json name found; set htmx.namespace or a nonempty package.json name');
     directory = parent;
   }
 }
@@ -255,8 +258,8 @@ export function htmxPlugin(options: RecoolerOptions) {
       entryUrl = config.command === 'serve' ? `${base}@id/${clientId}` : `${base}${clientFile}?v=${buildId}`;
       roots = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root });
       serving = config.command === 'serve';
-      const identity = options.htmx && options.htmx.namespace !== undefined ? options.htmx.namespace : appIdentity(roots.srcDir);
-      if (identity === '') throw new Error('recooler: htmx.namespace must be nonempty');
+      const identity = options.htmx === false ? 'disabled' : options.htmx?.namespace ?? appIdentity(roots.srcDir);
+      if (typeof identity === 'string' && !identity.trim()) throw new Error('recooler: htmx.namespace must be nonempty');
       projectNamespace = 'recooler:' + createHash('sha256').update(JSON.stringify(identity)).digest('hex').slice(0, 24)
         + (serving ? ':' + randomUUID() : '');
     },
@@ -389,7 +392,8 @@ export function htmxPlugin(options: RecoolerOptions) {
         const known = [...states.values()].some(state => state.modules.get(key)?.client);
         const inSource = !path.relative(roots.srcDir, key.split('?')[0]!).startsWith('..') && sourcePattern.test(key);
         if (!known && !inSource) this.error(`recooler: unauthorized handler slice ${original}`);
-        const code = serverInput?.source ?? await readFile(original.split('?')[0]!, 'utf8');
+        if (!serverInput) this.error(`recooler: no server transform input for handler slice ${original}`);
+        const code = serverInput.source;
         const result = transform(code, { id: original, relativePath: relative(original), mode: 'client-slice',
           moduleKind: kinds.get(original.split('?')[0]!) ?? 'component',
           clientBannedImports: options.htmx && options.htmx.clientBannedImports || undefined });
@@ -624,7 +628,7 @@ export function htmxPlugin(options: RecoolerOptions) {
       files = result.files.map(normalizePath);
       const absolute = (file: string) => normalizePath(path.resolve(roots.srcDir, file));
       routeSeeds = result.routes.map(({ file, layoutFiles, rootFile }) => ({ file: absolute(file),
-        pattern: routePathWithoutGroups('/' + normalizePath(path.relative(roots.routesDir, path.dirname(absolute(file)))).split('/').filter(Boolean).map(routeSegment).join('/')),
+        pattern: routePathWithoutGroups('/' + normalizePath(path.relative(roots.routesDir, path.dirname(absolute(file)))).split('/').filter(segment => segment && segment !== '.').map(routeSegment).join('/')),
         chain: [file, ...layoutFiles, rootFile].filter((file): file is string => file !== undefined).map(absolute) }));
       kinds.clear();
       for (const file of files) {

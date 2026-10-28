@@ -6,6 +6,8 @@ import { createBuilder, createServer } from 'vite';
 import { recooler } from '../../dist/vite/index.js';
 import { evaluateClientPage } from './client-dom.mjs';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
+import { actionTransformVersion } from '../../dist/htmx/transform/index.js';
 const packageDir = fileURLToPath(new URL('../../', import.meta.url));
 await mkdir(path.join(packageDir, '.cache'), { recursive: true });
 const root = await mkdtemp(path.join(packageDir, '.cache/client-security-'));
@@ -18,16 +20,17 @@ const build = async (client = {}, plugins = [], htmx = {}) => {
     build: { ssr: 'src/entry.ts', outDir: 'server', minify: false, sourcemap: true, rolldownOptions: { output: { entryFileNames: 'app.mjs' } } } });
   await builder.buildApp();
   const app = (await import(pathToFileURL(path.join(root, 'server/app.mjs')).href + '?g=' + generation++)).default;
-  return { builder, html: await (await app.fetch(new Request('http://test/'), { RECOOLER_SECRET: 'map-key' })).text() };
+  return { builder, app, html: await (await app.fetch(new Request('http://test/'), { RECOOLER_SECRET: 'map-key' })).text() };
 };
 try {
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/helper.tsx', `export const unusedServer = () => 'TREE_SHAKEN_SQL_SECRET'; export const Browser = () => 'browser';`);
   await write('src/routes/index.tsx', `import { Browser } from '../helper';
 // ROUTE_COMMENT_SECRET
 export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id="button" hx-on:click={function() { this.textContent = Browser(); }}/></form>;`);
+  await write('src/routes/table/index.ts', `import { clients, namespace } from 'virtual:recooler/htmx'; export const onGet = c => c.json({ clients, namespace });`);
   await write('app.js', `globalThis.USER_ENTRY = true;`);
   await write('index.html', `<html><body><script type="module" src="/app.js"></script></body></html>`);
   const first = await build({ sourcemap: true, minify: false, rolldownOptions: { input: { 'recooler-client': 'app.js', index: 'index.html' }, output: { entryFileNames: 'assets/user-[name].js' } } });
@@ -39,6 +42,10 @@ export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id
   assert((await readFile(path.join(root, 'dist/client/index.html'), 'utf8')).includes('user-recooler-client.js'));
   const sources = (await Promise.all(emitted.filter(f => /\.(?:js|map)$/.test(f)).map(f => readFile(path.join(directory, f), 'utf8')))).join('\n');
   for (const marker of ['ROUTE_ACTION_BODY_SECRET', 'ROUTE_COMMENT_SECRET', 'TREE_SHAKEN_SQL_SECRET']) assert(!sources.includes(marker), marker);
+  const identities = await (await first.app.fetch(new Request('http://test/table'))).json();
+  assert(!sources.includes(identities.namespace), 'server namespace never enters client JS/maps');
+  const moduleHash = createHash('sha256').update(JSON.stringify([actionTransformVersion, await readFile(path.join(root, 'src/routes/index.tsx'), 'utf8')])).digest('hex');
+  assert(!sources.includes(moduleHash), 'defining server module hash never enters client JS/maps');
   const entry = await readFile(path.join(directory, 'recooler-client.js'), 'utf8');
   assert(!entry.includes('routes/index.tsx')); assert(!entry.includes('helper.tsx'));
   for (const [, href] of first.html.matchAll(/rel="modulepreload" href="([^"]+)"/g)) await readFile(path.join(root, 'dist/client', href));
@@ -74,6 +81,23 @@ export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id
   assert.equal(button.textContent, 'intended'); await window.happyDOM.close();
   // A current client entry must refuse a page from an earlier generation.
   await assert.rejects(evaluateClientPage(path.join(root, 'dist/client'), second.html), /version mismatch/);
+  // Alias layout and root slices must use the same resolved chains as D5.
+  await write('src/root.tsx', `import { DefaultRootHOC } from 'recooler/jsx';
+    export default Content => DefaultRootHOC(props => <><button id="root-handler" hx-on:click={function() { this.textContent = 'root handler'; }}/><Content {...props}/></>);`);
+  await write('src/routes/[id]/layout.tsx', `export default Content => props => <><button id="alias-handler" hx-on:click={function() { this.textContent = 'alias handler'; }}/><Content {...props}/></>;`);
+  await write('src/routes/:id/edit/index.tsx', `export const onLoad = () => { globalThis.aliasLoaded = true; }; export default () => <p>alias child</p>;`);
+  const aliased = await build();
+  const clientTable = await (await aliased.app.fetch(new Request('http://test/table'))).json();
+  assert.deepEqual(clientTable.clients['routes/:id/edit/index.tsx'], ['root.tsx', 'routes/:id/edit/index.tsx', 'routes/[id]/layout.tsx']);
+  const aliasHtml = await (await aliased.app.fetch(new Request('http://test/x/edit'))).text();
+  const aliasWindow = await evaluateClientPage(path.join(root, 'dist/client'), aliasHtml);
+  assert.equal(aliasWindow.aliasLoaded, true);
+  for (const id of ['root-handler', 'alias-handler']) {
+    const element = aliasWindow.document.getElementById(id);
+    vm.runInContext('(function(event){' + element.getAttribute('hx-on:click') + '})', vm.createContext(aliasWindow)).call(element, new aliasWindow.Event('click'));
+    assert.equal(element.textContent, id === 'root-handler' ? 'root handler' : 'alias handler');
+  }
+  await aliasWindow.happyDOM.close();
   await write('src/helper.tsx', `import { randomUUID } from 'node:crypto'; export const Browser = () => randomUUID();`);
   await write('src/routes/index.tsx', `import { Browser } from '../helper'; export default () => <button hx-on:click={() => Browser()}/>;`);
   await assert.rejects(build({}, [], { clientBannedImports: ['^node:'] }), /helper\.tsx.*node:crypto/);

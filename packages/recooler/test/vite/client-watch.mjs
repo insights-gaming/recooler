@@ -20,7 +20,7 @@ const nextBuild = async previous => {
   return readFile(path.join(root, 'dist/client/assets/recooler-client.js'), 'utf8');
 };
 try {
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/routes/index.tsx', `export default () => <button hx-on:click={() => 1}/>;`);

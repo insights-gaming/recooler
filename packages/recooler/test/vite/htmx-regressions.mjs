@@ -24,7 +24,7 @@ const plain = marker => `export default () => <p>${marker}</p>;`;
 const imported = (marker, other = false) => `import { Late } from '../components/Late'; ${other ? "import { Other } from '../components/Other';" : ''} export default () => <><p>${marker}</p><Late/>${other ? '<Other/>' : ''}</>;`;
 let server, second;
 try {
-  await write('package.json', '{"type":"module"}');
+  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
   await write('src/entry.ts', `import app from 'virtual:recooler/app'; app.onError(e => new Response(e.stack, { status: 500 })); export default app;`);
@@ -42,11 +42,11 @@ try {
   const graph = htmxPlugin({});
   const plugin = graph.plugins[0];
   plugin.configResolved({ root, command: 'build' });
-  const context = { environment: { name: 'ssr', config: { consumer: 'server' } }, getModuleInfo: () => undefined, error: message => { throw new Error(message); } };
+  const context = { environment: { name: 'ssr', config: { consumer: 'server', environments: {} } }, getModuleIds: () => [], addWatchFile: () => {}, getModuleInfo: () => undefined, error: message => { throw new Error(message); } };
   const prefix = 'const data = JSON.parse("__RECOOLER_ACTION_TABLE_6d32ad94__");';
-  assert.equal(plugin.renderChunk.call(context, prefix + '\nthrow new Error("later")').map, null);
+  assert.equal((await plugin.renderChunk.call(context, prefix + '\nthrow new Error("later")')).map, null);
   const combined = prefix + 'throw new Error("later")';
-  const replaced = plugin.renderChunk.call(context, combined);
+  const replaced = await plugin.renderChunk.call(context, combined);
   assert(replaced.map);
   const column = replaced.code.indexOf('throw');
   assert.equal(originalPositionFor(new TraceMap(replaced.map), { line: 1, column }).column, combined.indexOf('throw'));

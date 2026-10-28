@@ -100,7 +100,7 @@ recooler({
   serverEnvironment: 'my_worker', // Cloudflare v1 Worker environment, if restricted
   htmx: {
     secretBinding: 'RECOOLER_SECRET', // default
-    namespace: 'my-app',            // optional stable app identity override
+    namespace: 'my-app',            // required if nearest package.json has no name
     base: '/app',                   // only for prefix-stripping mounts/proxies
     trustedOrigins: ['https://app.example'],
   },
@@ -133,7 +133,8 @@ name is appended, along with a per-server nonce in dev. Moving a checkout leaves
 build identity unchanged; named apps built at the same Docker path remain
 separate. `htmx.namespace` overrides the app identity while retaining environment
 and dev isolation. Give every app a distinct package name or explicit namespace;
-apps without a package name must set the override for reliable isolation.
+build and dev startup reject a nearest package.json with no name unless an
+explicit namespace is set.
 Distinct apps, and separate deployments of one app such as staging and production,
 **must not share a signing secret**, even when their namespaces differ.
 It matches all registrations and isolates concurrent dev servers with identical
@@ -226,7 +227,7 @@ when they have tree-shaken server exports. Public entry lookup keys are opaque.
 Client chunks are public performance units; bans remain an application boundary.
 
 The entry exports `init()`, initializes on startup and observes
-`htmx:afterSettle` for boosts/changed route markers and `htmx:historyRestore`.
+`htmx:afterSettle` for changed route markers (HX-Location, hx-push-url or boost) and `htmx:historyRestore`.
 It imports missing slices, runs the owning route's `onLoad`, then replays early
 events. Content includes a route/version meta marker inside the swapped body for
 both default and custom roots. Preserve the Content slot. Root/layout onLoad
@@ -268,9 +269,14 @@ root omits the entry or it fails to load; if CSP blocks that inline watchdog,
 the browser's CSP diagnostics apply. Build watch uses one server watcher and
 orders a fresh client build after each server output, avoiding stale route maps.
 
-`test/vite/client-htmx.mjs` loads real htmx 2.x in jsdom over HTTP and executes
+`test/vite/client-htmx.mjs` loads real htmx 2.x and 1.9.12 in jsdom over HTTP and executes
 unmodified legacy imports through native ESM. It covers delayed load events,
-confirm, submit, links, replay errors, boosted swaps and cached imports.
+confirm, submit, links, replay errors, HX-Location, hx-push-url, real history
+restore, boosted swaps and cached imports. For 1.9.12, load-triggered requests
+need `load delay:1ms` when their wildcard hx-on listeners must cancel them.
+`client-proxy.mjs` runs two Workers in Miniflare with separate assets and a
+service-binding proxy, checking Vite base on entries, preloads, lazy slices and
+legacy imports.
 `client-security.mjs` covers maps, user/HTML entries, preloads, transform drift,
 version skew and fs.allow; `client-watch.mjs` covers adding/removing handlers.
 The plain, Cloudflare v1 and v2 integrations scan JS and maps, check original
