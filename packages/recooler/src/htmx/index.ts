@@ -20,7 +20,10 @@ export interface HtmxOptions<E extends Env = Env> {
   trustedOrigins?: readonly string[] | ((origin: string, context: Context<E>) => boolean | Promise<boolean>);
   /** External prefix hidden by mount() or a prefix-stripping proxy, e.g. /app. */
   base?: string;
+  /** Explicit escape hatch for production unsigned mode; signing is strongly preferred. */
+  allowUnsignedInProduction?: boolean;
 }
+declare const __RECOOLER_PRODUCTION__: boolean;
 /** Phase 4b production-build hook: reject an extension whose marker is true. */
 export const unsafeUnsignedMarker = Symbol.for('recooler.htmx.unsafeUnsigned.v1');
 export interface HtmxExtension extends RouterExtension {
@@ -42,6 +45,9 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
     throw new TypeError('htmx base must be a local path prefix without query, hash or dot segments');
   }
   const unsafeUnsigned = typeof options.secret === 'object' && options.secret?.unsafeUnsigned === true;
+  if (unsafeUnsigned && typeof __RECOOLER_PRODUCTION__ !== 'undefined' && __RECOOLER_PRODUCTION__ && !options.allowUnsignedInProduction) {
+    throw new Error('htmx: unsafeUnsigned is forbidden in production; configure a secret or explicitly set allowUnsignedInProduction: true');
+  }
   if (unsafeUnsigned) console.warn('htmx: unsafeUnsigned disables action signing and replay protection; use only for local development');
   const envSigners = new WeakMap<object, ActionSigner>();
   let fallbackSigner: ActionSigner | undefined;

@@ -13,6 +13,8 @@ export interface BuiltApp {
   fetch(request: Request): Response | Promise<Response>;
   /** Optional route table used to exercise Hono's route()/basePath() mounts. */
   hono?: import("hono").Hono;
+  /** Request-time bindings also supplied when the real route table is mounted. */
+  env?: Record<string, unknown>;
 }
 
 export type BuildResult = BuiltApp | { kind: "buildError"; error: string };
@@ -57,7 +59,7 @@ export interface IntentionalChange {
 
 export interface ScenarioRequest {
   /** Checks that require action dispatch or emitted browser chunks. */
-  requires?: "htmx"[];
+  requires?: ("htmx" | "client")[];
   name: string;
   path?: string;
   method?: string;

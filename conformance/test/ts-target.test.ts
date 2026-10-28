@@ -64,5 +64,6 @@ test.skipIf(!!await tsUnavailable())('TS builds reuse content-addressed bytes, i
 
 test('request feature tags preserve ordinary routing checks in action scenarios', () => {
   expect(tsRequestSkipReason(scenario.requests![0]!)).toBeUndefined();
-  expect(tsRequestSkipReason({ ...scenario.requests![0]!, requires: ['htmx'] })).toContain('not implemented');
+  expect(tsRequestSkipReason({ ...scenario.requests![0]!, requires: ['htmx'] })).toBeUndefined();
+  expect(tsRequestSkipReason({ ...scenario.requests![0]!, requires: ['client'] })).toContain('Phase 5');
 });

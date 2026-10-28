@@ -1,4 +1,4 @@
-import type { BuildResult, ScenarioRequest, Target } from "../target.js";
+import type { BuildResult, Scenario, ScenarioRequest, Target } from "../target.js";
 import { access, cp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -54,7 +54,7 @@ let importGeneration = 0;
 
 /** Feature tags apply to requests, so mixed scenarios still exercise routing. */
 export function tsRequestSkipReason(request: ScenarioRequest): string | undefined {
-  if (request.requires?.includes("htmx")) return "htmx dispatch and client chunks are not implemented yet";
+  if (request.requires?.includes("client")) return "client chunks and script delivery are Phase 5 (not implemented yet)";
 }
 
 const buildMode = "production";
@@ -62,7 +62,7 @@ const buildNodeEnv = "production";
 let prunedNamespace: string | undefined;
 
 /** Deterministic location for build bytes and diagnostics, also used by cache verification. */
-export async function tsCacheDirectory(scenarioDir: string): Promise<string> {
+export async function tsCacheDirectory(scenarioDir: string, scenario?: Scenario): Promise<string> {
   const hash = createHash("sha256");
   hash.update(`ts/vite-8.3.5/${process.version}/${process.platform}/${process.arch}/mode=${buildMode}/NODE_ENV=${buildNodeEnv}`);
   for (const file of [builder, fileURLToPath(import.meta.url), path.join(packageDir, "../pnpm-lock.yaml"), path.join(packageDir, "tsconfig.json"), path.join(implementation, "../package.json"), ...await filesUnder(implementation)]) {
@@ -72,6 +72,7 @@ export async function tsCacheDirectory(scenarioDir: string): Promise<string> {
   }
   const namespace = hash.digest("hex");
   const sources = createHash("sha256");
+  sources.update(JSON.stringify(scenario?.ts?.htmxOptions ?? {}));
   const src = path.join(scenarioDir, "src");
   for (const file of await filesUnder(src)) {
     sources.update(path.relative(src, file));
@@ -87,9 +88,9 @@ export const tsTarget: Target = {
   expectationFamily: "ts",
   unavailable: tsUnavailable,
   requestSkipReason: tsRequestSkipReason,
-  async build(scenarioDir: string): Promise<BuildResult> {
+  async build(scenarioDir: string, scenario: Scenario): Promise<BuildResult> {
     const src = path.join(scenarioDir, "src");
-    const cache = await tsCacheDirectory(scenarioDir);
+    const cache = await tsCacheDirectory(scenarioDir, scenario);
     const cacheRoot = path.dirname(cache);
     const namespace = path.basename(cache).split('-')[1]!;
     await mkdir(cacheRoot, { recursive: true });
@@ -134,6 +135,7 @@ export const tsTarget: Target = {
       await cp(src, path.join(cache, "src"), { recursive: true });
       await symlink(path.join(packageDir, "node_modules"), path.join(cache, "node_modules"), "dir");
       await writeFile(path.join(cache, "package.json"), '{"type":"module"}\n');
+      await writeFile(path.join(cache, "htmx-options.json"), JSON.stringify(scenario.ts?.htmxOptions ?? {}));
       let logs: string;
       try {
         const result = await execute(process.execPath, [builder, cache], { cwd: cache, env: { ...process.env, NODE_ENV: buildNodeEnv }, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
@@ -158,6 +160,7 @@ export const tsTarget: Target = {
       app = module.default;
     } catch (error) { return { kind: "buildError", error: String((error as Error).stack ?? error) }; }
     if (typeof app?.fetch !== "function") throw new Error(`Vite output has no default fetch(): ${cache}`);
-    return { kind: "app", fetch: app.fetch.bind(app), hono: app };
+    const env = { RECOOLER_SECRET: scenario.ts?.htmxOptions?.secret ?? 'conformance-test-secret' };
+    return { kind: "app", fetch: request => app.fetch(request, env), hono: app, env };
   },
 };

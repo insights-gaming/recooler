@@ -192,7 +192,7 @@ it('provides a thin Vite plugin that regenerates before build and on add/unlink'
   const off = vi.fn();
   const server = { ws: { clients: new Set(), on: vi.fn(), off: vi.fn(), send: vi.fn() }, watcher: { add: vi.fn(), on(event: string, callback: (file: string) => void) { events.set(event, callback); return this; }, off }, config: { logger: { error: vi.fn() } }, httpServer: { once: vi.fn() } };
   const buildStart = plugin.buildStart as () => Promise<void>;
-  const configureServer = plugin.configureServer as (server: unknown) => Promise<void>;
+  const configureServer = (typeof plugin.configureServer === 'function' ? plugin.configureServer : plugin.configureServer!.handler) as (server: unknown) => Promise<void>;
   await buildStart();
   await configureServer(server);
   await put(cwd, 'src/routes/added/index.ts', handler);

@@ -3,9 +3,11 @@ import { normalizePath, searchForWorkspaceRoot } from 'vite';
 import type { Plugin, ViteDevServer } from 'vite';
 import { crawlFrameworkPkgs } from 'vitefu';
 import { generateRoutes } from '../gen/index.js';
+import type { GenerateResult } from '../gen/index.js';
 import type { GenerateOptions } from '../gen/index.js';
 import { locations } from '../gen/locations.js';
 import { serverEnvironment } from './environment.js';
+import { htmxPlugin, tableId } from './htmx.js';
 import { jsxDefaults } from './jsx.js';
 
 const appId = 'virtual:recooler/app';
@@ -16,7 +18,7 @@ export function routes(options: GenerateOptions = {}): Plugin {
   return routePlugin(options);
 }
 
-function routePlugin(options: GenerateOptions, changed?: (error?: Error) => void): Plugin {
+function routePlugin(options: GenerateOptions, changed?: (error?: Error, result?: GenerateResult) => void): Plugin {
   let cwd = options.cwd;
   let serve = false;
   let stop: (() => void) | undefined;
@@ -26,8 +28,8 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error) => void
   const enqueue = (server?: ViteDevServer) => {
     const pending = queue.then(async () => {
       try {
-        await generateRoutes({ ...options, cwd });
-        changed?.();
+        const result = await generateRoutes({ ...options, cwd });
+        changed?.(undefined, result);
         lastError = undefined;
       } catch (cause) {
         const error = cause instanceof Error ? cause : new Error(String(cause));
@@ -47,7 +49,9 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error) => void
     name: 'recooler:routes',
     configResolved(config) { cwd ??= config.root; serve = config.command === 'serve'; },
     async buildStart() { if (!serve) await enqueue(); },
-    async configureServer(server) {
+    // Cloudflare can eagerly import the Worker during configureServer. Generate
+    // the manifest and graph roots before platform hooks can load virtual apps.
+    configureServer: { order: 'pre', async handler(server) {
       const roots = locations({ ...options, cwd });
       const rootFile = path.join(roots.srcDir, 'root.tsx');
       server.watcher.add([roots.routesDir, rootFile]);
@@ -71,7 +75,7 @@ function routePlugin(options: GenerateOptions, changed?: (error?: Error) => void
       };
       server.httpServer?.once('close', () => stop?.());
       await enqueue(server);
-    },
+    } },
     async closeBundle() { stop?.(); await queue; },
   };
 }
@@ -81,15 +85,28 @@ export interface RecoolerOptions {
   routes?: GenerateOptions;
   /** Restrict virtual app imports to this configured server environment. */
   serverEnvironment?: string;
+  /** Enabled automatically by hx- source attributes. Client delivery is Phase 5. */
+  htmx?: false | {
+    /** Request env binding, then process.env on Node. Never a build-time secret. */
+    secretBinding?: string;
+    base?: string;
+    trustedOrigins?: readonly string[];
+    clientBannedImports?: readonly (RegExp | string)[];
+    /** Additional action packages without a declared recooler peer/dependency. */
+    actionDependencies?: readonly string[];
+  };
 }
 
-/** JSX server integration. htmx remains a separate transform/runtime layer. */
+/** Server route, JSX and htmx integration. Does not replace platform builders. */
 export function recooler(options: RecoolerOptions = {}): Plugin[] {
+  const htmx = htmxPlugin(options);
   let manifest: string;
   let generationError: Error | undefined;
   let devServer: ViteDevServer | undefined;
   let noExternal = ['recooler', 'easy-jsx-html-engine'];
-  const generated = (error?: Error) => {
+  const generated = (error?: Error, result?: GenerateResult) => {
+    htmx.generationFailed(error !== undefined);
+    if (result) htmx.generated(result);
     const previous = generationError?.message;
     generationError = error;
     if (previous === error?.message) return;
@@ -116,10 +133,17 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
             ['recooler', 'easy-jsx-html-engine'].some(name => pkg[field]?.[name]));
         },
       });
-      noExternal = [...new Set([...noExternal, ...crawled.ssr.noExternal])];
+      noExternal = [...new Set([...noExternal, ...crawled.ssr.noExternal, ...(options.htmx && options.htmx.actionDependencies || [])])];
     },
     configEnvironment(_name, config) {
       if ((config.consumer ?? (_name === 'client' ? 'client' : 'server')) !== 'server') return;
+      const htmxSelected = options.htmx !== false && (options.serverEnvironment === undefined || options.serverEnvironment === _name);
+      if (htmxSelected) {
+        config.optimizeDeps ??= {};
+        config.optimizeDeps.exclude = [...new Set([...(config.optimizeDeps.exclude ?? []), ...noExternal])];
+        config.optimizeDeps.include = config.optimizeDeps.include?.filter(name => !noExternal.some(dep => name === dep || name.startsWith(dep + '/')));
+        if (Array.isArray(config.resolve?.external)) config.resolve.external = config.resolve.external.filter(name => !noExternal.some(dep => name === dep || name.startsWith(dep + '/')));
+      }
       const existing = config.resolve?.noExternal;
       if (existing === true) return;
       const entries = existing ? [existing].flat() : [];
@@ -143,10 +167,14 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
       if (id !== resolvedAppId) return;
       serverEnvironment(this.environment, options.serverEnvironment);
       if (generationError) throw generationError;
-      return `import { createApp } from 'recooler/router';\nimport { jsxPages } from 'recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\nexport default createApp(manifest, { pages: jsxPages() });\n`;
+      const settings = options.htmx || {};
+      const binding = JSON.stringify(settings.secretBinding ?? 'RECOOLER_SECRET');
+      const imports = options.htmx === false ? '' : `import { htmx } from 'recooler/htmx';\nimport { table, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
+      const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, namespace, secret: env => env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined), base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
+      return { code: `import { createApp } from 'recooler/router';\nimport { jsxPages } from 'recooler/jsx';\nimport { manifest } from ${JSON.stringify(manifest)};\n${imports}export default createApp(manifest, { pages: jsxPages()${extensions} });\n`, map: null };
     },
   };
   // Wire invalidation before configureServer's initial generation can fail.
   const generator = routePlugin(options.routes ?? {}, generated);
-  return [app, generator, jsxDefaults()];
+  return [app, generator, ...htmx.plugins, jsxDefaults()];
 }

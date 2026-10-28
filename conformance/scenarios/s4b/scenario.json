@@ -48,9 +48,17 @@
       "changes": [
         {
           "decision": "D6",
-          "reason": "On a route with actions for this method, unknown or unsigned action URLs fall through to 404 after chain middleware.",
+          "reason": "D6 (\u00a73.5): unknown actions fall through to the later admin catch-all, whose guard runs before signature lookup and returns 401 without authentication.",
           "ts": {
-            "status": 404
+            "status": 401,
+            "body": "BLOCKED by admin-group",
+            "trace": [
+              "public-group",
+              "admin-group"
+            ],
+            "traceExcludes": [
+              "action admin-rest"
+            ]
           }
         },
         {

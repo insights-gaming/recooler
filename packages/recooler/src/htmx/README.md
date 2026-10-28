@@ -30,7 +30,7 @@ surviving static dependencies. IDs must match the transform's supplied
 actions. Only routes with their own function `default` export register actions;
 handler-only routes ignore table entries.
 
-The bundler will supply this table through a virtual module in a later phase.
+The Vite plugin supplies this table through `virtual:recooler/htmx` (Phase 4b).
 Static imports, re-exports (including barrels) and side-effect imports contribute
 graph edges. Dynamic `import()` is not followed in v1. Barrels over-approximate
 reachability; signing prevents a foreign URL from authorizing an unused action.
@@ -97,10 +97,14 @@ URLs are unsigned; CSRF and module reachability still apply, but **D6 route/path
 replay protection is disabled**, including protection against unused barrel actions.
 Use it only for local development. Each `htmx()` creation logs one runtime warning
 for this mode. The exported `unsafeUnsignedMarker` symbol is
-true on the returned extension in this mode. Phase 4b's Vite plugin **must fail
-production builds** when it detects this marker. Because the marker is a runtime
-property on the extension, the plugin must evaluate the built server entry to
-check it; source inspection alone cannot enforce this requirement.
+true on the returned extension in this mode. The Vite plugin defines a production
+flag, and `htmx()` **throws at startup** in every build, including custom entries,
+unless `allowUnsignedInProduction: true` is explicitly set. It need not execute
+Worker bundles in Node or statically detect a runtime marker. The override retains
+the warning and marker; CSRF and reachability still apply. Without the Vite plugin,
+this bundler-independent runtime does not infer production from a host platform.
+See [Vite integration](../vite/README.md) for automatic table/namespace wiring and
+request-time `secretBinding` resolution.
 
 Actions run after directory/group middleware but **before `onRequest`**, as in
 0.0.27. Authorization in `onRequest` does not protect actions; use directory or
