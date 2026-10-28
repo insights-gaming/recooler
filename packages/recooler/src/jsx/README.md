@@ -124,7 +124,7 @@ Arrays concatenate in extension order using the router's public merge rule
 `{ extension, page }` contributions as the adapter's third argument. JSX does not
 use those names or apply an extension-specific collision policy; it reads scripts
 and the legacy clientScript from the merged extras.
-Each request gets its own script array. The default root emits external module
+Each request gets its own script array. The adapter emits Recooler's static module scripts in Content; the default root emits other external module
 scripts after content, adds `<body data-recooler-route="/pattern/:id">`, and adds
 UTF-8 charset only when head metas declare no rendered charset attribute.
 Custom roots should render those URLs themselves, for example:
@@ -141,11 +141,16 @@ export default function Root(Content: Component<RouteProps>) {
 }
 ```
 
-For a custom root, the adapter puts `<meta name="recooler-route" content="…">`
-at the beginning of the Content slot. This remains discoverable even if the root
-renders its own body and does not call `renderHeadElements`. The value is the
-manifest pattern, not the concrete request URL or mount prefix. Roots wrapping
-`DefaultRootHOC` use its body attribute and do not get a second meta marker.
+For every root, the adapter puts a hidden span with `data-recooler-marker="true"`
+and `data-recooler-route="…"` at the beginning of Content, followed by Recooler's
+static module scripts. Custom roots also get dependency modulepreloads there.
+This survives body swaps and htmx 1's DOMParser history restore, which moves a
+leading meta into head. The route is a manifest pattern, without mount prefix.
+Initialization reads every marker to support cross-route fragments; it never
+falls back to the stale body attribute. Keep the Content slot intact. Static
+modules register before DOMContentLoaded even in a legacy root and streamed page.
+A repeated module URL does not rerun registration; init deduplicates onLoad by
+marker identity, and runs the fragment's own route onLoad on insertion.
 
 For one release an extension may still provide `page.clientScript: string`.
 It is passed to legacy custom roots as the second argument, and is available as

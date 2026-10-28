@@ -212,10 +212,9 @@ defaults to `dist/client`; read resolved environment outDirs on platform builder
 
 The entry URL is `assets/recooler-client.js?v=<content hash>` under Vite's base.
 The generated entry embeds that version and refuses to dispatch a mismatched
-page, reloading it. Identical graph/source-tree inputs, runtime, configuration and package/lock
+page, with one guarded reload per version pair. Identical graph/source-tree inputs, runtime, configuration and package/lock
 metadata produce the same version, including helpers pruned from server code. Versioned opaque slice filenames avoid stale lazy-chunk collisions.
-Keep old slices available during rolling deployments. Relative Vite bases warn
-and use `/`. Server output needs no client manifest.
+Keep old slices available during rolling deployments. Relative Vite bases are build errors. Server output needs no client manifest.
 
 Client source maps default to **off**, and minification to **on**, independently
 of the top-level server build. Override with `environments.client.build.sourcemap`
@@ -226,58 +225,53 @@ Unsliced dependencies retain mappings without embedded source contents, includin
 when they have tree-shaken server exports. Public entry lookup keys are opaque.
 Client chunks are public performance units; bans remain an application boundary.
 
-The entry exports `init()`, initializes on startup and observes
-`htmx:afterSettle` for changed route markers (HX-Location, hx-push-url or boost) and `htmx:historyRestore`.
-It imports missing slices, runs the owning route's `onLoad`, then replays early
-events. Content includes a route/version meta marker inside the swapped body for
-both default and custom roots. Preserve the Content slot. Root/layout onLoad
-exports warn and do not run. Repeated init calls for one content marker share
-one initialization; swapped content and history restoration rerun onLoad.
+Initial pages include static `assets/recooler-route-<opaque route hash>.js?v=<version>`
+modules. Each route entry imports its own slices, sharing dependencies with other
+entries. The server computes names from route.file without a client manifest.
+The stable general entry is still `assets/recooler-client.js?v=<version>`.
+Content includes these module scripts even with a legacy root, plus dependency
+modulepreloads for custom roots. Synchronous registration and route onLoad happen
+after the entire HTML stream parses and before htmx's DOMContentLoaded startup.
+There is no initial event queue.
 
-New roots render `props.scripts` as external module scripts and optional
-`props.preloads` as `<link rel="modulepreload" href={url}/>` in their head.
-DefaultRootHOC handles both. A custom `createApp` entry should pass `clientPreloads`
-alongside `clients` and `clientEntry` from `virtual:recooler/htmx` to `htmx()`.
-`htmx.legacyClientScript: true` supplies the one-release inline string
-`import("<entry URL>").then(m=>m.init())`, so htmx re-execution works even when
-imports are cached. Load real htmx before the client entry. The entry waits for
-DOMContentLoaded, including when the legacy script runs during streaming.
+The entry exports `init()` and observes afterSwap, afterSettle and historyRestore.
+Every hidden `[data-recooler-marker]` span contributes its own route and version;
+body attributes are never a fallback. Spans survive htmx 1's DOMParser history
+cache. New fragment markers load their slices and run their owning route onLoad.
+Repeated scripts/events share jobs and run onLoad once per marker. Replacing a
+marker, including on history restore, reruns onLoad. Root/layout onLoad does not run.
 
-Early function handlers use a compact queue stub and immediately prevent the
-original event's default. Replay preserves this, event data and captured scope;
-it presents a fresh cancellation state to the handler. If the handler does not
-cancel, confirm continues through `detail.issueRequest()`, submit through
-`form.requestSubmit(submitter)`, and anchor/button clicks through `click()`.
-A handler that invokes issueRequest itself is never resumed a second time.
-Config-request/before-request can restart through `htmx.ajax` using the exposed
-request config. Other cancelable htmx events without request config or a
-continuation remain cancelled and warn; they cannot resume an internal htmx
-stack. Transient properties such as currentTarget are unavailable after the
-original event dispatch. Detached elements are skipped. Each handler/onLoad
-failure is reported independently, so one error does not drop later events.
-`globalThis.__recooler_ready` tracks the latest initialization; import failures
-reject it. Already-string hx-on attributes keep their existing behavior/CSP needs.
+During lazy swap initialization, only htmx:confirm is canceled and deferred, using
+its public issueRequest(true) continuation after onLoad. ConfigRequest/beforeRequest
+handlers run late without cancellation or request restart; changes may miss the
+request. All other early events are dropped, leaving native and htmx defaults
+untouched. Dev warns except for htmx:load. This avoids stale callbacks and late
+cancellation-dependent side effects. No click/submit redispatch or htmx.ajax replay
+exists. Once initialized, handlers receive the original event normally. Detached
+targets are skipped and errors are reported independently.
 
-Banned imports are checked in retained handler/onLoad references, raw client
-resolution specifiers (including transitive helpers), and emitted resolved
-module IDs with importer chains. Browser-external stubs are always rejected.
-Dev slice requests must belong to discovered clients or source files under
-srcDir with a script extension; arbitrary `/@fs` slice requests cannot bypass
-that boundary. Dev changes refresh the server input before slicing, invalidate
-the virtual entry and send a full reload. A dev Content watchdog warns when a
-root omits the entry or it fails to load; if CSP blocks that inline watchdog,
-the browser's CSP diagnostics apply. Build watch uses one server watcher and
-orders a fresh client build after each server output, avoiding stale route maps.
+`globalThis.__recooler_ready` settles after the current initialization. Failed imports
+are evicted and retried with a fresh URL, then attempt one guarded reload per client
+version. Persistent failure reports an error without unhandled rejection; another
+init can recover. Version mismatches reload once per HTML/client version pair,
+then report an error and refuse handler dispatch. SessionStorage guards prevent loops.
 
-`test/vite/client-htmx.mjs` loads real htmx 2.x and 1.9.12 in jsdom over HTTP and executes
-unmodified legacy imports through native ESM. It covers delayed load events,
-confirm, submit, links, replay errors, HX-Location, hx-push-url, real history
-restore, boosted swaps and cached imports. For 1.9.12, load-triggered requests
-need `load delay:1ms` when their wildcard hx-on listeners must cancel them.
-`client-proxy.mjs` runs two Workers in Miniflare with separate assets and a
-service-binding proxy, checking Vite base on entries, preloads, lazy slices and
-legacy imports.
-`client-security.mjs` covers maps, user/HTML entries, preloads, transform drift,
-version skew and fs.allow; `client-watch.mjs` covers adding/removing handlers.
-The plain, Cloudflare v1 and v2 integrations scan JS and maps, check original
-positions, execute native ESM with Happy DOM, and verify real HMR websocket reloads.
+For custom createApp entries, pass clientModules and clientPreloads alongside clients
+and clientEntry from virtual:recooler/htmx. The legacyClientScript opt-in still supplies
+import(entry).then(m=>m.init()), including cached imports; static scripts in Content
+now provide the first-load ordering guarantee. Load classic htmx before these modules.
+
+Bans, exact server input slicing, dev fs authorization, redacted maps, and opaque
+lookup keys remain enforced. Dropped slice comments are removed even with minify:false.
+Server graph edits retain SSR runner invalidation; client table changes trigger a
+client reload, while unrelated SPA CSS/TypeScript edits keep normal Vite updates.
+Build watch orders client rebuilding after server output.
+
+`test/vite/client-htmx.mjs` uses headless Chromium through Playwright with real
+htmx 1.9.12 and 2.x. Install its browser with `pnpm --filter recooler exec playwright
+install chromium`. It covers static/DCL and Suspense ordering, all request replay
+attacks, native defaults during swaps, body lifecycle loops, A→B→C→Back for both
+root styles, HX-Location, push-url, fragments, failure retries and guarded reloads.
+The jsdom proxy fixture still runs two real Workers through /_admin; Happy DOM
+checks emitted ESM, sharing, maps and route isolation. client-hmr.mjs checks that
+unrelated CSS and TypeScript edits send updates only.

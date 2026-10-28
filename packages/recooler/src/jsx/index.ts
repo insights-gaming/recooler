@@ -127,6 +127,7 @@ async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<Rou
 }
 
 declare const __RECOOLER_PRODUCTION__: boolean;
+const recoolerScript = (src: string) => /(?:\/assets\/recooler-(?:client|route-[a-f0-9]+)\.js|\/@id\/virtual:recooler\/(?:client|route\/))/.test(src);
 
 export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
   return {
@@ -155,8 +156,9 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
             'data-recooler-version': props.scripts.filter(src => new URL(src, props.url).pathname.endsWith('/assets/recooler-client.js'))
               .map(src => new URL(src, props.url).searchParams.get('v')).find(Boolean) }),
           typeof __RECOOLER_PRODUCTION__ !== 'undefined' && !__RECOOLER_PRODUCTION__ && props.scripts.some(src => src.includes('virtual:recooler/client'))
-            && createElement('script', {}, dangerouslyPreventEscaping(`setTimeout(()=>{if(!globalThis.__recooler_entry_loaded)console.warn('recooler: client entry did not load; render props.scripts in your root and check CSP')},5000)`)),
-          ...props.scripts.map(src => createElement('script', { type: 'module', src })),
+            && createElement('script', {}, dangerouslyPreventEscaping(`setTimeout(()=>{if(!globalThis.__recooler_entry_loaded)console.warn('recooler: client entry did not load; check its URL and CSP')},5000)`)),
+          ...(Root !== DefaultRootHOC ? props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href })) ?? [] : []),
+          ...props.scripts.filter(recoolerScript).map(src => createElement('script', { type: 'module', src })),
           createElement(Page, props));
       }
       // Named contributions are available to adapters for collision policies. JSX
@@ -271,7 +273,7 @@ export const DefaultRootHOC: RootHOC = Content => (props: RouteProps) => {
         props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href }))),
       createElement('body', { 'data-recooler-route': props.route },
         createElement(Content, props),
-        props.scripts.map(src => createElement('script', { type: 'module', src })))));
+        props.scripts.filter(src => !recoolerScript(src)).map(src => createElement('script', { type: 'module', src })))));
 };
 
 /** Logs the error; stack traces in HTML require an explicit opt-in. */

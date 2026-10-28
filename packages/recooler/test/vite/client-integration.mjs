@@ -116,27 +116,14 @@ export default {
   else assert.match(await readFile(path.join(serverOut, asset), 'utf8'), /<svg/);
   // Native ESM evaluation with a Happy DOM document; no source rewriting or
   // mocked imports. Vite preload helpers and import.meta run as emitted.
-  const window = await evaluateClientPage(clientOut, html, (window, context) => {
-    const counter = window.document.querySelector('#counter');
-    vm.runInContext('(function(event){' + counter.getAttribute('hx-on:click') + '})', context).call(counter, new window.Event('click'));
-    assert.equal(window.__recooler_queue.length, 1);
-  });
+  const window = await evaluateClientPage(clientOut, html);
   const counter = window.document.querySelector('#counter');
-  assert.equal(counter.textContent, 'PUBLIC_HANDLER:7:click', JSON.stringify({ html: window.document.body.outerHTML, queue: window.__recooler_queue, handlers: Object.keys(window.$handlers ?? {}) }));
+  assert.equal(counter.textContent, '');
   assert.equal(window.document.body.dataset.loaded, 'public');
   assert.equal(window.__sharedEvaluations, 1); assert.equal(window.__adminEvaluations, undefined);
   vm.runInContext('(function(event){' + counter.getAttribute('hx-on:click') + '})', vm.createContext(window)).call(counter, new window.Event('click'));
   assert.equal(counter.textContent, 'PUBLIC_HANDLER:7:click');
-  const loadWindow = await evaluateClientPage(clientOut, (await (await request('/load')).text()).replace('data-recooler-route="/load"', '').replace(/<body[^>]*>/, '<body><meta name="recooler-route" content="/load">'), window => {
-    // Legacy dynamic import during a streamed response waits for parsing; the
-    // meta fallback supports roots that own their body.
-    Object.defineProperty(window.document, 'readyState', { value: 'loading', configurable: true });
-    setTimeout(() => {
-      assert.equal(window.document.body.dataset.loaded, undefined);
-      Object.defineProperty(window.document, 'readyState', { value: 'complete', configurable: true });
-      window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
-    }, 20);
-  });
+  const loadWindow = await evaluateClientPage(clientOut, await (await request('/load')).text());
   assert.equal(loadWindow.document.body.dataset.loaded, 'load-only');
   await window.happyDOM.close(); await loadWindow.happyDOM.close();
   await builtPreview?.close(); builtPreview = undefined;
@@ -156,6 +143,7 @@ export default {
   await new Promise((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
   const deadline = Date.now() + 15000;
   await write('src/components/Shared.tsx', sharedSource.replace('shared()', "shared() + ':edited'"));
+  await write('src/routes/plain/index.tsx', `export default () => <button hx-on:click={() => 'new'}/>;`);
   while (!frames.some(frame => frame.type === 'full-reload') || node.transformResult) {
     assert(Date.now() < deadline, 'client entry invalidation / full-reload timed out: ' + JSON.stringify(frames));
     await new Promise(resolve => setTimeout(resolve, 25));
@@ -170,7 +158,7 @@ export default {
   assert.equal(original.line, 2);
   assert(transformed.map.sourcesContent.some(content => content.includes(":edited") && content.length === sharedSource.replace('shared()', "shared() + ':edited'").length));
   assert((await (await fetch(new URL(devEntry, devOrigin))).text()).includes('recooler-handlers'));
-  console.log(JSON.stringify({ kind, cli: true, dom: true, queue: true, onLoad: true, sourceMap: true, noServerCode: true, hmr: true, clientOut, serverOut, chunks: client.chunks.length }));
+  console.log(JSON.stringify({ kind, cli: true, dom: true, staticModules: true, onLoad: true, sourceMap: true, noServerCode: true, hmr: true, clientOut, serverOut, chunks: client.chunks.length }));
 } finally {
   socket?.terminate(); await server?.close(); await builtPreview?.close();
   await rm(root, { recursive: true, force: true });

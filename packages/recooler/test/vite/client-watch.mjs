@@ -17,7 +17,15 @@ const nextBuild = async previous => {
     assert(Date.now() < deadline, 'ordered client watch rebuild');
     await new Promise(resolve => setTimeout(resolve, 25));
   }
-  return readFile(path.join(root, 'dist/client/assets/recooler-client.js'), 'utf8');
+  const directory = path.join(root, 'dist/client/assets');
+  const seen = new Set();
+  const read = async name => {
+    if (seen.has(name)) return '';
+    seen.add(name);
+    const code = await readFile(path.join(directory, name), 'utf8');
+    return code + (await Promise.all([...code.matchAll(/from\s*["']\.\/([^"']+\.js)["']/g)].map(match => read(match[1])))).join('\n');
+  };
+  return read('recooler-client.js');
 };
 try {
   await write('package.json', '{"name":"recooler-test-app","type":"module"}');

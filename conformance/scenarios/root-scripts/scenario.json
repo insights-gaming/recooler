@@ -16,7 +16,7 @@
           "<script type=\"module\" src="
         ],
         "matches": [
-          "(?:<body[^>]*\\sdata-recooler-route=[\"'][^\"']+[\"']|<meta(?=[^>]*\\sname=[\"']recooler-route[\"'])(?=[^>]*\\scontent=[\"'][^\"']+[\"'])[^>]*>)"
+          "<span(?=[^>]*\\sdata-recooler-marker=\"true\")(?=[^>]*\\sdata-recooler-route=\"[^\"]+\")[^>]*>"
         ],
         "clientIncludes": [
           "root-scripts-handler"

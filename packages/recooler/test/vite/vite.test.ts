@@ -108,7 +108,7 @@ test('client banned-import checks and explicit legacy-root opt-in', async () => 
   expect(result.stdout).toContain('"clientOptions":true');
 }, 65000);
 
-for (const [script, marker] of [['client-proxy.mjs', 'clientProxy'], ['client-security.mjs', 'clientSecurity'], ['client-watch.mjs', 'clientWatch']]) {
+for (const [script, marker] of [['client-hmr.mjs', 'clientHmr'], ['client-proxy.mjs', 'clientProxy'], ['client-security.mjs', 'clientSecurity'], ['client-watch.mjs', 'clientWatch']]) {
   test(`client regressions: ${marker}`, async () => {
     const result = await execute(process.execPath, ['--experimental-vm-modules', fileURLToPath(new URL('./' + script, import.meta.url))], {
       timeout: 60000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
@@ -135,7 +135,7 @@ test('warmup and manifest-first entries retain actions; build identity survives 
 }, 130000);
 
 for (const version of ['2', '1']) {
-  test(`real htmx ${version}: HX-Location, push-url, boost, history and delayed handlers`, async () => {
+  test(`real htmx ${version}: HX-Location, push-url, boost, history and static startup in Chromium`, async () => {
     const result = await execute(process.execPath, ['--experimental-vm-modules', fileURLToPath(new URL('./client-htmx.mjs', import.meta.url)), version], {
       timeout: 60000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
     });

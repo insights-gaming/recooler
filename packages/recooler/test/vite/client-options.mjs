@@ -33,7 +33,7 @@ try {
   const modern = await build(); assert(!modern.html.includes('import('), modern.html);
   const legacy = await build({ legacyClientScript: true });
   assert.match(legacy.html, /<script>import\("\/static\/assets\/recooler-client\.js\?v=[^"]+"\)\.then\(m=>m.init\(\)\)<\/script>/);
-  assert.match(legacy.html, /name="recooler-route" content="\/"/);
+  assert.match(legacy.html, /data-recooler-marker="true" data-recooler-route="\/"/);
   assert(!legacy.html.includes('this.textContent'));
   // The default root continues to render URL scripts even with the shim enabled.
   await rm(path.join(root, 'src/root.tsx'));
@@ -44,6 +44,7 @@ try {
   assert.equal(first, second, 'identical inputs produce the same version');
   await write('src/routes/index.tsx', `export default () => <button hx-on:click={function () { this.textContent = 'changed'; }}/>;`);
   assert.notEqual(first, (await build()).html.match(/recooler-client.js\?v=([^"]+)/)[1]);
+  for (const base of ['./', '', 'relative/']) await assert.rejects(build({}, { base }), /relative Vite base is unsupported/);
   // Bad custom orchestration is an actionable error, not an empty route table.
   await assert.rejects(build({}, { builder: { buildApp: builder => builder.build(builder.environments.client) } }), /build the selected server environment before the client/);
   console.log(JSON.stringify({ clientOptions: true, rawBanned: true, resolvedBanned: true, legacyOptIn: true, cacheBusting: true }));

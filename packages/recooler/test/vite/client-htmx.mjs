@@ -4,250 +4,212 @@ import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promis
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createBuilder } from 'vite';
-import { JSDOM } from 'jsdom';
-import vm from 'node:vm';
+import { chromium } from 'playwright';
 import { recooler } from '../../dist/vite/index.js';
-const htmxPackage = process.argv[2] === '1' ? 'htmx-1' : 'htmx.org';
-const packageDir = fileURLToPath(new URL('../../', import.meta.url));
-await mkdir(path.join(packageDir, '.cache'), { recursive: true });
-const root = await mkdtemp(path.join(packageDir, '.cache/client-htmx-'));
+const major = process.argv[2] ?? '2';
+const pkg = fileURLToPath(new URL('../../', import.meta.url));
+await mkdir(path.join(pkg, '.cache'), { recursive: true });
+const root = await mkdtemp(path.join(pkg, '.cache/client-chromium-'));
 const write = async (name, code) => { await mkdir(path.dirname(path.join(root, name)), { recursive: true }); await writeFile(path.join(root, name), code); };
-const until = async (fn, label) => {
-  const deadline = Date.now() + 10000;
-  while (!fn()) { assert(Date.now() < deadline, label); await new Promise(resolve => setTimeout(resolve, 10)); }
-};
-let server;
-const windows = [];
-// jsdom supplies real DOM/XPath/XHR and executes htmx's inserted scripts. Its
-// vm.Script calls omit Node's dynamic-import hook; supply native ESM loading
-// here so the unmodified legacy import(url).then(m => m.init()) really executes.
-const originalRun = vm.runInContext;
-const contexts = new WeakMap();
-async function load(url, context) {
-  let cache = contexts.get(context);
-  if (!cache) contexts.set(context, cache = new Map());
-  if (!cache.has(url)) cache.set(url, (async () => {
-    const module = new vm.SourceTextModule(await (await fetch(url)).text(), { context, identifier: url,
-      initializeImportMeta(meta) { meta.url = url; },
-      importModuleDynamically: async (specifier, parent) => {
-        const dependency = await load(new URL(specifier, parent.identifier).href, context);
-        if (dependency.status === 'linked') await dependency.evaluate();
-        return dependency;
-      },
-    });
-    await module.link((specifier, parent) => load(new URL(specifier, parent.identifier).href, context));
-    return module;
-  })());
-  return cache.get(url);
-}
-vm.runInContext = (code, context, options) => new vm.Script(code, { ...options,
-  importModuleDynamically: async specifier => {
-    const module = await load(new URL(specifier, options.filename).href, context);
-    if (module.status === 'linked') await module.evaluate();
-    return module;
-  },
-}).runInContext(context);
-let release, gate, requests = [];
-try {
-  await write('package.json', '{"name":"recooler-test-app","type":"module"}');
-  await mkdir(path.join(root, 'node_modules')); await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
-  await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
-  await write('src/root.tsx', `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
-    export default (Content, clientScript) => props => <html><head><script src="/htmx.js"/></head><body hx-boost="true"><Content {...props}/><script>{dangerouslyPreventEscaping(clientScript ?? '')}</script></body></html>;`);
-  await write('src/routes/index.tsx', `export const onLoad = () => { globalThis.loads = (globalThis.loads ?? 0) + 1; };
-    export default () => <>
-      <button id="confirm" hx-post="/destroy" hx-swap="none" hx-on--confirm={function(event) {
-        globalThis.confirms = (globalThis.confirms ?? 0) + 1; event.preventDefault();
-        if (confirm('destroy?')) event.detail.issueRequest(true);
-      }}>destroy</button>
-      <button id="continue" hx-post="/continue" hx-swap="none" hx-on--confirm={() => { globalThis.continued = true; }}>continue</button>
-      <form id="form" hx-boost="false" action="/submitted" method="post" hx-on:submit={function(event) { globalThis.submits = (globalThis.submits ?? 0) + 1; globalThis.submitter = event.submitter.id; }}><button id="submit">submit</button></form>
-      <div hx-on:click={() => { globalThis.parents = (globalThis.parents ?? 0) + 1; }}><a id="link" href="#clicked" hx-boost="false" hx-on:click={() => { globalThis.links = (globalThis.links ?? 0) + 1; }}>link</a></div>
-      <a id="boost" href="/b">B</a>
-      <button id="throw" hx-on:click={() => { throw new Error('replay boom'); }}>throw</button>
-      <button id="after" hx-on:click={function() { this.textContent = 'loaded:' + globalThis.loads; }}>after</button>
-    </>;`);
-  await write('src/routes/b/index.tsx', `export const onLoad = () => { globalThis.bLoads = (globalThis.bLoads ?? 0) + 1; };
-    export default () => <><button id="b" hx-on:click={function() { this.textContent = 'B handler'; }}>B</button><a id="back" href="/">A</a></>;`);
-  // htmx 1 installs wildcard hx-on listeners after processing synchronous load
-  // triggers. Its documented delay modifier gives those listeners one tick.
-  await write('src/routes/load/index.tsx', `export const onLoad = () => { globalThis.loadReady = true; };
-    export default () => <>
-      <div hx-get="/load-confirm" hx-trigger="load${htmxPackage === 'htmx-1' ? ' delay:1ms' : ''}" hx-swap="none" hx-on--confirm={function(event) { event.preventDefault(); if (confirm('load?')) event.detail.issueRequest(true); }}/>
-      <div hx-get="/load-config" hx-trigger="load${htmxPackage === 'htmx-1' ? ' delay:1ms' : ''}" hx-swap="none" hx-on--config-request={() => { globalThis.configCalls = (globalThis.configCalls ?? 0) + 1; }}/>
-      <div hx-get="/load-before" hx-trigger="load${htmxPackage === 'htmx-1' ? ' delay:1ms' : ''}" hx-swap="none" hx-on--before-request={() => { globalThis.beforeCalls = (globalThis.beforeCalls ?? 0) + 1; }}/>
-    </>;`);
-  const builder = await createBuilder({ root, configFile: false, logLevel: 'silent', plugins: recooler({ htmx: { legacyClientScript: true } }),
-    environments: { client: { build: { minify: false } } }, ssr: { noExternal: true }, build: { ssr: 'src/entry.ts', outDir: 'server', minify: false, rolldownOptions: { output: { entryFileNames: 'app.mjs' } } } });
-  await builder.buildApp();
-  let app = (await import(pathToFileURL(path.join(root, 'server/app.mjs')))).default;
-  const htmx = await readFile(fileURLToPath(import.meta.resolve(htmxPackage + '/dist/htmx.js')), 'utf8');
-  server = createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url, origin);
-      if (url.pathname === '/htmx.js') { res.setHeader('Content-Type', 'text/javascript'); return res.end(htmx); }
-      if (url.pathname.startsWith('/assets/')) {
-        if (gate) await gate;
-        res.setHeader('Content-Type', 'text/javascript'); return res.end(await readFile(path.join(root, 'dist/client', url.pathname), 'utf8'));
-      }
-      if (url.pathname === '/relocate') { res.setHeader('HX-Location', JSON.stringify({ path: '/c', target: 'body', swap: 'innerHTML' })); return res.end(); }
-      if (['/destroy', '/continue', '/submitted', '/load-confirm', '/load-config', '/load-before'].includes(url.pathname)) {
-        requests.push(url.pathname); res.statusCode = 204; return res.end();
-      }
-      const response = await app.fetch(new Request(url), { RECOOLER_SECRET: 'htmx-test-key' });
-      res.statusCode = response.status; res.setHeader('Content-Type', 'text/html'); res.end(await response.text());
-    } catch (error) { res.statusCode = 500; res.end(String(error.stack)); }
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  const open = async (block = true, pathname = '/') => {
-    requests = [];
-    gate = block ? new Promise(resolve => { release = () => { gate = undefined; resolve(); }; }) : undefined;
-    const dom = new JSDOM(await (await fetch(origin + pathname)).text(), { url: origin + pathname, runScripts: 'dangerously', resources: 'usable',
-      beforeParse(window) {
-        // These fixtures use plain identifier ids; jsdom lacks CSS.escape.
-        window.CSS = { escape: value => String(value) };
-        window.HTMLElement.prototype.scrollIntoView = () => {};
-        window.scrollTo = () => {};
-        // jsdom requires the optional XPath result type that browsers default.
-        const evaluate = window.XPathExpression.prototype.evaluate;
-        window.XPathExpression.prototype.evaluate = function(node, type = 0, result = null) { return evaluate.call(this, node, type, result); };
-        window.confirm = () => window.accept === true;
-        window.reportError = error => (window.errors ??= []).push(error.message);
-      },
-    });
-    const window = dom.window;
-    windows.push(window);
-    // jsdom does not execute module script elements. Use the same native ESM
-    // loader for that browser primitive; htmx still owns every subsequent swap.
-    const moduleScript = window.document.querySelector('script[type="module"][src]');
-    if (moduleScript) vm.runInContext('import(' + JSON.stringify(moduleScript.src) + ')', dom.getInternalVMContext(), { filename: origin }).catch(window.reportError);
-    window.document.addEventListener('htmx:afterSettle', () => { window.settled = (window.settled ?? 0) + 1; });
-    await until(() => window.htmx && window.document.readyState !== 'loading', 'htmx DOMContentLoaded');
-    // htmx processes the initial DOM in its ready callback.
-    await new Promise(resolve => setTimeout(resolve, 30));
-    return window;
-  };
-  const window = await open();
-  window.document.querySelector('#confirm').click();
-  window.document.querySelector('#continue').click();
-  window.document.querySelector('#throw').click();
-  window.document.querySelector('#after').click();
-  window.document.querySelector('#link').click();
-  const form = window.document.querySelector('#form');
-  // Observe native default submission without navigating the test document.
-  const submitDefaults = [];
-  form.addEventListener('submit', event => { if (!event.defaultPrevented) { submitDefaults.push(event.submitter.id); event.preventDefault(); } });
-  form.requestSubmit(window.document.querySelector('#submit'));
-  assert.equal(requests.length, 0, 'no destructive request before handlers load');
-  assert.equal(window.location.hash, '', 'early anchor default is cancelled');
-  assert.deepEqual(submitDefaults, [], 'early submit default is cancelled');
-  assert(window.$rq.length >= 6, 'real htmx listeners queued events');
-  release();
-  await until(() => window.loads && window.document.querySelector('#after').textContent === 'loaded:1' && window.submits === 1, 'queue replay');
-  await until(() => requests.includes('/continue'), 'confirm continuation');
-  assert.equal(window.confirms, 1); assert(!requests.includes('/destroy'));
-  assert.equal(requests.filter(p => p === '/continue').length, 1, 'continuation issues exactly one request');
-  assert.deepEqual(window.errors, ['replay boom']);
-  assert.equal(window.links, 1); assert.equal(window.parents, 1); assert.equal(window.location.hash, '#clicked');
-  assert.equal(window.submitter, 'submit'); assert.deepEqual(submitDefaults, ['submit']);
-  window.accept = true;
-  window.document.querySelector('#confirm').click();
-  await until(() => requests.includes('/destroy'), 'accepted confirm');
-  assert.equal(requests.filter(p => p === '/destroy').length, 1);
-  const oldBody = window.document.body;
-  const settled = window.settled ?? 0;
-  window.document.querySelector('#boost').click();
-  await until(() => window.bLoads === 1 && window.settled > settled && window.document.querySelector('#b'), 'boosted navigation initializes B');
-  assert.equal(window.document.body, oldBody, 'real htmx swaps body content');
-  window.document.querySelector('#b').click();
-  assert.equal(window.document.querySelector('#b').textContent, 'B handler');
-  window.document.querySelector('#back').click();
-  await until(() => window.loads === 2 && window.document.querySelector('#after'), 'cached legacy import initializes A again');
-  window.document.body.dispatchEvent(new window.CustomEvent('htmx:historyRestore', { bubbles: true }));
-  await window.__recooler_ready;
-  assert.equal(window.loads, 2, 'duplicate lifecycle events do not repeat onLoad');
-  const loadWindow = await open(true, '/load');
-  loadWindow.accept = true;
-  assert.equal(requests.length, 0, 'load-triggered confirm/config/before events cannot send before loading');
-  assert(loadWindow.$rq.length >= 3);
-  release();
-  await until(() => requests.length === 3 && loadWindow.loadReady, 'load-triggered continuations');
-  for (const endpoint of ['/load-confirm', '/load-config', '/load-before']) assert.equal(requests.filter(p => p === endpoint).length, 1, endpoint);
-  assert.equal(loadWindow.configCalls, 1); assert.equal(loadWindow.beforeCalls, 1);
-  // Match the real consumer: the confirm listener belongs to the boosted body,
-  // while issueRequest belongs to a descendant button's htmx request.
-  await write('src/root.tsx', `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
-    export default (Content, clientScript) => props => <html><head><script src="/htmx.js"/></head><body hx-boost="true" hx-on--confirm={function(event) {
-      event.preventDefault(); globalThis.rootConfirms = (globalThis.rootConfirms ?? 0) + 1;
-      if (confirm('body confirm?')) event.detail.issueRequest(true);
-    }}><Content {...props}/><script>{dangerouslyPreventEscaping(clientScript ?? '')}</script></body></html>;`);
-  const rootBuilder = await createBuilder({ root, configFile: false, logLevel: 'silent', plugins: recooler({ htmx: { legacyClientScript: true } }),
+const inc = `const inc = k => { globalThis[k] = (globalThis[k] ?? 0) + 1; };`;
+let browser, server, app, generation = 0;
+let requests = [], assets = [], block, release = () => {}, fail = false, failures = 0, badVersion = false;
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const htmx = await readFile(path.join(pkg, 'node_modules', major === '1' ? 'htmx-1' : 'htmx.org', 'dist/htmx.js'));
+const build = async legacy => {
+  if (legacy) await write('src/root.tsx', `import { dangerouslyPreventEscaping } from 'easy-jsx-html-engine';
+    export default (Content, clientScript) => props => <html><head><script src="/htmx.js"/></head><body hx-boost="true"
+      hx-on--confirm={event => { inc('rootConfirms'); }}
+      hx-on--after-settle={() => inc('bodySettles')} hx-on--after-request={() => inc('bodyRequests')}
+      hx-on--after-swap={() => inc('bodySwaps')} hx-on--load={() => inc('bodyLoads')}>
+      <Content {...props}/><script>{dangerouslyPreventEscaping(clientScript ?? '')}</script></body></html>;
+    ${inc}`);
+  else await rm(path.join(root, 'src/root.tsx'), { force: true });
+  const builder = await createBuilder({ root, configFile: false, logLevel: 'silent', plugins: recooler({ htmx: { legacyClientScript: legacy } }),
     environments: { client: { build: { minify: false } } }, ssr: { noExternal: true },
     build: { ssr: 'src/entry.ts', outDir: 'server', rolldownOptions: { output: { entryFileNames: 'app.mjs' } } } });
-  await rootBuilder.buildApp();
-  app = (await import(pathToFileURL(path.join(root, 'server/app.mjs')).href + '?root-confirm')).default;
-  const rootWindow = await open();
-  rootWindow.accept = true;
-  rootWindow.document.querySelector('#continue').click();
-  assert.equal(requests.length, 0, 'body confirm blocks the descendant request before loading');
-  release();
-  await until(() => rootWindow.rootConfirms === 1 && requests.includes('/continue'), 'body confirm replay');
-  assert.equal(requests.filter(p => p === '/continue').length, 1, 'body and element listeners share one continuation');
-  await rm(path.join(root, 'src/root.tsx'));
-  await write('src/routes/index.tsx', `export const head = { scripts: [{ src: '/htmx.js' }] };
-    export const onLoad = () => { globalThis.modernA = (globalThis.modernA ?? 0) + 1; };
+  await builder.buildApp();
+  app = (await import(pathToFileURL(path.join(root, 'server/app.mjs')).href + '?g=' + generation++)).default;
+};
+try {
+  await write('package.json', '{"name":"chromium-regressions","type":"module"}');
+  await mkdir(path.join(root, 'node_modules')); await symlink(pkg, path.join(root, 'node_modules/recooler'), 'dir');
+  await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
+  await write('src/routes/index.tsx', `${inc}
+    export const head = { scripts: [{ src: '/htmx.js' }] };
+    export const onLoad = () => { inc('loadsA'); (globalThis.order ??= []).push('onLoad'); };
     export default () => <>
-      <a id="modern-boost" href="/b" hx-boost="true">B</a>
-      <button id="location" hx-get="/relocate">HX-Location</button>
-      <button id="push" hx-get="/d" hx-push-url="true" hx-target="body" hx-swap="innerHTML">push</button>
+      <a id="tob" href="/b" hx-boost="true">B</a><a id="toc" href="/c" hx-boost="true">C</a>
+      <button id="hxpost" hx-post="/m/post" hx-swap="none" hx-on:click={() => inc('postClicks')}>post</button>
+      <form action="/m/form" method="post" hx-boost="true" hx-swap="none" hx-on:submit={() => inc('formSubmits')}><button id="submit">go</button></form>
+      <form action="/m/prevent" method="post" hx-boost="true" hx-swap="none" hx-on:submit={e => { inc('preventSubmits'); e.preventDefault(); }}><button id="prevent">prevent</button></form>
+      <a id="link" href="/m/link" hx-boost="true" hx-swap="none" hx-on:click={() => inc('links')}>link</a>
+      <button id="after" hx-post="/m/after" hx-swap="none" hx-on--after-request={() => inc('afterCalls')}>after</button>
+      <button id="before" hx-post="/m/before" hx-on--before-swap={() => inc('beforeCalls')}>before</button>
+      <input id="check" type="checkbox" hx-on:click={() => inc('checks')}/>
+      <input id="key" hx-on:keydown={() => inc('keys')} hx-on:paste={() => inc('pastes')} hx-on:drop={() => inc('drops')}/>
+      <button id="open" hx-get="/edit" hx-target="#modal">open</button><div id="modal"/>
+      <button id="location" hx-get="/relocate">location</button>
+      <button id="push" hx-get="/c" hx-push-url="true" hx-target="body">push</button>
     </>;`);
-  await write('src/routes/b/index.tsx', `export const onLoad = () => { globalThis.modernB = true; };
-    export default () => <button id="modern-b" hx-on:click={function() { this.textContent = 'modern B'; }}>B</button>;`);
-  for (const route of ['c', 'd']) await write('src/routes/' + route + '/index.tsx', `
-    export const onLoad = () => { globalThis.${route}Loads = (globalThis.${route}Loads ?? 0) + 1; };
-    export default () => <button id="${route}" hx-on:click={function() { this.textContent = '${route} handler'; }}/>;`);
-  const modernBuilder = await createBuilder({ root, configFile: false, logLevel: 'silent', plugins: recooler({ htmx: {} }),
-    ssr: { noExternal: true }, build: { ssr: 'src/entry.ts', outDir: 'server', rolldownOptions: { output: { entryFileNames: 'app.mjs' } } } });
-  await modernBuilder.buildApp();
-  app = (await import(pathToFileURL(path.join(root, 'server/app.mjs')).href + '?modern')).default;
-  const modern = await open(false);
-  await until(() => modern.modernA, 'modern entry initialization');
-  const modernSettle = modern.settled ?? 0;
-  modern.document.querySelector('#modern-boost').click();
-  await until(() => modern.modernB && modern.settled > modernSettle, 'default root boosted afterSettle initialization');
-  assert.equal(modern.document.body.dataset.recoolerRoute, '/', 'htmx leaves the old body attribute unchanged');
-  assert.equal(modern.document.querySelector('body meta[name="recooler-route"]').content, '/b');
-  modern.document.querySelector('#modern-b').click();
-  assert.equal(modern.document.querySelector('#modern-b').textContent, 'modern B');
-  for (const [trigger, route] of [['location', 'c'], ['push', 'd']]) {
-    const swapped = await open(false);
-    await until(() => swapped.modernA === 1, 'initial modern route');
-    const oldBody = swapped.document.body;
-    swapped.document.querySelector('#' + trigger).click();
-    await until(() => swapped[route + 'Loads'] === 1 && swapped.location.pathname === '/' + route, trigger + ' navigation');
-    await swapped.__recooler_ready;
-    assert.equal(swapped.document.body, oldBody, 'body content replaced by real htmx');
-    assert.equal(swapped.document.body.dataset.recoolerRoute, '/', 'body attribute remains stale');
-    assert.equal(swapped.document.querySelector('body meta[name="recooler-route"]').content, '/' + route);
-    swapped.document.querySelector('#' + route).click();
-    assert.equal(swapped.document.querySelector('#' + route).textContent, route + ' handler');
-    // Restore htmx's real history cache rather than synthesizing its event.
-    swapped.history.back();
-    await until(() => swapped.modernA === 2 && swapped.document.querySelector('#location'), 'real history restore');
-    // In-place marker changes must also initialize, even when the node survives.
-    const marker = swapped.document.querySelector('body meta[name="recooler-route"]') ?? swapped.document.querySelector('meta[name="recooler-route"]') ?? swapped.document.body;
-    if (marker.tagName === 'META') marker.content = '/' + route;
-    else marker.dataset.recoolerRoute = '/' + route;
-    swapped.document.body.dispatchEvent(new swapped.CustomEvent('htmx:afterSettle', { bubbles: true }));
-    await until(() => swapped[route + 'Loads'] === 2, 'in-place marker route change');
+  for (const route of ['b', 'c']) await write(`src/routes/${route}/index.tsx`, `${inc}
+    export const onLoad = () => { inc('loads${route.toUpperCase()}'); (globalThis.routeLog ??= []).push('${route}:' + document.querySelector('#label')?.textContent); };
+    export default () => <><p id="label">${route}</p><a id="toc" href="/c" hx-boost="true">C</a><a id="toa" href="/" hx-boost="true">A</a>
+    <input id="late-check" type="checkbox" hx-on:click={e => e.preventDefault()}/>
+    <input id="late-key" hx-on:keydown={e => e.preventDefault()} hx-on:paste={e => e.preventDefault()} hx-on:drop={e => e.preventDefault()}/>
+    <button id="late-post" hx-post="/m/late-post" hx-swap="none" hx-on:click={() => inc('latePosts')}>post</button>
+    <form hx-boost="true" action="/m/late-form" method="post" hx-swap="none" hx-on:submit={e => e.preventDefault()}><button id="late-submit">submit</button></form>
+    <a id="late-link" hx-boost="true" href="/m/late-link" hx-swap="none" hx-on:click={e => e.preventDefault()}>link</a>
+    <button id="late-after" hx-post="/m/late-after" hx-swap="none" hx-on--after-request={() => inc('lateAfters')}>after</button>
+    <button id="late-before" hx-post="/m/late-before" hx-swap="none" hx-on--before-swap={() => inc('lateBefores')}>before</button>
+    <button id="handler" hx-on:click={() => inc('destinationClicks')}>handler</button>
+    <button id="gate" hx-post="/m/gate" hx-swap="none" hx-on--confirm={event => { event.preventDefault(); inc('gateConfirms'); if (globalThis.accept) event.detail.issueRequest(true); }}>gate</button>
+    <button id="config" hx-post="/m/config" hx-swap="none" hx-on--config-request={() => inc('configs')}>config</button>
+    <button id="request" hx-post="/m/request" hx-swap="none" hx-on--before-request={() => inc('befores')}>before</button>
+    </>;`);
+  await write('src/routes/edit/index.tsx', `${inc} export const onLoad = () => inc('editLoads');
+    export default () => <button id="save" hx-on:click={() => inc('saves')}>save</button>;`);
+  await write('src/routes/stream/index.tsx', `import { Suspense } from 'recooler/jsx'; ${inc}
+    export const head = { scripts: [{ src: '/htmx.js' }] };
+    export const onLoad = () => { inc('streamLoads'); (globalThis.order ??= []).push('onLoad'); };
+    const Child = async () => { await new Promise(r => setTimeout(r, 200)); return <button id="streamed" hx-on:click={() => inc('streamClicks')}>streamed</button>; };
+    export default props => <Suspense rid={props.rid} fallback={<p id="fallback">waiting</p>}><Child/></Suspense>;`);
+  server = createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://localhost');
+    try {
+      if (url.pathname === '/htmx.js') { res.setHeader('Content-Type', 'text/javascript'); return res.end(htmx); }
+      if (url.pathname.startsWith('/assets/')) {
+        assets.push(req.url);
+        if (block) await block;
+        if (url.pathname.includes('recooler-slice') && (fail || failures-- > 0)) { res.statusCode = 503; return res.end('temporary failure'); }
+        res.setHeader('Content-Type', 'text/javascript'); return res.end(await readFile(path.join(root, 'dist/client', url.pathname)));
+      }
+      requests.push(req.method + ' ' + url.pathname);
+      if (url.pathname === '/relocate') { res.setHeader('HX-Location', '/c'); return res.end(); }
+      if (url.pathname.startsWith('/m/')) { res.statusCode = url.pathname === '/m/before' ? 200 : 204; return res.end(url.pathname === '/m/before' ? '<p>done</p>' : ''); }
+      const response = await app.fetch(new Request(new URL(req.url, origin), { headers: req.headers }), { RECOOLER_SECRET: 'browser-test' });
+      res.statusCode = response.status; res.setHeader('Content-Type', 'text/html');
+      // Forward the actual Response stream, preserving Suspense chunk boundaries.
+      if (badVersion) return res.end((await response.text()).replaceAll(/data-recooler-version="[^"]+"/g, 'data-recooler-version="stale-html"'));
+      for await (const chunk of response.body) res.write(chunk);
+      res.end();
+    } catch (error) { res.statusCode = 500; res.end(String(error.stack)); }
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  browser = await chromium.launch({ headless: true });
+  const open = async (pathname = '/') => {
+    const page = await browser.newPage();
+    page.errors = []; page.warnings = [];
+    page.on('pageerror', e => page.errors.push(e.message));
+    page.on('console', m => { if (m.type() === 'warning') page.warnings.push(m.text()); });
+    await page.addInitScript(() => {
+      globalThis.unhandled = [];
+      addEventListener('unhandledrejection', e => globalThis.unhandled.push(String(e.reason)));
+      document.addEventListener('DOMContentLoaded', () => {
+        (globalThis.order ??= []).push('DCL');
+        globalThis.atDCL = { handlers: Object.keys(globalThis.$handlers ?? {}).length, loads: globalThis.loadsA ?? globalThis.streamLoads };
+      });
+      document.addEventListener('htmx:beforeProcessNode', e => {
+        if (location.pathname === '/stream' && e.detail.elt.tagName === 'BODY') (globalThis.streamProcessing ??= []).push({
+          handlers: Object.keys(globalThis.$handlers ?? {}).length, loads: globalThis.streamLoads,
+        });
+        if (e.detail.elt.id === 'hxpost' || e.detail.elt.id === 'streamed') (globalThis.processed ??= []).push({ id: e.detail.elt.id, handlers: Object.keys(globalThis.$handlers ?? {}).length, loads: globalThis.loadsA ?? globalThis.streamLoads });
+      });
+    });
+    await page.goto(origin + pathname);
+    await page.evaluate(() => globalThis.__recooler_ready);
+    return page;
+  };
+  const count = path => requests.filter(r => r.endsWith(' ' + path)).length;
+  for (const legacy of [true, false]) {
+    await build(legacy);
+    assets = []; requests = [];
+    const page = await open();
+    assert.deepEqual(await page.evaluate(() => globalThis.order.slice(0, 2)), ['onLoad', 'DCL']);
+    const dcl = await page.evaluate(() => globalThis.atDCL); assert(dcl.handlers > 0); assert.equal(dcl.loads, 1);
+    assert((await page.evaluate(() => globalThis.processed)).every(x => x.handlers > 0 && x.loads === 1));
+    assert(!assets.some(x => x.includes('rc_retry=')));
+    assert.equal(await page.evaluate(() => globalThis.$rq), undefined);
+    // replay.mjs: one request per htmx owner, plus native checkbox/key/paste/drop defaults.
+    for (const [id, endpoint] of [['hxpost', '/m/post'], ['submit', '/m/form'], ['link', '/m/link'], ['after', '/m/after'], ['before', '/m/before']]) {
+      await page.click('#' + id); await page.waitForFunction(() => globalThis.__recooler_ready); await sleep(80); assert.equal(count(endpoint), 1, endpoint);
+    }
+    // htmx's own boosted submit listener runs before hx-on and ignores defaultPrevented.
+    // The client must not add a second request when the handler prevents the submit.
+    await page.click('#prevent'); await sleep(80); assert.equal(count('/m/prevent'), 1);
+    await page.click('#check'); assert.equal(await page.isChecked('#check'), true);
+    await page.locator('#key').press('x'); assert.equal(await page.inputValue('#key'), 'x');
+    assert.deepEqual(await page.evaluate(() => ['paste', 'drop'].map(type => document.querySelector('#key').dispatchEvent(new Event(type, { bubbles: true, cancelable: true })))), [true, true]);
+    // init.mjs: fragment adds a second marker and runs only its own onLoad once.
+    await page.click('#open'); await page.waitForFunction(() => globalThis.editLoads === 1); await page.click('#save');
+    assert.equal(await page.evaluate(() => globalThis.saves), 1);
+    await page.evaluate(() => globalThis.__recooler_client.init()); assert.equal(await page.evaluate(() => globalThis.editLoads), 1);
+    assert.equal(await page.locator('[data-recooler-marker]').count(), 2);
+    // Settle-loop: body lifecycle listeners and a delayed destination cause one GET, no replay.
+    block = new Promise(r => { release = () => { block = undefined; r(); }; });
+    await page.click('#tob'); await page.waitForSelector('#handler'); await sleep(80);
+    await page.evaluate(() => { document.querySelector('#config').click(); document.querySelector('#request').click(); });
+    await page.click('#late-check'); assert.equal(await page.isChecked('#late-check'), true);
+    await page.locator('#late-key').press('x'); assert.equal(await page.inputValue('#late-key'), 'x');
+    assert.deepEqual(await page.evaluate(() => ['paste', 'drop'].map(type => document.querySelector('#late-key').dispatchEvent(new Event(type, { bubbles: true, cancelable: true })))), [true, true]);
+    for (const id of ['late-post', 'late-submit', 'late-link', 'late-after', 'late-before']) await page.click('#' + id);
+    await sleep(100); assert.equal(count('/b'), 1);
+    release(); await page.waitForFunction(() => globalThis.loadsB === 1); await sleep(300);
+    assert.equal(count('/b'), 1); assert.equal(await page.evaluate(() => globalThis.loadsB), 1);
+    assert.equal(count('/m/config'), 1, JSON.stringify({ requests, errors: page.errors, state: await page.evaluate(() => ({ configs: globalThis.configs, rootConfirms: globalThis.rootConfirms, befores: globalThis.befores, html: document.body.innerHTML })) })); assert.equal(count('/m/request'), 1);
+    for (const endpoint of ['late-post', 'late-form', 'late-link', 'late-after', 'late-before']) assert.equal(count('/m/' + endpoint), 1);
+    await page.click('#handler'); assert.equal(await page.evaluate(() => globalThis.destinationClicks), 1);
+    // hist / hist-modern: A -> B -> C -> Back must initialize B on B's DOM.
+    await page.click('#toc'); await page.waitForFunction(() => globalThis.loadsC === 1); await sleep(60);
+    await page.goBack(); await page.waitForFunction(() => globalThis.loadsB === 2);
+    assert.equal(await page.locator('#label').textContent(), 'b');
+    assert.deepEqual(await page.evaluate(() => globalThis.routeLog), ['b:b', 'c:c', 'b:b']);
+    assert.equal(count('/b'), 1, 'history cache does not refetch B');
+    assert.deepEqual(page.errors, []); assert.deepEqual(await page.evaluate(() => globalThis.unhandled), []);
+    assert.deepEqual(page.warnings, []);
+    await page.close();
+    // Native modules hold DCL while initial handler assets are unavailable.
+    block = new Promise(r => { release = () => { block = undefined; r(); }; });
+    const early = await browser.newPage(); let dclFired = false; early.on('domcontentloaded', () => { dclFired = true; });
+    const navigation = early.goto(origin); await sleep(150); assert.equal(dclFired, false); release(); await navigation;
+    assert.equal(await early.evaluate(() => globalThis.loadsA), 1); await early.close();
+    // Streamed Suspense: browser executes engine scripts before deferred handler modules and DCL.
+    const stream = await open('/stream');
+    await stream.waitForSelector('#streamed'); assert.deepEqual(await stream.evaluate(() => globalThis.order.slice(0, 2)), ['onLoad', 'DCL']);
+    await stream.click('#streamed'); assert.equal(await stream.evaluate(() => globalThis.streamClicks), 1);
+    assert.equal((await stream.evaluate(() => globalThis.atDCL)).loads, 1);
+    assert((await stream.evaluate(() => globalThis.atDCL)).handlers > 0);
+    const processing = await stream.evaluate(() => globalThis.streamProcessing);
+    assert(processing.length > 0); assert(processing.every(x => x.handlers > 0 && x.loads === 1));
+    assert.deepEqual(stream.errors, []);
+    await stream.close();
+    // HX-Location and push-url run destination onLoad once despite inserted module scripts.
+    for (const trigger of ['location', 'push']) {
+      const p = await open(); await p.click('#' + trigger); await p.waitForFunction(() => globalThis.loadsC === 1); await sleep(80);
+      assert.equal(await p.evaluate(() => globalThis.loadsC), 1); await p.close();
+    }
+    // Confirm swap window: no request before the module; public issueRequest resumes exactly once.
+    const p = await open(); await p.evaluate(() => { globalThis.accept = true; });
+    block = new Promise(r => { release = () => { block = undefined; r(); }; });
+    const beforeGate = count('/m/gate'); await p.click('#tob'); await p.waitForSelector('#gate'); await sleep(80); await p.click('#gate'); await sleep(80);
+    assert.equal(count('/m/gate'), beforeGate); release(); await p.waitForFunction(() => globalThis.gateConfirms === 1); await sleep(100);
+    assert.equal(count('/m/gate'), beforeGate + 1); assert.deepEqual(p.errors, []); await p.close();
+    // failure.mjs: reject an import, retry with a new URL, recover without a reload.
+    const recovered = await open(); failures = 1; await recovered.click('#tob'); await recovered.waitForFunction(() => globalThis.loadsB === 1);
+    await recovered.click('#handler'); assert.equal(await recovered.evaluate(() => globalThis.destinationClicks), 1);
+    assert.deepEqual(await recovered.evaluate(() => globalThis.unhandled), []); await recovered.close();
+    console.log(JSON.stringify({ chromium: true, major, legacy, hxLocation: true, pushUrl: true, initialBeforeDCL: true, streamedBeforeDCL: true,
+      requestCounts: 'one per action; no loop', history: 'a b c back b', fragment: true, retry: true }));
   }
-  console.log(JSON.stringify({ realHtmx: true, htmxPackage, hxLocation: true, pushUrl: true, historyRestore: true, boost: true, legacyImport: true, confirm: true, submit: true, link: true, replayErrors: true }));
-} catch (error) { console.error('REAL HTMX FAILURE', error); throw error; } finally {
-  release?.();
-  await new Promise(resolve => setTimeout(resolve, 50));
-  for (const window of windows) window.close();
-  vm.runInContext = originalRun;
-  await new Promise(resolve => server ? server.close(resolve) : resolve());
-  await rm(root, { recursive: true, force: true });
-}
+  // Persistent import failures reload once across the same page version, then stop.
+  const broken = await open(); fail = true; const requestStart = count('/b');
+  await broken.click('#tob'); await sleep(1200); assert(count('/b') <= requestStart + 2);
+  assert.equal(await broken.evaluate(() => Object.keys(sessionStorage).filter(k => k.startsWith('recooler:import:')).length), 1);
+  assert.deepEqual(await broken.evaluate(() => globalThis.unhandled), []); fail = false; await broken.close();
+  // Persistent HTML/entry mismatch reloads at most once for a version pair.
+  badVersion = true; const mismatchStart = count('/'); const skew = await browser.newPage();
+  await skew.goto(origin).catch(error => { if (!String(error).includes('interrupted')) throw error; }); await sleep(1000);
+  assert.equal(count('/') - mismatchStart, 2); assert.equal(await skew.evaluate(() => Object.keys(sessionStorage).filter(k => k.startsWith('recooler:version:')).length), 1);
+  await skew.close(); badVersion = false;
+} finally { release(); await browser?.close(); await new Promise(r => server ? server.close(r) : r()); await rm(root, { recursive: true, force: true }); }

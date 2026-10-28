@@ -344,8 +344,8 @@ export function htmxPlugin(options: RecoolerOptions) {
         const client = context.server.environments.client;
         client?.moduleGraph.invalidateAll();
         client?.hot.send({ type: 'full-reload', path: '*' });
-        this.environment.hot.send({ type: 'full-reload', path: '*' });
       }
+      this.environment.hot.send({ type: 'full-reload', path: '*' });
       return [];
     },
     async resolveId(id, importer) {

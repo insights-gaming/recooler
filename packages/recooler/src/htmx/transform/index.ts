@@ -270,8 +270,8 @@ export function transform(code: string, options: TransformOptions): TransformRes
           ? `\`${escapeTemplate(ref)}(\${${helper("handlerScope")}(${scopeAtSite(c)})}).call(this, event)\``
           : JSON.stringify(`${ref}.call(this, event)`);
         if (options.queueHandlers) {
-          // Self-installing: an event can arrive before even the module entry
-          // executes (notably while a Suspense response is still streaming).
+          // Static route modules install dispatch before htmx initializes.
+          // An unavailable entry must never suppress a native event default.
           const dispatch = `globalThis.$rc?.`;
           const prefix = `${dispatch}(${JSON.stringify(c.id)},`;
           replacement = c.variables.length

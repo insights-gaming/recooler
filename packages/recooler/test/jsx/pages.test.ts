@@ -44,12 +44,12 @@ describe('jsxPages', () => {
       { default: hoc('root'), head: { title: 'root' } },
       [{ default: hoc('outer'), head: extend('outer') }, { head: extend('head-only') }, { default: hoc('inner'), head: extend('inner') }]));
     expect(calls).toEqual(['outer', 'head-only', 'inner', 'page']);
-    expect(result).toBe('<root><meta name="recooler-route" content="/"/><outer><inner><p>page</p></inner></outer></root>');
+    expect(result).toBe('<root><span hidden data-recooler-marker="true" data-recooler-route="/"></span><outer><inner><p>page</p></inner></outer></root>');
   });
 
   it.each([undefined, null])('uses the default root when root.default is %s', async defaultExport => {
     const result = await html(app({ default: Page }, { default: defaultExport, head: { title: 'head-only root' } }));
-    expect(result).toBe('<!DOCTYPE html><html><head><meta charset="utf-8"/><title>head-only root</title></head><body data-recooler-route="/"><meta name="recooler-route" content="/"/><p>page</p></body></html>');
+    expect(result).toBe('<!DOCTYPE html><html><head><meta charset="utf-8"/><title>head-only root</title></head><body data-recooler-route="/"><span hidden data-recooler-marker="true" data-recooler-route="/"></span><p>page</p></body></html>');
   });
 
   it('leaves API-only modules to the router without calling the page adapter', () => {
@@ -283,7 +283,7 @@ describe('client script URLs and route metadata', () => {
   it('concatenates extras in extension order and renders external module scripts', async () => {
     const scripts = ['/one.js'];
     const result = await html(app({ default: Page }, undefined, [], {}, [{ scripts }, { scripts: ['/two.js'] }]));
-    expect(result).toContain('<body data-recooler-route="/"><meta name="recooler-route" content="/"/>');
+    expect(result).toContain('<body data-recooler-route="/"><span hidden data-recooler-marker="true" data-recooler-route="/"></span>');
     expect(result).toContain('<script type="module" src="/one.js"></script><script type="module" src="/two.js"></script>');
     expect(scripts).toEqual(['/one.js']);
   });
@@ -302,8 +302,8 @@ describe('client script URLs and route metadata', () => {
     const a = app({ default: Page }, { default: Root }, [], {}, [{ scripts: ['/entry.js'] }]);
     const result = await html(a);
     expect(result).toBe(await html(a));
-    expect(result).toContain('<body data-recooler-route="/"><meta name="recooler-route" content="/"/><p>page</p>');
-    expect(result.match(/name="recooler-route"/g)).toHaveLength(1);
+    expect(result).toContain('<body data-recooler-route="/"><span hidden data-recooler-marker="true" data-recooler-route="/"></span><p>page</p>');
+    expect(result.match(/data-recooler-marker=/g)).toHaveLength(1);
     expect(received[0]).not.toBe(received[1]);
     expect(received[0]).toEqual(['/entry.js', '/root.js']);
   });
@@ -326,10 +326,10 @@ describe('client script URLs and route metadata', () => {
     expect(await html(app({ default: Page }, undefined, [], {}, [{ clientScript: source }, { scripts: ['/entry.js'] }]))).toContain('src="/entry.js"');
   });
 
-  it('emits a route-pattern meta for custom bodies even without renderHeadElements', async () => {
+  it('emits a route-pattern body marker for custom bodies even without renderHeadElements', async () => {
     const manifest: Manifest = { version: 1, root: { default: hoc('body') }, tree: node({ default: Page }, [], '/:id') };
     const a = new Hono().route('/mount', createApp(manifest, { pages: jsxPages() }));
-    expect(await html(a, '/mount/42')).toBe('<body><meta name="recooler-route" content="/:id"/><p>page</p></body>');
+    expect(await html(a, '/mount/42')).toBe('<body><span hidden data-recooler-marker="true" data-recooler-route="/:id"></span><p>page</p></body>');
   });
 
   it('has no legacy ?script endpoint', async () => {
@@ -471,7 +471,7 @@ describe('Suspense streaming', () => {
 
   it('renders synchronous Suspense children without a fallback or streaming scripts', async () => {
     const result = await html(app({ default: ({ rid }: RouteProps) => h(Suspense, { rid, fallback: 'loading' }, 'ready') }));
-    expect(result).toContain('<body data-recooler-route="/"><meta name="recooler-route" content="/"/>ready</body>');
+    expect(result).toContain('<body data-recooler-route="/"><span hidden data-recooler-marker="true" data-recooler-route="/"></span>ready</body>');
     expect(result).not.toContain('data-suspense');
   });
 

@@ -28,7 +28,9 @@ try {
   await write('src/entry.ts', `export { default } from 'virtual:recooler/app';`);
   await write('src/helper.tsx', `export const unusedServer = () => 'TREE_SHAKEN_SQL_SECRET'; export const Browser = () => 'browser';`);
   await write('src/routes/index.tsx', `import { Browser } from '../helper';
-// ROUTE_COMMENT_SECRET
+/** DROPPED_JSDOC_SECRET */
+const serverOnly = () => 'SERVER_ONLY_COMMENT_BODY';
+/*! ROUTE_COMMENT_SECRET */
 export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id="button" hx-on:click={function() { this.textContent = Browser(); }}/></form>;`);
   await write('src/routes/table/index.ts', `import { clients, namespace } from 'virtual:recooler/htmx'; export const onGet = c => c.json({ clients, namespace });`);
   await write('app.js', `globalThis.USER_ENTRY = true;`);
@@ -41,7 +43,7 @@ export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id
   assert(emitted.includes('recooler-client.js')); assert(emitted.includes('user-recooler-client.js'));
   assert((await readFile(path.join(root, 'dist/client/index.html'), 'utf8')).includes('user-recooler-client.js'));
   const sources = (await Promise.all(emitted.filter(f => /\.(?:js|map)$/.test(f)).map(f => readFile(path.join(directory, f), 'utf8')))).join('\n');
-  for (const marker of ['ROUTE_ACTION_BODY_SECRET', 'ROUTE_COMMENT_SECRET', 'TREE_SHAKEN_SQL_SECRET']) assert(!sources.includes(marker), marker);
+  for (const marker of ['ROUTE_ACTION_BODY_SECRET', 'ROUTE_COMMENT_SECRET', 'DROPPED_JSDOC_SECRET', 'TREE_SHAKEN_SQL_SECRET']) assert(!sources.includes(marker), marker);
   const identities = await (await first.app.fetch(new Request('http://test/table'))).json();
   assert(!sources.includes(identities.namespace), 'server namespace never enters client JS/maps');
   const moduleHash = createHash('sha256').update(JSON.stringify([actionTransformVersion, await readFile(path.join(root, 'src/routes/index.tsx'), 'utf8')])).digest('hex');
@@ -58,7 +60,7 @@ export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id
     const inline = code.match(/sourceMappingURL=data:application\/json[^,]*;base64,([^\s]+)/);
     if (!inline) continue;
     const map = Buffer.from(inline[1], 'base64').toString();
-    for (const secret of ['ROUTE_ACTION_BODY_SECRET', 'ROUTE_COMMENT_SECRET', 'TREE_SHAKEN_SQL_SECRET']) assert(!map.includes(secret), 'inline ' + secret);
+    for (const secret of ['ROUTE_ACTION_BODY_SECRET', 'ROUTE_COMMENT_SECRET', 'DROPPED_JSDOC_SECRET', 'TREE_SHAKEN_SQL_SECRET']) assert(!map.includes(secret), 'inline ' + secret);
   }
   const second = await build();
   assert.equal(second.builder.environments.client.config.build.sourcemap, false);
@@ -80,7 +82,10 @@ export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id
   vm.runInContext('(function(event){' + button.getAttribute('hx-on:click') + '})', vm.createContext(window)).call(button, new window.Event('click'));
   assert.equal(button.textContent, 'intended'); await window.happyDOM.close();
   // A current client entry must refuse a page from an earlier generation.
-  await assert.rejects(evaluateClientPage(path.join(root, 'dist/client'), second.html), /version mismatch/);
+  const stale = await evaluateClientPage(path.join(root, 'dist/client'), second.html);
+  assert.equal(stale.document.body.dataset.loaded, undefined);
+  assert(stale.sessionStorage.length > 0, 'version mismatch records a reload guard');
+  await stale.happyDOM.close();
   // Alias layout and root slices must use the same resolved chains as D5.
   await write('src/root.tsx', `import { DefaultRootHOC } from 'recooler/jsx';
     export default Content => DefaultRootHOC(props => <><button id="root-handler" hx-on:click={function() { this.textContent = 'root handler'; }}/><Content {...props}/></>);`);

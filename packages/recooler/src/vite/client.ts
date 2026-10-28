@@ -27,7 +27,7 @@ const urls = ${JSON.stringify(Object.fromEntries(ids.map(id => [opaque(id), retr
 const routes = ${JSON.stringify(pages)};
 const version = ${JSON.stringify(version)};
 const handlers = globalThis.$handlers ??= Object.create(null);
-const modules = new Map(), jobs = new WeakMap(), completed = new WeakMap();
+const modules = new Map(), jobs = new WeakMap(), started = new WeakMap(), completed = new WeakMap();
 const report = error => console.error(error);
 const markers = () => [...document.querySelectorAll('[data-recooler-marker]')];
 const signature = node => node.dataset.recoolerRoute + '@' + node.dataset.recoolerVersion;
@@ -82,16 +82,17 @@ async function initializeNode(node) {
     if (missing.length) await Promise.all(missing.map(load));
     const values = (page?.slices ?? []).map(id => modules.get(id));
     if (values.some(value => value instanceof Promise)) await Promise.all(values);
-    if (!node.isConnected || signature(node) !== key) return;
-    completed.set(node, key);
+    if (!node.isConnected || signature(node) !== key || started.get(node) === key) return;
+    started.set(node, key);
     const value = page?.onLoad && modules.get(page.onLoad);
     const module = value instanceof Promise ? await value : value;
     if (typeof module?.onLoad === 'function') {
       try { await module.onLoad(); } catch (error) { report(error); }
     }
+    if (node.isConnected && signature(node) === key) completed.set(node, key);
   };
   const promise = run().catch(error => {
-    reloadOnce('recooler:import:' + (version || 'dev') + ':' + node.dataset.recoolerRoute,
+    reloadOnce('recooler:import:' + (version || 'dev'),
       'recooler: client module failed after retry; ' + error);
     report(error);
   }).finally(() => { if (jobs.get(node)?.promise === promise) jobs.delete(node); });
@@ -99,6 +100,9 @@ async function initializeNode(node) {
   return promise;
 }
 function init() {
+  if (document.readyState === 'loading') {
+    return globalThis.__recooler_ready = new Promise(resolve => document.addEventListener('DOMContentLoaded', () => resolve(init()), { once: true }));
+  }
   const ready = Promise.all(markers().map(initializeNode));
   // Observe every public readiness promise even when the caller ignores it.
   ready.catch(report);
@@ -106,15 +110,27 @@ function init() {
 }
 function register(entries) {
   for (const [id, module] of entries) modules.set(id, module);
+  // A legacy import may have started a lazy job while the static graph loaded.
+  // Static registration owns startup and must run onLoad before DCL, even then.
+  for (const node of markers()) {
+    const page = routes[node.dataset.recoolerRoute];
+    if (started.get(node) !== signature(node) && page?.slices.every(id => modules.has(id) && !(modules.get(id) instanceof Promise))) jobs.delete(node);
+  }
   init();
 }
 const waiting = new WeakMap();
 globalThis.$rc = (id, scope, element, event) => {
+  if (markers().some(node => !checkVersion(node))) return;
   if (handlers[id] && markers().every(node => completed.get(node) === signature(node))) {
     return invoke(id, scope, element, event);
   }
-  // Confirm is the only public htmx continuation. All other handlers run late:
-  // never prevent a native default or restart an htmx request.
+  // Only confirm has a safe public continuation. Config/beforeRequest run
+  // late; other events are dropped without touching their defaults.
+  if (!['htmx:confirm', 'htmx:configRequest', 'htmx:beforeRequest'].includes(event.type)) {
+    init();
+    ${dev ? `if (event.type !== 'htmx:load') console.warn('recooler: dropped ' + event.type + ' while route handlers load');` : ''}
+    return;
+  }
   let batch = waiting.get(event);
   if (!batch) {
     const confirm = event.type === 'htmx:confirm' && typeof event.detail?.issueRequest === 'function';
@@ -124,6 +140,7 @@ globalThis.$rc = (id, scope, element, event) => {
     queueMicrotask(async () => {
       try {
         await init();
+        if (markers().some(node => !checkVersion(node))) return;
         let cancelled = false, issued = false;
         const detail = confirm ? new Proxy(event.detail, { get(target, key) {
           if (key === 'issueRequest') return (...args) => { issued = true; return target.issueRequest(...args); };
