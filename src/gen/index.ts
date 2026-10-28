@@ -217,6 +217,7 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
     return watcher;
   };
   const sourceWatchDirs = new Map<string, { watcher: FSWatcher; dev: number; ino: number }>();
+  const invalidSourceDirs = new Set<string>();
   let sourceQueue = Promise.resolve();
   const watchSource = async () => {
     // Only direct children matter for root.tsx. If srcDir is missing, watch an
@@ -227,8 +228,9 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
         const current = await stat(dir).catch(error => {
           if (error.code !== 'ENOENT') throw error;
         });
-        if (current?.dev === watched.dev && (!current.ino || !watched.ino || current.ino === watched.ino)) continue;
+        if (!invalidSourceDirs.has(dir) && current?.dev === watched.dev && (!current.ino || !watched.ino || current.ino === watched.ino)) continue;
         watched.watcher.close(); watchers.delete(watched.watcher); sourceWatchDirs.delete(dir);
+        invalidSourceDirs.delete(dir);
       }
       let dir = srcDir;
       let current;
@@ -243,6 +245,8 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
       if (closed || sourceWatchDirs.has(dir)) return;
       try {
         const watcher = await watchReady(dir, false, filename => {
+          // Deleted directories can reuse the same inode before stat runs.
+          if (filename === null || filename === path.basename(dir)) invalidSourceDirs.add(dir);
           const file = filename === null ? dir : path.resolve(dir, filename);
           if (filename === null || filename === path.basename(dir) || file === path.join(srcDir, 'root.tsx') || file === srcDir || srcDir.startsWith(file + path.sep)) {
             sourceQueue = sourceQueue.then(watchSource).then(run).catch(report);

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { mkdirSync, watch as fsWatch, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { watchRoutes } from '../../src/gen/index.js';
@@ -8,10 +8,15 @@ import { watchRoutes } from '../../src/gen/index.js';
 const io = vi.hoisted(() => ({
   beforeRead: undefined as ((file: string) => Promise<void>) | undefined,
   beforeWatch: undefined as ((dir: string) => void) | undefined,
+  directoryInode: undefined as number | undefined,
 }));
 vi.mock('node:fs/promises', async importOriginal => {
   const original = await importOriginal<typeof import('node:fs/promises')>();
-  return { ...original, readFile: async (...args: Parameters<typeof original.readFile>) => {
+  return { ...original, stat: async (...args: Parameters<typeof original.stat>) => {
+    const result = await original.stat(...args);
+    if (result.isDirectory() && io.directoryInode !== undefined) result.ino = io.directoryInode;
+    return result;
+  }, readFile: async (...args: Parameters<typeof original.readFile>) => {
     await io.beforeRead?.(String(args[0]));
     return original.readFile(...args);
   } };
@@ -27,6 +32,7 @@ const temporary: string[] = [];
 afterEach(async () => {
   io.beforeRead = undefined;
   io.beforeWatch = undefined;
+  io.directoryInode = undefined;
   await Promise.all(temporary.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
 });
 async function fixture() {
@@ -123,7 +129,7 @@ it('uses only non-recursive ancestor watches for a missing nested srcDir', async
     // The newly created source watcher must also notice subsequent root edits.
     await rm(path.join(cwd, 'missing/source/root.tsx'));
     await vi.waitFor(() => expect(results.at(-1)).not.toContain('rootFile:'), { timeout: 10000 });
-    // Replacing either parent must reattach watches to the new inodes.
+    // Replacing either parent must reattach watches, even if inodes are reused.
     for (const dir of ['missing', 'missing/source']) {
       await rm(path.join(cwd, dir), { recursive: true });
       await mkdir(path.join(cwd, 'missing/source'), { recursive: true });
@@ -152,6 +158,33 @@ for (const replacement of ['remove', 'rename']) {
       await rm(path.join(source, 'root.tsx'));
       await vi.waitFor(() => expect(results.at(-1)).not.toContain('rootFile:'), { timeout: 10000 });
     } finally { await watcher.close(); }
+  }, 30000);
+}
+
+for (const ino of [1, 0]) {
+  it(`reattaches srcDir when replacement stats keep ino=${ino}`, async () => {
+    const cwd = await fixture();
+    const source = path.join(cwd, 'source');
+    await mkdir(source);
+    io.directoryInode = ino;
+    vi.mocked(fsWatch).mockClear();
+    const results: string[] = [];
+    const watcher = await watchRoutes({ cwd, srcDir: 'source', routesDir: 'src/routes', out: 'generated/routes.ts',
+      onResult: result => results.push(result.code) });
+    const closes = vi.mocked(fsWatch).mock.results.map(result => vi.spyOn(result.value, 'close'));
+    io.beforeWatch = dir => {
+      if (dir === source) expect(closes.at(-1)).toHaveBeenCalled();
+    };
+    try {
+      // No async stat can observe the gap and bypass the same-inode check.
+      rmSync(source, { recursive: true });
+      mkdirSync(source);
+      writeFileSync(path.join(source, 'root.tsx'), 'export const head = {};');
+      await vi.waitFor(() => expect(results.at(-1)).toContain('rootFile: "root.tsx"'), { timeout: 10000 });
+      await rm(path.join(source, 'root.tsx'));
+      await vi.waitFor(() => expect(results.at(-1)).not.toContain('rootFile:'), { timeout: 10000 });
+    } finally { await watcher.close(); }
+    for (const close of closes) expect(close).toHaveBeenCalled();
   }, 30000);
 }
 
