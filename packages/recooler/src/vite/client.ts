@@ -4,6 +4,34 @@ export const internalClient = '\0' + clientId;
 export const routeClientId = 'virtual:recooler/route/';
 export const sliceQuery = 'recooler-handlers';
 export const clientFile = 'assets/recooler-client.js';
+export const gateFile = 'assets/recooler-gate.js';
+
+/** A classic, parser-blocking external script: installed before streamed htmx.process. */
+export function clientGate(dev = false): string {
+  return `globalThis.__recooler_gate ??= (() => {
+    const resumed = new WeakSet();
+    // htmx 1 can emit a synchronous load confirm before installing hx-on.
+    // Allow that processing stack to finish, then use its public continuation.
+    document.addEventListener('htmx:confirm', event => {
+      if (resumed.has(event) || typeof event.detail?.issueRequest !== 'function') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      queueMicrotask(() => {
+        if (!event.target.isConnected) return;
+        const next = new CustomEvent(event.type, { bubbles: true, cancelable: true, detail: event.detail });
+        resumed.add(next);
+        if (event.target.dispatchEvent(next)) event.detail.issueRequest(true);
+      });
+    }, true);
+    return true;
+  })();
+  globalThis.$rc ??= (id, scope, element, event) => {
+    if (['htmx:confirm', 'htmx:configRequest', 'htmx:config-request', 'htmx:beforeRequest', 'htmx:before-request'].includes(event.type)) {
+      if (event.type === 'htmx:confirm') event.preventDefault();
+      (globalThis.__recooler_pending ??= []).push([id, scope, element, event]);
+    } else { ${dev ? "console.warn('recooler: dropped ' + event.type + ' while route handlers load');" : ''} }
+  };`;
+}
 
 export interface ClientRoute {
   slices: string[];
@@ -27,9 +55,8 @@ const urls = ${JSON.stringify(Object.fromEntries(ids.map(id => [opaque(id), retr
 const routes = ${JSON.stringify(pages)};
 const version = ${JSON.stringify(version)};
 const handlers = globalThis.$handlers ??= Object.create(null);
-const owners = new WeakMap();
 const modules = new Map(), jobs = new WeakMap(), started = new WeakMap(), completed = new WeakMap();
-const report = error => console.error(error);
+const report = error => typeof globalThis.reportError === 'function' ? globalThis.reportError(error) : console.error(error);
 const markers = () => [...document.querySelectorAll('[data-recooler-marker]')];
 const signature = node => node.dataset.recoolerRoute + '@' + node.dataset.recoolerVersion;
 function reloadOnce(key, message) {
@@ -52,18 +79,10 @@ function checkVersion(node) {
 }
 function remember(id, module) {
   modules.set(id, module);
-  for (const fn of Object.values(module)) if (typeof fn === 'function') {
-    const pages = owners.get(fn) ?? new Set();
-    for (const [route, page] of Object.entries(routes)) if (page.slices.includes(id)) pages.add(route);
-    owners.set(fn, pages);
-  }
   return module;
 }
 function available(id) {
-  const fn = handlers[id];
-  if (!fn) return false;
-  const pages = owners.get(fn);
-  return markers().some(node => completed.get(node) === signature(node) && (!pages || pages.has(node.dataset.recoolerRoute)));
+  return typeof handlers[id] === 'function';
 }
 async function load(id) {
   if (!modules.has(id)) {
@@ -106,7 +125,7 @@ async function initializeNode(node) {
     const value = page?.onLoad && modules.get(page.onLoad);
     const module = value instanceof Promise ? await value : value;
     if (typeof module?.onLoad === 'function') {
-      try { await module.onLoad(); } catch (error) { report(error); }
+      try { Promise.resolve(module.onLoad()).catch(report); } catch (error) { report(error); }
     }
     if (node.isConnected && signature(node) === key) completed.set(node, key);
   };
@@ -130,7 +149,7 @@ function init() {
 function register(entries) {
   for (const [id, module] of entries) remember(id, module);
   // A legacy import may have started a lazy job while the static graph loaded.
-  // Static registration owns startup and must run onLoad before DCL, even then.
+  // Static registration owns startup; onLoad waits for the complete DOM at DCL.
   for (const node of markers()) {
     const page = routes[node.dataset.recoolerRoute];
     if (started.get(node) !== signature(node) && page?.slices.every(id => modules.has(id) && !(modules.get(id) instanceof Promise))) jobs.delete(node);
@@ -145,9 +164,9 @@ globalThis.$rc = (id, scope, element, event) => {
   }
   // Only confirm has a safe public continuation. Config/beforeRequest run
   // late; other events are dropped without touching their defaults.
-  if (!['htmx:confirm', 'htmx:configRequest', 'htmx:beforeRequest'].includes(event.type)) {
+  if (!['htmx:confirm', 'htmx:configRequest', 'htmx:config-request', 'htmx:beforeRequest', 'htmx:before-request'].includes(event.type)) {
     init();
-    ${dev ? `if (event.type !== 'htmx:load') console.warn('recooler: dropped ' + event.type + ' while route handlers load');` : ''}
+    ${dev ? `console.warn('recooler: dropped ' + event.type + ' while route handlers load');` : ''}
     return;
   }
   let batch = waiting.get(event);
@@ -183,6 +202,8 @@ globalThis.$rc = (id, scope, element, event) => {
   }
   batch.records.push([id, scope, element]);
 };
+for (const args of globalThis.__recooler_pending ?? []) globalThis.$rc(...args);
+delete globalThis.__recooler_pending;
 for (const name of ['htmx:afterSwap', 'htmx:afterSettle', 'htmx:historyRestore']) document.addEventListener(name, init);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
 else queueMicrotask(init);

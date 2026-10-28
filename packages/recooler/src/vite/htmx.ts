@@ -15,7 +15,7 @@ import type { ActionTable } from '../htmx/index.js';
 import type { TransformResult } from '../htmx/transform/index.js';
 import type { RecoolerOptions } from './index.js';
 import { routePathWithoutGroups, routeSegment } from '../router/resolve.js';
-import { clientEntry, clientId, internalClient, clientFile, routeClientId, sliceQuery, type ClientRoute } from './client.js';
+import { clientGate, gateFile, clientEntry, clientId, internalClient, clientFile, routeClientId, sliceQuery, type ClientRoute } from './client.js';
 
 export const tableId = 'virtual:recooler/htmx';
 const internalTable = '\0' + tableId;
@@ -266,7 +266,14 @@ export function htmxPlugin(options: RecoolerOptions) {
       projectNamespace = 'recooler:' + createHash('sha256').update(JSON.stringify(identity)).digest('hex').slice(0, 24)
         + (serving ? ':' + randomUUID() : '');
     },
-    configureServer(server) { devServer = server; },
+    configureServer(server) {
+      devServer = server;
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.split('?')[0] !== base + gateFile) return next();
+        res.setHeader('Content-Type', 'text/javascript');
+        res.end(clientGate(true));
+      });
+    },
     // A post hook leaves platform builders intact. Cloudflare has already built
     // Worker -> client (and moved assets); plain Vite's default builder is a no-op.
     buildApp: { order: 'post', async handler(builder) {
@@ -302,6 +309,7 @@ export function htmxPlugin(options: RecoolerOptions) {
       }
       if (this.environment.name === 'client') {
         sliceContents.clear();
+        this.emitFile({ type: 'asset', fileName: gateFile, source: clientGate() });
         for (const id of sliceIds()) this.emitFile({ type: 'chunk',
           id: normalizePath(path.resolve(roots.srcDir, id)) + (id.includes('?') ? '&' : '?') + sliceQuery, fileName: sliceFile(id) });
         for (const [file, ids] of Object.entries(builtData?.clients ?? {})) if (ids.length) {
@@ -513,7 +521,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         // Derive the version from source/configuration inputs rather than a
         // random UUID. Client-only source inputs are included below too.
         const clientBuild = this.environment.config.environments.client?.build;
-        const hash = createHash('sha256').update(JSON.stringify(clients)).update(clientEntry.toString())
+        const hash = createHash('sha256').update(JSON.stringify(clients)).update(clientEntry.toString()).update(clientGate.toString())
           .update(JSON.stringify({ base, minify: clientBuild?.minify, target: clientBuild?.target,
             sourcemap: clientBuild?.sourcemap, define: this.environment.config.define,
             banned: options.htmx && options.htmx.clientBannedImports?.map(String) }));

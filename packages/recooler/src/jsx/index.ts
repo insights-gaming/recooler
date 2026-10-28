@@ -126,7 +126,6 @@ async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<Rou
   return head;
 }
 
-declare const __RECOOLER_PRODUCTION__: boolean;
 const recoolerScript = (src: string) => /(?:\/assets\/recooler-(?:client|route-[a-f0-9]+)\.js|\/@id\/virtual:recooler\/(?:client|route\/))/.test(src);
 
 export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
@@ -147,19 +146,22 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         const source = route.rootFile ?? `root (used by ${route.file})`;
         throw new RouteValidationError([`Invalid root in ${source}: default export is not a function`]);
       }
-      // Custom roots may render their own body without using renderHeadElements. Put a
-      // discoverable body marker in the content slot, which works for those roots as well.
+      // Content carries startup for custom/legacy roots too. The blocking external
+      // gate precedes any streamed htmx.process; async modules register during the
+      // stream and the identical deferred URLs still hold DOMContentLoaded.
       {
         const Page = Content;
-        Content = (props: RouteProps) => createElement(Fragment, {},
-          createElement('span', { hidden: true, 'data-recooler-marker': 'true', 'data-recooler-route': props.route,
-            'data-recooler-version': props.scripts.filter(src => new URL(src, props.url).pathname.endsWith('/assets/recooler-client.js'))
-              .map(src => new URL(src, props.url).searchParams.get('v')).find(Boolean) }),
-          typeof __RECOOLER_PRODUCTION__ !== 'undefined' && !__RECOOLER_PRODUCTION__ && props.scripts.some(src => src.includes('virtual:recooler/client'))
-            && createElement('script', {}, dangerouslyPreventEscaping(`setTimeout(()=>{if(!globalThis.__recooler_entry_loaded)console.warn('recooler: client entry did not load; check its URL and CSP')},5000)`)),
-          ...(Root !== DefaultRootHOC ? props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href })) ?? [] : []),
-          ...props.scripts.filter(recoolerScript).map(src => createElement('script', { type: 'module', src })),
-          createElement(Page, props));
+        Content = (props: RouteProps) => {
+          const modules = props.scripts.filter(recoolerScript);
+          const entry = modules.find(src => /(?:recooler-client\.js|virtual:recooler\/client)/.test(src));
+          return createElement(Fragment, {},
+            entry && createElement('script', { src: entry.replace(/(?:assets\/recooler-client\.js|@id\/virtual:recooler\/client)/, 'assets/recooler-gate.js') }),
+            ...(Root !== DefaultRootHOC ? props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href })) ?? [] : []),
+            ...modules.flatMap(src => [createElement('script', { type: 'module', async: true, src }), createElement('script', { type: 'module', src })]),
+            createElement(Page, props),
+            modules.length > 0 && createElement('template', { 'data-recooler-marker': 'true', 'data-recooler-route': props.route,
+              'data-recooler-version': entry && new URL(entry, props.url).searchParams.get('v') }));
+        };
       }
       // Named contributions are available to adapters for collision policies. JSX
       // uses the standard ordered extras merge and needs no extension-specific policy.
