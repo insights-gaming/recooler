@@ -14,7 +14,7 @@ const nativeImport = (url: string): Promise<{ default: { fetch: (req: Request) =
 
 export async function filesUnder(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
-  const files = await Promise.all(entries.sort((a, b) => a.name.localeCompare(b.name)).map(async (entry) => {
+  const files = await Promise.all(entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(async (entry) => {
     const file = path.join(dir, entry.name);
     return entry.isDirectory() ? filesUnder(file) : [file];
   }));
@@ -69,7 +69,7 @@ export const farmTarget: Target = {
     if (!result.ok) {
       return { kind: "buildError", error: (result.error ?? "") + "\n" + await readFile(path.join(cache, "build.log"), "utf8") };
     }
-    const { default: app } = await nativeImport(pathToFileURL(path.join(cache, "dist/main.js")).href);
+    const { default: app } = await nativeImport(pathToFileURL(path.join(cache, "dist/main.js")).href + "?scenario=" + encodeURIComponent(scenarioDir));
     if (typeof app?.fetch !== "function") throw new Error(`Farm output has no default fetch(): ${cache}`);
     return { kind: "app", fetch: app.fetch.bind(app), hono: app as unknown as import("hono").Hono };
   },

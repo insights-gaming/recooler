@@ -2,6 +2,7 @@ import type { Target } from "../target.js";
 
 export const tsTarget: Target = {
   name: "ts",
+  expectationFamily: "ts",
   async unavailable() {
     try {
       const moduleName = "recooler/router";

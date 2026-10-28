@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { Hono } from "hono";
-import type { BuiltApp, Expectation, Scenario, ScenarioRequest } from "./target.js";
+import type { BuiltApp, Expectation, Scenario, ScenarioRequest, Target } from "./target.js";
 
 export async function loadScenario(dir: string): Promise<Scenario> {
   const scenario = JSON.parse(await readFile(path.join(dir, "scenario.json"), "utf8")) as Scenario;
@@ -9,12 +9,14 @@ export async function loadScenario(dir: string): Promise<Scenario> {
     throw new Error(`${dir}: require name, source, and exactly one of requests or buildError`);
   }
   if (scenario.requests?.length === 0) throw new Error(`${dir}: requests must not be empty`);
+  if (scenario.changes?.some((change) => "ts" in change)) throw new Error(`${dir}: put TS request expectations on individual requests, or use buildErrors`);
   const names = new Set<string>();
   for (const request of scenario.requests ?? []) {
     if (!request.name || names.has(request.name) || (!!request.path === !!request.action) || !Number.isInteger(request.expect?.status)) {
       throw new Error(`${dir}: invalid/duplicate request ${request.name}`);
     }
     names.add(request.name);
+    if (request.repeatExpect && request.repeatExpect.length !== (request.repeat ?? 1) - 1) throw new Error(`${dir}: repeatExpect must cover every dispatch after the first`);
     if (request.repeat !== undefined && (!Number.isInteger(request.repeat) || request.repeat < 1)) {
       throw new Error(`${dir}: repeat must be a positive integer`);
     }
@@ -31,9 +33,18 @@ export async function discoverScenarios(root: string, additional: string[] = [])
   ])].sort();
 }
 
-export function expectationFor(request: ScenarioRequest, scenario: Scenario, target: string): Expectation {
-  if (target !== "ts") return request.expect;
-  const replacements = [...scenario.changes ?? [], ...request.changes ?? []].flatMap((change) => change.ts ? [change.ts] : []);
+export function targetKey(target: string | Pick<Target, "name" | "expectationFamily">): string {
+  return typeof target === "string" ? target : target.expectationFamily ?? target.name;
+}
+
+export function buildErrorFor(scenario: Scenario, target: string | Target): string | string[] | undefined {
+  const name = typeof target === "string" ? target : target.name;
+  return scenario.buildErrors?.[name] ?? scenario.buildErrors?.[targetKey(target)] ?? scenario.buildError;
+}
+
+export function expectationFor(request: ScenarioRequest, _scenario: Scenario, target: string | Target): Expectation {
+  if (targetKey(target) !== "ts") return request.expect;
+  const replacements = (request.changes ?? []).flatMap((change) => change.ts ? [change.ts] : []);
   if (replacements.length > 1) throw new Error(`Ambiguous TS expectations for ${request.name}`);
   return replacements[0] ?? request.expect;
 }
@@ -50,7 +61,7 @@ export function actionUrl(html: string, attribute: string, index: number, page: 
   return new URL(decoded, new URL(page, "http://localhost")).href;
 }
 
-export interface Observation { status: number; body: string; headers: Headers; trace: string[] }
+export interface Observation { status: number; body: string; headers: Headers; trace: string[]; clientChunks?: Record<string, string> }
 
 // Review fixtures originally used this trace channel. The harness exposes it as a response
 // header, identically for both targets. Scenarios execute serially; builds run out of process.
@@ -58,15 +69,21 @@ const state = globalThis as typeof globalThis & { __t?: string[]; __app?: unknow
 
 export function observe(app: BuiltApp): (request: Request, mount?: ScenarioRequest["mount"]) => Promise<Observation> {
   const dispatch = app.fetch.bind(app);
+  state.__dbUp = false;
+  state.__rl = false;
   state.__app = {
     fetch: dispatch,
     request: (url: string | Request, init?: RequestInit) => dispatch(url instanceof Request ? url : new Request(new URL(url, "http://localhost"), init)),
   };
   const mounts = new Map<string, Hono>();
+  const seen = new WeakSet<Request>();
   return async (request, mount) => {
     state.__t = [];
-    state.__dbUp = false;
-    state.__rl = false;
+    if (!seen.has(request)) {
+      seen.add(request);
+      state.__dbUp = false;
+      state.__rl = false;
+    }
     let response: Response;
     if (mount) {
       const key = JSON.stringify(mount);
@@ -77,9 +94,26 @@ export function observe(app: BuiltApp): (request: Request, mount?: ScenarioReque
         const routed = (app as BuiltApp & { hono?: Hono }).hono;
         if (mount.type !== "mount" && !routed) throw new Error("Target must expose hono for route/basePath mount probes");
         outer = new Hono({ strict: true });
+        if (mount.retry) {
+          // Re-dispatch through the OUTER app, with the same raw Request.
+          const retried = new WeakSet<Request>();
+          outer.use("*", async (c, next) => {
+            await next();
+            if (c.res.status === 401 && !retried.has(c.req.raw)) {
+              retried.add(c.req.raw);
+              state.__t!.push("RETRY-outer");
+              c.res = await outer!.fetch(c.req.raw);
+            }
+          });
+        }
         if (mount.type === "mount") outer.mount(mount.prefix, dispatch);
         else if (mount.type === "basePath") outer.basePath(mount.prefix).route("/", routed!);
         else outer.route(mount.prefix, routed!);
+        if (mount.outerPrefix) {
+          const twice = new Hono({ strict: true });
+          twice.route(mount.outerPrefix, outer);
+          outer = twice;
+        }
         mounts.set(key, outer);
       }
       response = await outer.fetch(request);
@@ -87,7 +121,7 @@ export function observe(app: BuiltApp): (request: Request, mount?: ScenarioReque
     const body = await response.text();
     const headers = new Headers(response.headers);
     headers.set("x-conformance-trace", JSON.stringify(state.__t));
-    return { status: response.status, body, headers, trace: JSON.parse(headers.get("x-conformance-trace")!) as string[] };
+    return { status: response.status, body, headers, clientChunks: app.clientChunks, trace: JSON.parse(headers.get("x-conformance-trace")!) as string[] };
   };
 }
 
@@ -103,13 +137,26 @@ export async function performRequest(
     if (action.response && !rendered) throw new Error(`No previous response named ${action.response}`);
     if (!rendered) {
       const page = new URL(action.page, "http://localhost").href;
-      const response = await fetch(new Request(page, { headers: action.headers }));
+      const response = await fetch(new Request(page, { headers: action.headers }), request.mount);
       if (response.status !== 200) throw new Error(`Action page ${page} returned ${response.status}`);
       rendered = { body: response.body, url: page };
     }
     url = actionUrl(rendered.body, action.attribute, action.index ?? 0, rendered.url);
+    if (action.path) {
+      const destination = new URL(action.path, url);
+      destination.search = new URL(url).search;
+      url = destination.href;
+    }
   }
-  const init: RequestInit = { method: request.method ?? "GET", headers: request.headers };
+  const headers = new Headers();
+  if (request.action || new URL(url).searchParams.has("action")) {
+    headers.set("HX-Request", "true");
+    headers.set("Origin", new URL(url).origin);
+    headers.set("Sec-Fetch-Site", "same-origin");
+  }
+  new Headers(request.headers).forEach((value, name) => headers.set(name, value));
+  for (const name of request.omitHeaders ?? []) headers.delete(name);
+  const init: RequestInit = { method: request.method ?? "GET", headers };
   if (request.form) init.body = new URLSearchParams(request.form);
   else if (request.body !== undefined) init.body = request.body;
   const input = new Request(url, init);

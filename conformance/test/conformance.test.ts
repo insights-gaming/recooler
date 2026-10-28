@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { describe, test, expect, beforeAll } from "vitest";
-import { discoverScenarios, expectationFor, loadScenario, observe, performRequest } from "../src/runner.js";
+import { buildErrorFor, targetKey, discoverScenarios, expectationFor, loadScenario, observe, performRequest } from "../src/runner.js";
 import { farmTarget } from "../src/targets/farm.js";
 import { tsTarget } from "../src/targets/ts.js";
 import type { BuiltApp, BuildResult, Target } from "../src/target.js";
@@ -18,30 +18,35 @@ for (const name of selected) {
   const target = available.get(name);
   if (!target) throw new Error(`Unknown conformance target ${name}`);
   const reason = await target.unavailable?.();
+  if (reason && process.env.CONFORMANCE_ALLOW_SKIP !== "1") throw new Error(`Selected target ${name} is unavailable: ${reason}. Set CONFORMANCE_ALLOW_SKIP=1 to allow skipping.`);
   describe.skipIf(!!reason)(`${name}${reason ? ` (${reason})` : ""}`, () => {
     for (const { dir, data: scenario } of filtered) {
-      describe(scenario.name, () => {
+      const applies = !scenario.targets || scenario.targets.includes(name) || scenario.targets.includes(targetKey(target));
+      const buildError = buildErrorFor(scenario, target);
+      describe.skipIf(!applies)(scenario.name, () => {
         let result: BuildResult;
         let fetch: ReturnType<typeof observe>;
         const responses = new Map<string, { body: string; url: string }>();
         beforeAll(async () => {
           result = await target.build(dir, scenario);
-          if (!scenario.buildError) {
+          if (!buildError) {
             expect(result.kind, result.kind === "buildError" ? result.error : "").toBe("app");
             fetch = observe(result as BuiltApp);
           }
         });
-        if (scenario.buildError) {
+        if (buildError) {
           test("rejects the build with the expected diagnostic", () => {
             expect(result.kind).toBe("buildError");
             if (result.kind !== "buildError") return;
-            for (const part of [scenario.buildError].flat()) expect(result.error).toContain(part);
+            for (const part of [buildError!].flat()) expect(result.error).toContain(part);
           });
         } else {
           for (const request of scenario.requests!) {
             test(request.name, async () => {
-              const expected = expectationFor(request, scenario, name);
-              for (const actual of await performRequest(request, fetch, responses)) {
+              const firstExpected = expectationFor(request, scenario, target);
+              const results = await performRequest(request, fetch, responses);
+              for (const [index, actual] of results.entries()) {
+                const expected = index > 0 ? request.repeatExpect?.[index - 1] ?? firstExpected : firstExpected;
                 expect(actual.status).toBe(expected.status);
                 if (expected.body !== undefined) expect(actual.body).toBe(expected.body);
                 for (const part of expected.includes ?? []) expect(actual.body).toContain(part);
@@ -49,6 +54,12 @@ for (const name of selected) {
                 for (const pattern of expected.matches ?? []) expect(actual.body).toMatch(new RegExp(pattern));
                 for (const [pattern, count] of Object.entries(expected.counts ?? {})) expect([...actual.body.matchAll(new RegExp(pattern, "g"))]).toHaveLength(count);
                 for (const [header, value] of Object.entries(expected.headers ?? {})) expect(actual.headers.get(header)).toBe(value);
+                for (const part of expected.traceExcludes ?? []) expect(actual.trace).not.toContain(part);
+                if (expected.clientExcludes) {
+                  expect(actual.clientChunks, "Target must expose every emitted client chunk").toBeDefined();
+                  const chunks = Object.values(actual.clientChunks!).join("\n");
+                  for (const part of expected.clientExcludes) expect(chunks).not.toContain(part);
+                }
                 if (expected.trace) expect(actual.trace).toEqual(expected.trace);
               }
             });
