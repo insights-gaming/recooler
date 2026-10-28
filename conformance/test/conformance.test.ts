@@ -66,7 +66,7 @@ for (const name of selected) {
                   if (expected.noClientEntry) {
                     const urls = Object.keys(actual.clientChunks!);
                     expect(urls.length, "Target must expose the app's client entry even on handler-free pages").toBeGreaterThan(0);
-                    for (const script of actual.body.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)) {
+                    for (const script of actual.body.matchAll(/<script\b[^>]*\ssrc=["']([^"']+)["'][^>]*>/gi)) {
                       const src = new URL(script[1]!, "http://localhost").pathname;
                       for (const url of urls) expect(src).not.toBe(new URL(url, "http://localhost").pathname);
                     }

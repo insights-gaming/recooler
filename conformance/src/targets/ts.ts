@@ -1,6 +1,18 @@
 import type { Target } from "../target.js";
+import { access } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
-const importModule = (name: string): Promise<Record<string, unknown>> => import(/* @vite-ignore */ name);
+const importModule = async (name: string): Promise<Record<string, unknown>> => {
+  const entry = import.meta.resolve(name);
+  // Vitest can wrap a missing file as a generic "Cannot find package" error.
+  // Check the resolved entry itself before evaluating it, so this remains
+  // distinguishable from a missing dependency inside an existing build.
+  try { await access(fileURLToPath(entry)); } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    throw Object.assign(new Error(`Missing public entrypoint ${name}`), { code: "ERR_MODULE_NOT_FOUND", url: entry });
+  }
+  return import(/* @vite-ignore */ entry);
+};
 
 /** Missing public entrypoints mean "not built". Missing transitive dependencies,
  * evaluation errors and invalid exports mean a broken build and must fail. */

@@ -82,7 +82,7 @@ describe("portable request contract", () => {
   test.each(["drop-sig", "flip-sig", "scope", "method"] as const)("tampers with an extracted action: %s", async (tamper) => {
     const seen: Request[] = [];
     await performRequest({
-      name: tamper, method: "POST", action: { page: "/users/1", attribute: "hx-post", tamper }, expect: { status: 404 },
+      name: tamper, method: "POST", form: {}, action: { page: "/users/1", attribute: "hx-post", tamper }, expect: { status: 404 },
     }, async (input) => {
       seen.push(input);
       return { status: 200, body: '<button hx-post="?action=real&amp;sig=abc&amp;scope=%7B%22value%22%3A%22original%22%7D">', headers: new Headers(), trace: [] };

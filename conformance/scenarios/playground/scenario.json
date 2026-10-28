@@ -404,8 +404,7 @@
               "clicked"
             ],
             "inlineScriptExcludes": [
-              "clicked",
-              "window.$handlers="
+              "clicked"
             ]
           }
         }
@@ -432,8 +431,7 @@
             "status": 200,
             "noClientEntry": true,
             "inlineScriptExcludes": [
-              "clicked",
-              "window.$handlers="
+              "clicked"
             ]
           }
         }

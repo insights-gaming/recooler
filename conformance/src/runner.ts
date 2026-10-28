@@ -175,8 +175,11 @@ export async function performRequest(
   new Headers(request.headers).forEach((value, name) => headers.set(name, value));
   for (const name of request.omitHeaders ?? []) headers.delete(name);
   const init: RequestInit = { method, headers };
-  if (request.form) init.body = new URLSearchParams(request.form);
-  else if (request.body !== undefined) init.body = request.body;
+  // Method tampering can turn a form POST into GET, which cannot carry a body.
+  if (method !== "GET" && method !== "HEAD") {
+    if (request.form) init.body = new URLSearchParams(request.form);
+    else if (request.body !== undefined) init.body = request.body;
+  }
   const input = new Request(url, init);
   const results: Observation[] = [];
   for (let i = 0; i < (request.repeat ?? 1); i++) results.push(await fetch(input, request.mount));
