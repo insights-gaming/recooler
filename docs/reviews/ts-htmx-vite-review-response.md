@@ -1,5 +1,8 @@
 # Phase 4b implementation review response
 
+The [second review response](ts-htmx-vite-second-review-response.md) supersedes
+this response’s absolute-path namespace and strict-filesystem workaround.
+
 Implementation checkpoints: `4146f9d` (runtime security and JSX guard),
 `8b139cc` (Vite graph, registration, reloads and regression coverage), based on
 `98acae9`. The final report/benchmark checkpoint includes the updated documentation
