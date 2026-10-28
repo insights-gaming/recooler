@@ -1,0 +1,456 @@
+{
+  "date": "2026-10-28T02:55:20.596Z",
+  "node": "v22.22.2",
+  "records": [
+    {
+      "count": 400,
+      "mode": "none",
+      "warmup": true,
+      "ms": 208.24929199999997,
+      "graphMs": 0.0024579999999900792,
+      "resolveCalls": 0,
+      "bytes": 688831,
+      "gzipBytes": 24340,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "graph",
+      "warmup": true,
+      "ms": 479.862041,
+      "graphMs": 256.86075000000005,
+      "resolveCalls": 0,
+      "bytes": 1146102,
+      "gzipBytes": 32386,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "aggregator",
+      "warmup": true,
+      "ms": 234.43229100000008,
+      "graphMs": 0,
+      "resolveCalls": 1201,
+      "bytes": 781775,
+      "gzipBytes": 29650,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "none",
+      "warmup": false,
+      "ms": 141.27424999999994,
+      "graphMs": 0.0006249999998999556,
+      "resolveCalls": 0,
+      "bytes": 688831,
+      "gzipBytes": 24340,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 400.17895899999985,
+      "graphMs": 230.96299999999997,
+      "resolveCalls": 0,
+      "bytes": 1146102,
+      "gzipBytes": 32386,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 227.3804580000001,
+      "graphMs": 0,
+      "resolveCalls": 1201,
+      "bytes": 781775,
+      "gzipBytes": 29650,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 247.04379200000017,
+      "graphMs": 0,
+      "resolveCalls": 1201,
+      "bytes": 781775,
+      "gzipBytes": 29650,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 428.9055410000001,
+      "graphMs": 233.52320800000007,
+      "resolveCalls": 0,
+      "bytes": 1146102,
+      "gzipBytes": 32386,
+      "load": "19:54  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "none",
+      "warmup": false,
+      "ms": 170.9159999999997,
+      "graphMs": 0.0006250000001273293,
+      "resolveCalls": 0,
+      "bytes": 688831,
+      "gzipBytes": 24340,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "none",
+      "warmup": false,
+      "ms": 105.53366600000027,
+      "graphMs": 0.0015419999999721767,
+      "resolveCalls": 0,
+      "bytes": 688831,
+      "gzipBytes": 24340,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 86.01 99.85 116.06"
+    },
+    {
+      "count": 400,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 429.5559579999999,
+      "graphMs": 235.2282909999999,
+      "resolveCalls": 0,
+      "bytes": 1146102,
+      "gzipBytes": 32386,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 400,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 230.09833400000025,
+      "graphMs": 0,
+      "resolveCalls": 1201,
+      "bytes": 781775,
+      "gzipBytes": 29650,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 400,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 249.6463749999998,
+      "graphMs": 0,
+      "resolveCalls": 1201,
+      "bytes": 781775,
+      "gzipBytes": 29650,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 400,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 382.54341699999986,
+      "graphMs": 220.92941700000029,
+      "resolveCalls": 0,
+      "bytes": 1146102,
+      "gzipBytes": 32386,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 400,
+      "mode": "none",
+      "warmup": false,
+      "ms": 134.76716699999997,
+      "graphMs": 0.0007500000001527951,
+      "resolveCalls": 0,
+      "bytes": 688831,
+      "gzipBytes": 24340,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 400,
+      "mode": "none",
+      "warmup": false,
+      "ms": 127.80212500000016,
+      "graphMs": 0.0009580000005371403,
+      "resolveCalls": 0,
+      "bytes": 688831,
+      "gzipBytes": 24340,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 400,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 527.6509999999998,
+      "graphMs": 345.7508749999997,
+      "resolveCalls": 0,
+      "bytes": 1146102,
+      "gzipBytes": 32386,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 400,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 246.05974999999944,
+      "graphMs": 0,
+      "resolveCalls": 1201,
+      "bytes": 781775,
+      "gzipBytes": 29650,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 1000,
+      "mode": "none",
+      "warmup": true,
+      "ms": 291.35533399999986,
+      "graphMs": 0.0009999999992942321,
+      "resolveCalls": 0,
+      "bytes": 1712835,
+      "gzipBytes": 53351,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 1000,
+      "mode": "graph",
+      "warmup": true,
+      "ms": 1865.2052079999994,
+      "graphMs": 1241.47375,
+      "resolveCalls": 0,
+      "bytes": 2856506,
+      "gzipBytes": 71568,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 87.13 99.86 115.96"
+    },
+    {
+      "count": 1000,
+      "mode": "aggregator",
+      "warmup": true,
+      "ms": 556.4673330000005,
+      "graphMs": 0,
+      "resolveCalls": 3001,
+      "bytes": 1946983,
+      "gzipBytes": 66649,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.91 98.98 115.56"
+    },
+    {
+      "count": 1000,
+      "mode": "none",
+      "warmup": false,
+      "ms": 273.5220420000005,
+      "graphMs": 0.0005409999994299142,
+      "resolveCalls": 0,
+      "bytes": 1712835,
+      "gzipBytes": 53351,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.91 98.98 115.56"
+    },
+    {
+      "count": 1000,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 1632.1804169999996,
+      "graphMs": 1164.0939999999991,
+      "resolveCalls": 0,
+      "bytes": 2856506,
+      "gzipBytes": 71568,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.91 98.98 115.56"
+    },
+    {
+      "count": 1000,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 545.2850419999995,
+      "graphMs": 0,
+      "resolveCalls": 3001,
+      "bytes": 1946983,
+      "gzipBytes": 66649,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.91 98.98 115.56"
+    },
+    {
+      "count": 1000,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 537.1125830000001,
+      "graphMs": 0,
+      "resolveCalls": 3001,
+      "bytes": 1946983,
+      "gzipBytes": 66649,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.91 98.98 115.56"
+    },
+    {
+      "count": 1000,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 1655.970666000001,
+      "graphMs": 1193.809292,
+      "resolveCalls": 0,
+      "bytes": 2856506,
+      "gzipBytes": 71568,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.52 98.65 115.34"
+    },
+    {
+      "count": 1000,
+      "mode": "none",
+      "warmup": false,
+      "ms": 319.27225,
+      "graphMs": 0.0014579999988200143,
+      "resolveCalls": 0,
+      "bytes": 1712835,
+      "gzipBytes": 53351,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.52 98.65 115.34"
+    },
+    {
+      "count": 1000,
+      "mode": "none",
+      "warmup": false,
+      "ms": 310.5951249999998,
+      "graphMs": 0.001374999999825377,
+      "resolveCalls": 0,
+      "bytes": 1712835,
+      "gzipBytes": 53351,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.52 98.65 115.34"
+    },
+    {
+      "count": 1000,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 1754.8665839999994,
+      "graphMs": 1312.6018750000003,
+      "resolveCalls": 0,
+      "bytes": 2856506,
+      "gzipBytes": 71568,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.52 98.65 115.34"
+    },
+    {
+      "count": 1000,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 673.8622919999998,
+      "graphMs": 0,
+      "resolveCalls": 3001,
+      "bytes": 1946983,
+      "gzipBytes": 66649,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.52 98.65 115.34"
+    },
+    {
+      "count": 1000,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 566.3005420000009,
+      "graphMs": 0,
+      "resolveCalls": 3001,
+      "bytes": 1946983,
+      "gzipBytes": 66649,
+      "load": "19:55  up 7 days, 10:16, 10 users, load averages: 83.52 98.65 115.34"
+    },
+    {
+      "count": 1000,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 2659.7216670000016,
+      "graphMs": 2005.8165829999998,
+      "resolveCalls": 0,
+      "bytes": 2856506,
+      "gzipBytes": 71568,
+      "load": "19:55  up 7 days, 10:17, 10 users, load averages: 85.24 98.75 115.28"
+    },
+    {
+      "count": 1000,
+      "mode": "none",
+      "warmup": false,
+      "ms": 815.5644169999978,
+      "graphMs": 0.0014169999994919635,
+      "resolveCalls": 0,
+      "bytes": 1712835,
+      "gzipBytes": 53351,
+      "load": "19:55  up 7 days, 10:17, 10 users, load averages: 85.24 98.75 115.28"
+    },
+    {
+      "count": 1000,
+      "mode": "none",
+      "warmup": false,
+      "ms": 488.2050410000011,
+      "graphMs": 0.0009579999968991615,
+      "resolveCalls": 0,
+      "bytes": 1712835,
+      "gzipBytes": 53351,
+      "load": "19:55  up 7 days, 10:17, 10 users, load averages: 85.24 98.75 115.28"
+    },
+    {
+      "count": 1000,
+      "mode": "graph",
+      "warmup": false,
+      "ms": 1724.5687089999992,
+      "graphMs": 1229.8220419999998,
+      "resolveCalls": 0,
+      "bytes": 2856506,
+      "gzipBytes": 71568,
+      "load": "19:55  up 7 days, 10:17, 10 users, load averages: 85.24 98.75 115.28"
+    },
+    {
+      "count": 1000,
+      "mode": "aggregator",
+      "warmup": false,
+      "ms": 520.8445830000019,
+      "graphMs": 0,
+      "resolveCalls": 3001,
+      "bytes": 1946983,
+      "gzipBytes": 66649,
+      "load": "19:55  up 7 days, 10:17, 10 users, load averages: 85.06 98.49 115.09"
+    }
+  ],
+  "summary": [
+    {
+      "count": 400,
+      "variants": {
+        "none": {
+          "ms": 134.76716699999997,
+          "graphMs": 0.0007500000001527951,
+          "resolveCalls": 0,
+          "bytes": 688831,
+          "gzipBytes": 24340
+        },
+        "graph": {
+          "ms": 428.9055410000001,
+          "graphMs": 233.52320800000007,
+          "resolveCalls": 0,
+          "bytes": 1146102,
+          "gzipBytes": 32386
+        },
+        "aggregator": {
+          "ms": 246.05974999999944,
+          "graphMs": 0,
+          "resolveCalls": 1201,
+          "bytes": 781775,
+          "gzipBytes": 29650
+        }
+      }
+    },
+    {
+      "count": 1000,
+      "variants": {
+        "none": {
+          "ms": 319.27225,
+          "graphMs": 0.001374999999825377,
+          "resolveCalls": 0,
+          "bytes": 1712835,
+          "gzipBytes": 53351
+        },
+        "graph": {
+          "ms": 1724.5687089999992,
+          "graphMs": 1229.8220419999998,
+          "resolveCalls": 0,
+          "bytes": 2856506,
+          "gzipBytes": 71568
+        },
+        "aggregator": {
+          "ms": 545.2850419999995,
+          "graphMs": 0,
+          "resolveCalls": 3001,
+          "bytes": 1946983,
+          "gzipBytes": 66649
+        }
+      }
+    }
+  ]
+}

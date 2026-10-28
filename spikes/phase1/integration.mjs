@@ -1,7 +1,7 @@
 import { selectServer } from './server-environment.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build, createBuilder, createServer, preview } from 'vite';
 import { execFileSync } from 'node:child_process';
@@ -18,7 +18,7 @@ import { checkContext } from './context-assert.mjs';
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function waitFor(fn) { for (let n = 0; n < 100; n++) { const result = await fn(); if (result) return result; await sleep(50); } throw new Error('timed out'); }
+async function waitFor(fn) { for (let n = 0; n < 600; n++) { const result = await fn(); if (result) return result; await sleep(50); } throw new Error('timed out'); }
 function addSources(root, cf) {
   write(root, 'src/map-source.ts', mapSource);
   write(root, 'src/client/shared.ts', "globalThis.__shared = (globalThis.__shared ?? 0) + 1; export const shared = 'SHARED_SLICE';");
@@ -61,9 +61,9 @@ function assertChunks(stats) {
   assert(stats.chunks[adminChunk[0]].ids.includes('src/client/admin-only.ts'));
   return { sharedChunk: shared[0][0], publicChunk: publicChunk[0], adminChunk: adminChunk[0], publicStaticClosure: [...closure] };
 }
-async function inspectMaps(root, stats, serverName) {
+async function inspectMaps(root, stats, outDirs) {
   const result = {};
-  for (const [name, dir] of [['server', join(root, 'dist', serverName)], ['client', join(root, 'dist/client')]]) {
+  for (const [name, dir] of Object.entries(outDirs)) {
     const { readdirSync } = await import('node:fs');
     const find = path => readdirSync(path, { withFileTypes: true }).flatMap(e => e.isDirectory() ? find(join(path, e.name)) : [join(path, e.name)]);
     const records = [];
@@ -96,14 +96,24 @@ for (const kind of (selected ? [selected] : ['plain', 'stable-als', 'stable-comp
       routes['/p' + i] = [id, join(benchRoot,'src/root.tsx')];
       imports += `import * as bench${i} from ${JSON.stringify(id)}; globalThis.__bench${i} = bench${i};\n`;
     }
-    write(root, 'src/entry.ts', imports + readFileSync(join(root,'src/entry.ts'),'utf8'));
+    const pages = `globalThis.__benchPages = [${Array.from({length:benchCount},(_,i) => 'bench'+i).join(',')}];\n`;
+    const handler = `
+  if (/^\\/p[0-9]+$/.test(url.pathname)) {
+    const page = globalThis.__benchPages[Number(url.pathname.slice(2))];
+    if (page) {
+      const element = await page.default({ ctx: { get() { return {id:'spike-user'}; } }, url });
+      return new Response(await element.toHTML(), {headers:{'content-type':'text/html'}});
+    }
+  }
+`;
+    write(root, 'src/entry.ts', imports + pages + readFileSync(join(root,'src/entry.ts'),'utf8').replace('const url = new URL(request.url);', 'const url = new URL(request.url);' + handler));
   }
 
   const stats = {};
   const flag = kind.endsWith('als') ? 'nodejs_als' : 'nodejs_compat';
   const cf = kind !== 'plain';
   if (cf && kind !== 'beta') write(root, 'wrangler.json', JSON.stringify({ name: 'spike_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: [flag], assets: { directory: './dist/client' } }));
-  if (kind === 'beta') write(root, 'cloudflare.config.ts', `export default { name: 'spike-worker', main: './src/entry.ts', compatibilityDate: '2026-10-20', compatibilityFlags: ['nodejs_compat'] };`);
+  if (kind === 'beta') write(root, 'cloudflare.config.ts', `export default { worker: { name: 'spike-worker', entrypoint: './src/entry.ts', compatibilityDate: '2026-10-20', compatibilityFlags: ['nodejs_compat'] } };`);
   const make = (includeBanned = false) => config(root, [
     ...(cf ? kind === 'beta' ? [beta({ persistState: false, inspectorPort: false, types: { generate: false } })] : [cloudflare({ configPath: join(root, 'wrangler.json'), persistState: false, inspectorPort: false })] : []),
     graphPlugin({ root, routes, stats }), mapsPlugin(), clientPlugin({ root, stats, includeBanned })
@@ -114,9 +124,10 @@ for (const kind of (selected ? [selected] : ['plain', 'stable-als', 'stable-comp
   await builder.buildApp();
   const serverName = selectServer(builder.environments).name;
   const chunks = assertChunks(stats);
-  const maps = await inspectMaps(root, stats, serverName);
-  assert(existsSync(join(root, 'dist/client/.vite/manifest.json')));
-  const clientManifest = JSON.parse(readFileSync(join(root, 'dist/client/.vite/manifest.json'), 'utf8'));
+  const outDirs = { server: resolve(root, selectServer(builder.environments).config.build.outDir), client: resolve(root,builder.environments.client.config.build.outDir) };
+  const maps = await inspectMaps(root, stats, outDirs);
+  assert(existsSync(join(outDirs.client, '.vite/manifest.json')));
+  const clientManifest = JSON.parse(readFileSync(join(outDirs.client, '.vite/manifest.json'), 'utf8'));
   assert(Object.values(clientManifest).some(e => '/' + e.file === stats.manifest.entry && e.isEntry));
   // Test the path-level ban in a real failed client bundle.
   let banned = false;
@@ -125,6 +136,18 @@ for (const kind of (selected ? [selected] : ['plain', 'stable-als', 'stable-comp
   assert(banned);
   // Restore valid dist for native map/manifest inspection.
   const restored = await createBuilder(make()); await restored.buildApp();
+  // Exercise the actual CLI as well as createBuilder, with the identical config.
+  write(root, 'vite.config.mjs', `
+import { join, resolve } from 'node:path';
+import { cloudflare } from '@cloudflare/vite-plugin';
+import { cloudflare as beta } from 'cloudflare-vite-beta';
+import { config } from ${JSON.stringify(join(base,'fixture.mjs'))};
+import { graphPlugin } from ${JSON.stringify(join(base,'graph-plugin.mjs'))};
+import { mapsPlugin } from ${JSON.stringify(join(base,'maps-plugin.mjs'))};
+import { clientPlugin } from ${JSON.stringify(join(base,'client-plugin.mjs'))};
+const root = ${JSON.stringify(root)}, routes = ${JSON.stringify(routes)}, kind = ${JSON.stringify(kind)}, cf = ${cf}, stats = {};
+export default (${make.toString()})();`);
+  const cliOutput = execFileSync(join(base,'node_modules/.bin/vite'), ['build', root, '--config', join(root,'vite.config.mjs')], { encoding:'utf8', timeout: 60000, stdio: ['ignore','pipe','pipe'], env: { ...process.env, WRANGLER_SEND_METRICS: 'false' } });
   const buildOrder = [...stats.buildOrder];
   const builtChecks = {};
   let builtPreview;
@@ -145,15 +168,16 @@ for (const kind of (selected ? [selected] : ['plain', 'stable-als', 'stable-comp
     const bundleFile = join(root, maps.server[0].file);
     const map = JSON.parse(readFileSync(bundleFile + '.map','utf8'));
     builtChecks.frame = traceFrame(builtChecks.crash.stack, map, bundleFile);
+    if (benchCount) { const html = await (await builtRequest('/p0')).text(); assert(html.includes('<h2>page 0</h2>') && html.includes('item 19')); builtChecks.benchPageRendered = true; }
     builtChecks.context = {};
     for (const version of ['hono', 'hono5']) builtChecks.context[version] = await checkContext(p => builtRequest('/' + version + p));
   } finally { await builtPreview?.close(); }
   // Observe actual lazy module evaluation without a DOM: import each emitted slice.
   delete globalThis.__adminEvaluated; delete globalThis.__shared;
-  await import(pathToFileURL(join(root,'dist/client',chunks.publicChunk)));
+  await import(pathToFileURL(join(outDirs.client,chunks.publicChunk)));
   assert.equal(globalThis.__adminEvaluated, undefined);
   assert.equal(globalThis.__shared, 1);
-  await import(pathToFileURL(join(root,'dist/client',chunks.adminChunk)));
+  await import(pathToFileURL(join(outDirs.client,chunks.adminChunk)));
   assert.equal(globalThis.__adminEvaluated, true);
   assert.equal(globalThis.__shared, 1);
   chunks.runtimeEvaluation = { publicDidNotEvaluateAdmin: true, sharedEvaluations: 1 };
@@ -174,6 +198,7 @@ for (const kind of (selected ? [selected] : ['plain', 'stable-als', 'stable-comp
     await cold.json();
     const first = await (await request('/')).json();
     assertGraph(first, true);
+    if (benchCount) { const html = await (await request('/p0')).text(); assert(html.includes('<h2>page 0</h2>') && html.includes('item 19')); }
     const context = {};
     for (const version of ['hono', 'hono5']) context[version] = await checkContext(p => request('/' + version + p));
     const crash = await (await request('/crash')).json();
@@ -209,7 +234,7 @@ for (const kind of (selected ? [selected] : ['plain', 'stable-als', 'stable-comp
     await waitFor(() => stats.clientReloads > 0 && wsEvents.some(e => e.type === 'full-reload'));
     observed = { first, changed, context, crash, devMap, devClientMap, wsEvents, clientReloads: stats.clientReloads, devComputations: stats.devComputations };
   } finally { socket?.close(); await server.close(); }
-  results.push({ kind, benchCount, flag, serverName, buildOrder, builtChecks, chunks, maps, clientManifest, banned, stats, observed });
+  results.push({ kind, benchCount, flag, serverName, outDirs, buildOrder, cliOutput, builtChecks, chunks, maps, clientManifest, banned, stats, observed });
   writeFileSync(new URL(`results/integration-${label}.json`, import.meta.url), JSON.stringify(results.at(-1), null, 2) + '\n');
   console.log('PASS', kind);
 }

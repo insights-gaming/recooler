@@ -12,6 +12,8 @@ export function fixture(name, verbatim = true) {
     'node_modules/spike-actions/index.js': '/* @action */ export const dep = 42;',
     'outside/component.ts': '/* @action */ export const outside = 3;',
     'src/types.ts': '/* @action */ export interface TypeOnly { a: string };',
+    'src/type-named.ts': '/* @action */ export interface Named { b: number };',
+    'src/mixed.ts': '/* @action */ export interface Mixed { c: number }; export const mixed = 7;',
     'src/unused.ts': '/* @action */ export const unused = 12;',
     'src/side.ts': '/* @action */ globalThis.__spikeSide = true;',
     'src/cycle-a.ts': "/* @action */ import './cycle-b'; export const a = 1;",
@@ -24,16 +26,18 @@ export function fixture(name, verbatim = true) {
     'src/layout.ts': '/* @action */ export const layout = true;',
     'src/route.ts': `/* @action */
 import type { TypeOnly } from './types';
+import { type Named } from './type-named';
+import { type Mixed, mixed } from './mixed';
 import { unused } from './unused';
 import './side';
 import { component } from './barrel';
 import { outside } from '../outside/component';
 import { dep } from 'spike-actions';
-export const answer = component + outside + dep;
+export const answer = component + outside + dep + mixed;
 export const later = () => import('./dynamic');`,
     'src/entry.ts': `import { getTable, getActions } from 'virtual:spike-runtime';
-import { answer } from './route'; import './root'; import './layout';
-export default { async fetch(request) { return Response.json({ answer, table: await getTable(), actions: await getActions('/public') }); } };`,
+import { answer, later } from './route'; import './root'; import './layout';
+export default { async fetch(request) { if (new URL(request.url).pathname === '/load-dynamic') await later(); return Response.json({ answer, table: await getTable(), actions: await getActions('/public') }); } };`,
   };
   for (const [path, code] of Object.entries(files)) write(root, path, code);
   const routes = { '/public': ['src/route.ts', 'src/root.ts', 'src/layout.ts'].map(p => join(root, p)) };

@@ -8,7 +8,6 @@ const TABLE = '\0virtual:spike-table';
 const TOKEN = '__SPIKE_ROUTE_TABLE_18a5__';
 export function graphPlugin({ root, routes, mode = 'graph', stats = {}, banned = /\/server-only\./ }) {
   let serving = false;
-  let devOrigin;
   let devServer;
   let cached;
   let epoch = 0;
@@ -16,13 +15,14 @@ export function graphPlugin({ root, routes, mode = 'graph', stats = {}, banned =
   const canonical = id => relative(root, id.replace(/[?&](?:v|t)=[^&]*/g, '')).replaceAll('\\', '/');
   stats.resolveCalls = 0;
   stats.graphMs = 0;
+  stats.moduleInfoCalls = 0;
   stats.chunks = {};
-  const walkBuild = (ctx, seeds) => {
+  const walkBuild = (getInfo, seeds) => {
     const seen = new Set();
     const visit = id => {
-      if (seen.has(id) || id === INTERNAL || ctx.getModuleInfo(id)?.isExternal) return;
+      if (seen.has(id) || id === INTERNAL || getInfo(id)?.isExternal) return;
       seen.add(id);
-      for (const dep of ctx.getModuleInfo(id)?.importedIds ?? []) visit(dep);
+      for (const dep of getInfo(id)?.importedIds ?? []) visit(dep);
     };
     seeds.forEach(visit);
     return [...seen].map(canonical).sort();
@@ -57,9 +57,6 @@ export function graphPlugin({ root, routes, mode = 'graph', stats = {}, banned =
     configResolved(config) { serving = config.command === 'serve'; },
     configureServer(server) {
       devServer = server;
-      server.httpServer.once('listening', () => {
-        devOrigin = `http://127.0.0.1:${server.httpServer.address().port}`;
-      });
       server.middlewares.use('/__spike_graph', async (_req, res, next) => {
         try {
           const env = selectServer(server.environments);
@@ -69,12 +66,13 @@ export function graphPlugin({ root, routes, mode = 'graph', stats = {}, banned =
       });
     },
     hotUpdate(ctx) {
+      if (this.environment.config.consumer !== 'server') return;
       epoch++; cached = undefined;
-      const table = this.environment.moduleGraph.getModuleById(TABLE);
-      if (table) {
-        this.environment.moduleGraph.invalidateModule(table);
-        return [...ctx.modules, table];
-      }
+      // v1 deliberately uses an SSR full reload: partial reloads can retain an
+      // old route module while the lazy graph table has already changed.
+      this.environment.moduleGraph.invalidateAll();
+      this.environment.hot.send({ type: 'full-reload', path: '*' });
+      return [];
     },
     resolveId(id) { if (id === RUNTIME) return INTERNAL; if (id === 'virtual:spike-table') return TABLE; },
     async load(id) {
@@ -82,7 +80,6 @@ export function graphPlugin({ root, routes, mode = 'graph', stats = {}, banned =
       if (id !== INTERNAL) return;
       return { code: `const registry = ${serving ? `globalThis[Symbol.for(${JSON.stringify('spike.registry:' + root)})] ??= new Map()` : 'new Map()'};
 export function registerActions(id, actions) { registry.set(id, actions); }
-export function unregisterActions(id) { registry.delete(id); }
 const table = JSON.parse(${JSON.stringify(serving ? '{}' : TOKEN)});
 export async function getTable() { return ${serving ? `import('virtual:spike-table').then(m => m.default)` : 'table'}; }
 export async function getActions(route) { const t = await getTable(); return (t[route] ?? []).flatMap(id => Object.keys(registry.get(id) ?? {})).sort(); }
@@ -93,13 +90,13 @@ export async function getActions(route) { const t = await getTable(); return (t[
       async handler(code, id) {
         if (!id.startsWith(root) || id.includes('/dist/') || id === INTERNAL) return;
         if (this.environment.config.consumer !== 'server' || mode === 'none') return;
-        if (mode === 'graph') {
+        if (mode === 'graph' || mode === 'graph-uncached') {
           const hasActions = /@action|hx-(?:post|get|on)/.test(code);
           const key = canonical(id);
           if (!hasActions && !everActions.has(key)) return;
           everActions.add(key);
           const s = new MagicString(code);
-          s.append(`\nimport { registerActions, unregisterActions } from '${RUNTIME}';\nregisterActions(${JSON.stringify(canonical(id))}, ${hasActions ? `{ ${JSON.stringify(canonical(id) + '@0')}: () => 'fake' }` : '{}'});\n${serving ? `if (import.meta.hot) import.meta.hot.dispose(() => unregisterActions(${JSON.stringify(canonical(id))}));` : ''}\n`);
+          s.append(`\nimport { registerActions } from '${RUNTIME}';\nregisterActions(${JSON.stringify(canonical(id))}, ${hasActions ? `{ ${JSON.stringify(canonical(id) + '@0')}: () => 'fake' }` : '{}'});\n\n`);
           return { code: s.toString(), map: s.generateMap({ hires: true, source: id, includeContent: true }) };
         }
         if (id.endsWith('/src/entry.ts')) return;
@@ -123,7 +120,15 @@ export async function getActions(route) { const t = await getTable(); return (t[
     renderChunk(code) {
       if (!code.includes(TOKEN) || this.environment.config.consumer !== 'server') return;
       const start = performance.now();
-      stats.table = mode === 'none' ? {} : Object.fromEntries(Object.entries(routes).map(([route, seeds]) => [route, walkBuild(this, seeds)]));
+      const info = new Map();
+      const getInfo = id => {
+        if (mode !== 'graph-uncached' && info.has(id)) return info.get(id);
+        stats.moduleInfoCalls++;
+        const value = this.getModuleInfo(id);
+        info.set(id, value);
+        return value;
+      };
+      stats.table = mode === 'none' ? {} : Object.fromEntries(Object.entries(routes).map(([route, seeds]) => [route, walkBuild(getInfo, seeds)]));
       stats.graphMs += performance.now() - start;
       const s = new MagicString(code);
       const at = code.indexOf(JSON.stringify(TOKEN));

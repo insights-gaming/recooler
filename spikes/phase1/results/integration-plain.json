@@ -1,16 +1,419 @@
 {
   "kind": "plain",
+  "benchCount": 0,
   "flag": "nodejs_compat",
   "serverName": "ssr",
+  "outDirs": {
+    "server": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/dist/ssr",
+    "client": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/dist/client"
+  },
+  "buildOrder": [
+    "ssr",
+    "client",
+    "ssr:manifest",
+    "ssr"
+  ],
+  "cliOutput": "",
+  "builtChecks": {
+    "value": {
+      "answer": 53,
+      "table": {
+        "/public": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/type-named.ts",
+          "src/unused.ts"
+        ],
+        "/admin": [
+          "node_modules/spike-actions/index.js",
+          "outside/component.ts",
+          "src/admin.ts",
+          "src/barrel.ts",
+          "src/component.ts",
+          "src/cycle-a.ts",
+          "src/cycle-b.ts",
+          "src/layout.ts",
+          "src/mixed.ts",
+          "src/root.ts",
+          "src/route.ts",
+          "src/side.ts",
+          "src/type-named.ts",
+          "src/unused.ts"
+        ]
+      },
+      "actions": [
+        "node_modules/spike-actions/index.js@0",
+        "outside/component.ts@0",
+        "src/admin.ts@0",
+        "src/component.ts@0",
+        "src/cycle-a.ts@0",
+        "src/cycle-b.ts@0",
+        "src/layout.ts@0",
+        "src/mixed.ts@0",
+        "src/root.ts@0",
+        "src/route.ts@0",
+        "src/side.ts@0",
+        "src/type-named.ts@0",
+        "src/unused.ts@0"
+      ],
+      "manifest": {
+        "entry": "/assets/entry-CXbspv_M.mjs"
+      }
+    },
+    "crash": {
+      "stack": "Error: MOVED_FRAME\n    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/dist/ssr/entry.mjs:50:8)\n    at moved (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/dist/ssr/entry.mjs:44:9)\n    at Object.fetch (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/dist/ssr/entry.mjs:3611:3)\n    at builtRequest (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/integration.mjs:162:37)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/integration.mjs:167:38"
+    },
+    "frame": {
+      "frame": "    at hoisted (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/dist/ssr/entry.mjs:50:8)",
+      "generated": {
+        "line": 50,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/src/map-source.ts",
+        "line": 3,
+        "column": 10,
+        "name": null
+      }
+    },
+    "context": {
+      "hono": [
+        {
+          "path": "/mount/item/00-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "00-a b",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "00-a b",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+        },
+        {
+          "path": "/mount/item/01-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "01-c/d",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "01-c/d",
+            "propertyRoutePath": "/mount/item/:id/:rest{.+}",
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/10-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "10-a b",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "10-a b",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "11-c/d",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "11-c/d",
+            "propertyRoutePath": "/base/nested/item/:id/:rest{.+}",
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+        }
+      ],
+      "hono5": [
+        {
+          "path": "/mount/item/00-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "00-a b",
+            "propertyRoutePath": null,
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "00-a b"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "00-a b",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "00-a b"
+              }
+            },
+            "url": "/mount/item/00-a%20b/one/two%20three"
+          },
+          "reconstructed": "/mount/item/00-a%20b/one/two%20three"
+        },
+        {
+          "path": "/mount/item/01-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "01-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/mount/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "01-c/d"
+            },
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "01-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/mount/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "01-c/d"
+              }
+            },
+            "url": "/mount/item/01-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/mount/item/01-c%2Fd/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/10-a%20b/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "10-a b",
+            "propertyRoutePath": null,
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "10-a b"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "10-a b",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "10-a b"
+              }
+            },
+            "url": "/base/nested/item/10-a%20b/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/10-a%20b/one/two%20three"
+        },
+        {
+          "path": "/base/nested/item/11-c%2Fd/one/two%20three",
+          "initial": {
+            "where": "initial",
+            "id": "11-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/base/nested/item/:id/:rest{.+}",
+            "params": {
+              "rest": "one/two three",
+              "id": "11-c/d"
+            },
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "late": {
+            "where": "after-response",
+            "id": "11-c/d",
+            "propertyRoutePath": null,
+            "routePath": "/*",
+            "params": {},
+            "matched": {
+              "routePath": "/base/nested/item/:id/:rest{.+}",
+              "params": {
+                "rest": "one/two three",
+                "id": "11-c/d"
+              }
+            },
+            "url": "/base/nested/item/11-c%2Fd/one/two%20three"
+          },
+          "reconstructed": "/base/nested/item/11-c%2Fd/one/two%20three"
+        }
+      ]
+    }
+  },
   "chunks": {
-    "sharedChunk": "assets/shared-B9oSmJM6.mjs",
-    "publicChunk": "assets/public-6X8RrYsQ.mjs",
-    "adminChunk": "assets/admin-BicGWPYo.mjs",
+    "sharedChunk": "assets/shared-DWTDQ0eg.mjs",
+    "publicChunk": "assets/public-CVXHKumo.mjs",
+    "adminChunk": "assets/admin-Ao2rkXar.mjs",
     "publicStaticClosure": [
-      "assets/public-6X8RrYsQ.mjs",
-      "assets/shared-B9oSmJM6.mjs",
-      "assets/entry-b5ohOaAh.mjs"
-    ]
+      "assets/public-CVXHKumo.mjs",
+      "assets/shared-DWTDQ0eg.mjs",
+      "assets/entry-CXbspv_M.mjs"
+    ],
+    "runtimeEvaluation": {
+      "publicDidNotEvaluateAdmin": true,
+      "sharedEvaluations": 1
+    }
   },
   "maps": {
     "server": [
@@ -20,7 +423,7 @@
           {
             "marker": "MOVED_FRAME",
             "generated": {
-              "line": 46,
+              "line": 50,
               "column": 18
             },
             "original": {
@@ -38,7 +441,7 @@
           {
             "marker": "MOVED_FRAME",
             "generated": {
-              "line": 46,
+              "line": 50,
               "column": 21
             },
             "original": {
@@ -56,7 +459,7 @@
           {
             "marker": "MOVED_FRAME",
             "generated": {
-              "line": 46,
+              "line": 50,
               "column": 28
             },
             "original": {
@@ -74,7 +477,7 @@
           {
             "marker": "UNTOUCHED_FRAME",
             "generated": {
-              "line": 43,
+              "line": 47,
               "column": 18
             },
             "original": {
@@ -92,7 +495,7 @@
           {
             "marker": "UNTOUCHED_FRAME",
             "generated": {
-              "line": 43,
+              "line": 47,
               "column": 21
             },
             "original": {
@@ -110,7 +513,7 @@
           {
             "marker": "UNTOUCHED_FRAME",
             "generated": {
-              "line": 43,
+              "line": 47,
               "column": 32
             },
             "original": {
@@ -128,6 +531,8 @@
         ],
         "hasSourcesContent": true,
         "sources": [
+          "../../src/type-named.ts",
+          "../../src/mixed.ts",
           "../../src/unused.ts",
           "../../src/side.ts",
           "../../src/component.ts",
@@ -199,7 +604,7 @@
     ],
     "client": [
       {
-        "file": "dist/client/assets/entry-b5ohOaAh.mjs",
+        "file": "dist/client/assets/entry-CXbspv_M.mjs",
         "positions": [
           {
             "marker": "MOVED_FRAME",
@@ -318,36 +723,36 @@
     ]
   },
   "clientManifest": {
-    "../../../../virtual:client-entry": {
-      "file": "assets/entry-b5ohOaAh.mjs",
+    "../../virtual:client-entry": {
+      "file": "assets/entry-CXbspv_M.mjs",
       "name": "_virtual_client-entry",
-      "src": "../../../../virtual:client-entry",
+      "src": "../../virtual:client-entry",
       "isEntry": true,
       "dynamicImports": [
         "src/client/public.ts",
         "src/client/admin.ts"
       ]
     },
-    "_shared-B9oSmJM6.mjs": {
-      "file": "assets/shared-B9oSmJM6.mjs",
+    "_shared-DWTDQ0eg.mjs": {
+      "file": "assets/shared-DWTDQ0eg.mjs",
       "name": "shared"
     },
     "src/client/admin.ts": {
-      "file": "assets/admin-BicGWPYo.mjs",
+      "file": "assets/admin-Ao2rkXar.mjs",
       "name": "admin",
       "src": "src/client/admin.ts",
       "isDynamicEntry": true,
       "imports": [
-        "_shared-B9oSmJM6.mjs"
+        "_shared-DWTDQ0eg.mjs"
       ]
     },
     "src/client/public.ts": {
-      "file": "assets/public-6X8RrYsQ.mjs",
+      "file": "assets/public-CVXHKumo.mjs",
       "name": "public",
       "src": "src/client/public.ts",
       "isDynamicEntry": true,
       "imports": [
-        "_shared-B9oSmJM6.mjs"
+        "_shared-DWTDQ0eg.mjs"
       ]
     }
   },
@@ -355,6 +760,7 @@
   "stats": {
     "resolveCalls": 0,
     "graphMs": 0,
+    "moduleInfoCalls": 0,
     "chunks": {},
     "buildOrder": [
       "client"
@@ -369,9 +775,11 @@
         "src/cycle-a.ts",
         "src/cycle-b.ts",
         "src/layout.ts",
+        "src/mixed.ts",
         "src/root.ts",
         "src/route.ts",
         "src/side.ts",
+        "src/type-named.ts",
         "src/unused.ts"
       ],
       "/admin": [
@@ -383,21 +791,23 @@
         "src/cycle-a.ts",
         "src/cycle-b.ts",
         "src/layout.ts",
+        "src/mixed.ts",
         "src/root.ts",
         "src/route.ts",
         "src/side.ts",
+        "src/type-named.ts",
         "src/unused.ts"
       ]
     },
     "manifest": {
-      "entry": "/assets/entry-b5ohOaAh.mjs"
+      "entry": "/assets/entry-CXbspv_M.mjs"
     },
-    "devComputations": 2,
+    "devComputations": 3,
     "clientReloads": 1
   },
   "observed": {
     "first": {
-      "answer": 46,
+      "answer": 53,
       "table": {
         "/public": [
           "node_modules/spike-actions/index.js",
@@ -408,9 +818,11 @@
           "src/cycle-a.ts",
           "src/cycle-b.ts",
           "src/layout.ts",
+          "src/mixed.ts",
           "src/root.ts",
           "src/route.ts",
           "src/side.ts",
+          "src/type-named.ts",
           "src/unused.ts"
         ],
         "/admin": [
@@ -422,9 +834,11 @@
           "src/cycle-a.ts",
           "src/cycle-b.ts",
           "src/layout.ts",
+          "src/mixed.ts",
           "src/root.ts",
           "src/route.ts",
           "src/side.ts",
+          "src/type-named.ts",
           "src/unused.ts"
         ]
       },
@@ -436,15 +850,17 @@
         "src/cycle-a.ts@0",
         "src/cycle-b.ts@0",
         "src/layout.ts@0",
+        "src/mixed.ts@0",
         "src/root.ts@0",
         "src/route.ts@0",
         "src/side.ts@0",
+        "src/type-named.ts@0",
         "src/unused.ts@0"
       ],
       "manifest": {}
     },
     "changed": {
-      "answer": 46,
+      "answer": 53,
       "table": {
         "/public": [
           "node_modules/spike-actions/index.js",
@@ -456,9 +872,11 @@
           "src/cycle-a.ts",
           "src/cycle-b.ts",
           "src/layout.ts",
+          "src/mixed.ts",
           "src/root.ts",
           "src/route.ts",
           "src/side.ts",
+          "src/type-named.ts",
           "src/unused.ts"
         ],
         "/admin": [
@@ -471,9 +889,11 @@
           "src/cycle-a.ts",
           "src/cycle-b.ts",
           "src/layout.ts",
+          "src/mixed.ts",
           "src/root.ts",
           "src/route.ts",
           "src/side.ts",
+          "src/type-named.ts",
           "src/unused.ts"
         ]
       },
@@ -486,9 +906,11 @@
         "src/cycle-a.ts@0",
         "src/cycle-b.ts@0",
         "src/layout.ts@0",
+        "src/mixed.ts@0",
         "src/root.ts@0",
         "src/route.ts@0",
         "src/side.ts@0",
+        "src/type-named.ts@0",
         "src/unused.ts@0"
       ],
       "manifest": {}
@@ -808,7 +1230,7 @@
       ]
     },
     "crash": {
-      "stack": "Error: MOVED_FRAME\n    at hoisted (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/src/map-source.ts:3:11)\n    at moved (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/src/map-source.ts:5:10)\n    at Object.fetch (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/src/entry.ts:14:42)\n    at request (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/integration.mjs:120:134)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/integration.mjs:127:32\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)"
+      "stack": "Error: MOVED_FRAME\n    at hoisted (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/src/map-source.ts:3:11)\n    at moved (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/src/map-source.ts:5:10)\n    at Object.fetch (/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/integration-plain/src/entry.ts:14:42)\n    at request (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/integration.mjs:194:134)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/integration.mjs:204:32"
     },
     "devMap": {
       "positions": [
@@ -1055,7 +1477,7 @@
         "updates": [
           {
             "type": "js-update",
-            "timestamp": 1793154952829,
+            "timestamp": 1793156453360,
             "path": "\u0000virtual:client-entry",
             "acceptedPath": "\u0000virtual:client-entry",
             "explicitImportRequired": false,
@@ -1065,6 +1487,6 @@
       }
     ],
     "clientReloads": 1,
-    "devComputations": 2
+    "devComputations": 3
   }
 }

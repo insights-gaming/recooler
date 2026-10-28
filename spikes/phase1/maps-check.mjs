@@ -5,14 +5,14 @@ import { pathToFileURL } from 'node:url';
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
 import { fixture, config, write } from './fixture.mjs';
 import { mapsPlugin, mapSource, verifyMap, position } from './maps-plugin.mjs';
-export function traceFrame(stack, map, mapUrl) {
+export function traceFrame(stack, map, mapUrl, expectedLine = 3) {
   const frame = stack.split('\n')[1];
   const match = frame.match(/:(\d+):(\d+)\)?$/);
   assert(match, frame);
   const generated = { line: +match[1], column: +match[2] - 1 };
   const original = originalPositionFor(new TraceMap(map, mapUrl), generated);
   assert(original.source?.endsWith('/src/map-source.ts'), JSON.stringify(original));
-  assert.equal(original.line, 3);
+  assert.equal(original.line, expectedLine);
   return { frame, generated, original };
 }
 if (process.argv[1]?.endsWith('/maps-check.mjs')) {
@@ -43,12 +43,15 @@ if (process.argv[1]?.endsWith('/maps-check.mjs')) {
       let stack;
       try { globalThis.__maps.moved(); } catch (e) { stack = e.stack; }
       const frame = traceFrame(stack, map, root + '/dist/' + consumer + '/entry.mjs');
+      let untouchedStack;
+      try { globalThis.__maps.untouched(); } catch (e) { untouchedStack = e.stack; }
+      const untouchedFrame = traceFrame(untouchedStack, map, root + '/dist/' + consumer + '/entry.mjs', 8);
       let virtualStack;
       try { globalThis.__maps.virtualCrash(); } catch (e) { virtualStack = e.stack; }
       const vm = virtualStack.split('\n')[1].match(/:(\d+):(\d+)\)?$/);
       const virtualPosition = originalPositionFor(new TraceMap(map), { line: +vm[1], column: +vm[2]-1 });
       assert(!virtualPosition.source?.endsWith('map-source.ts'));
-      results.push({ includeContent, consumer, directHiresPositions: 26, mapping, stack, frame, virtualStack, virtualPosition });
+      results.push({ includeContent, consumer, directHiresPositions: 26, mapping, stack, frame, untouchedStack, untouchedFrame, virtualStack, virtualPosition });
     }
   }
   writeFileSync(new URL('results/maps.json', import.meta.url), JSON.stringify(results, null, 2)+'\n');

@@ -4,9 +4,14 @@
   "type": "module",
   "scripts": {
     "graph": "node graph-check.mjs",
-    "context": "node context-check.mjs",
+    "context": "node context-build.mjs && node .generated/context/context-native.mjs && bun .generated/context/context-native.mjs && deno run --allow-read --allow-write .generated/context/context-native.mjs",
     "bench": "node bench.mjs",
-    "integration": "node integration.mjs"
+    "integration": "node integration.mjs",
+    "maps": "node maps-check.mjs",
+    "aggregator": "node aggregator-check.mjs",
+    "check": "pnpm graph && pnpm maps && pnpm aggregator && pnpm urls && pnpm context && pnpm integration",
+    "integration:bench": "node integration.mjs stable-compat 400",
+    "urls": "node url-check.mjs"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.65.0",

@@ -1,0 +1,46 @@
+[
+  {
+    "version": "4",
+    "pattern": "/mount/nested/item/:id/:rest{.+}",
+    "params": {
+      "rest": "one/two three",
+      "id": "a/b"
+    },
+    "rebuilt": "/mount/nested/item/a%2Fb/one/two%20three",
+    "original": "/mount/nested/item/a%2Fb/one/two%20three",
+    "exact": true
+  },
+  {
+    "version": "4",
+    "pattern": "/mount/nested/item/:id/:rest{.+}",
+    "params": {
+      "rest": "one/two/three",
+      "id": "a/b"
+    },
+    "rebuilt": "/mount/nested/item/a%2Fb/one/two/three",
+    "original": "/mount/nested/item/a%2Fb/one%2Ftwo/three",
+    "exact": false
+  },
+  {
+    "version": "5rc",
+    "pattern": "/mount/nested/item/:id/:rest{.+}",
+    "params": {
+      "rest": "one/two three",
+      "id": "a/b"
+    },
+    "rebuilt": "/mount/nested/item/a%2Fb/one/two%20three",
+    "original": "/mount/nested/item/a%2Fb/one/two%20three",
+    "exact": true
+  },
+  {
+    "version": "5rc",
+    "pattern": "/mount/nested/item/:id/:rest{.+}",
+    "params": {
+      "rest": "one/two/three",
+      "id": "a/b"
+    },
+    "rebuilt": "/mount/nested/item/a%2Fb/one/two/three",
+    "original": "/mount/nested/item/a%2Fb/one%2Ftwo/three",
+    "exact": false
+  }
+]

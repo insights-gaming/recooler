@@ -134,7 +134,21 @@
         "name": null
       }
     },
-    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/server/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
     "virtualPosition": {
       "source": null,
       "line": null,
@@ -277,7 +291,21 @@
         "name": null
       }
     },
-    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-true/dist/client/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
     "virtualPosition": {
       "source": null,
       "line": null,
@@ -420,7 +448,21 @@
         "name": null
       }
     },
-    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/server/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
     "virtualPosition": {
       "source": null,
       "line": null,
@@ -563,7 +605,21 @@
         "name": null
       }
     },
-    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedStack": "Error: UNTOUCHED_FRAME\n    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:6:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:47:31",
+    "untouchedFrame": {
+      "frame": "    at Object.untouched (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:6:8)",
+      "generated": {
+        "line": 6,
+        "column": 7
+      },
+      "original": {
+        "source": "/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/src/map-source.ts",
+        "line": 8,
+        "column": 8,
+        "name": null
+      }
+    },
+    "virtualStack": "Error: VIRTUAL_FRAME\n    at Object.virtualCrash (file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/.generated/maps-false/dist/client/entry.mjs:13:8)\n    at file:///Users/steve/.t3/worktrees/farm-plugin-recooler/t3-9fd6447d/spikes/phase1/maps-check.mjs:50:31",
     "virtualPosition": {
       "source": null,
       "line": null,
