@@ -147,3 +147,20 @@ it('leaves missing source ids undefined instead of inventing module ids', () => 
   expect(route.middlewareFiles).toEqual([undefined]);
   expect(route.rootFile).toBeUndefined();
 });
+
+
+it.each(['[id{[0-9+}]', '[a{}]', '[[r{x}]]', '[a{[}]', '[a{(}]'])('rejects invalid parameter patterns in %s before constructing an app', segment => {
+  const file = `${segment}/index.ts`;
+  const input = manifest({ [file]: { onGet: handler }, 'index.ts': { onGet: handler } });
+  const errors = resolveRoutes(input).errors;
+  expect(errors).toHaveLength(1);
+  expect(errors[0]).toContain(`routes/${file}`);
+  expect(() => createApp(input)).toThrow(errors[0]);
+});
+
+it.each([undefined, null, 'page', 42, {}])('rejects an own non-function page default (%j) without a spurious conflict', value => {
+  const input = manifest({ '(a)/x/index.ts': { default: value, onPost: handler }, '(b)/x/index.ts': { onGet: handler } });
+  expect(resolveRoutes(input).errors).toEqual(['page default export in routes/(a)/x/index.ts is not a function']);
+  expect(() => createApp(input)).toThrow('page default export in routes/(a)/x/index.ts is not a function');
+  expect(() => createApp(manifest({ 'x/index.ts': { default: value } }))).toThrow('page default export in routes/x/index.ts is not a function');
+});

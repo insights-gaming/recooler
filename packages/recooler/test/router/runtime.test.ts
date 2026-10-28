@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { mount as mount5 } from 'hono-5/mount';
 import type { Context, Handler, MiddlewareHandler } from 'hono';
-import { createApp, mergePageExtras } from '../../src/router/index.js';
+import { createApp, mergePageExtras, RouteValidationError } from '../../src/router/index.js';
 import type { PageAdapter, RouterExtension } from '../../src/router/index.js';
 import { manifest } from './helpers.js';
 const text = (body: string): Handler => c => c.text(body);
@@ -284,7 +284,10 @@ it('provides frozen copies to hooks and named page contributions additively', as
   const app = createApp(manifest({ '(g)/middleware.ts': { default: (c: Context) => c.text('blocked', 401) }, '(g)/index.tsx': page }), {
     extensions: [{ name: 'first', route: route => {
       expect(Object.isFrozen(route)).toBe(true);
-      expect(() => route.middleware.pop()).toThrow();
+      expect(() => {
+        // @ts-expect-error Hooks receive readonly containers, also frozen at runtime.
+        route.middleware.pop();
+      }).toThrow();
       return { page: { title: 'first' } };
     } }, { name: 'last', route: () => ({ page: { title: 'last' } }) }],
     pages: { handler: (_route, extras, named) => { expect(extras).toEqual([{ title: 'first' }, { title: 'last' }]); contributions = named; return text('page'); } },
@@ -303,4 +306,39 @@ it('puts custom regex params before plain params regardless of their names', asy
   const app = createApp(manifest({ '[n{[0-9]+}]/index.ts': { onGet: text('numeric') }, '[id]/index.ts': { onGet: text('plain') } }));
   expect(await (await app.request('/42')).text()).toBe('numeric');
   expect(await (await app.request('/abc')).text()).toBe('plain');
+});
+
+
+it.each([undefined, []])('rejects extension array handlers without declared methods (%j)', methods => {
+  const input = manifest({ 'x/index.ts': { onGet: text('get') } });
+  const create = () => createApp(input, { extensions: [{ name: 'csrf-guard', route: () => ({ methods, handlers: [pass] }) }] });
+  expect(create).toThrow(RouteValidationError);
+  expect(create).toThrow('extension csrf-guard for routes/x/index.ts returns array handlers without methods');
+});
+
+it.each(['array', 'map'] as const)('dispatches a HEAD-only extension %s through GET registration', async kind => {
+  const seen: string[] = [];
+  const head: Handler = c => { seen.push(c.req.method); return c.body(null, 204); };
+  const app = createApp(manifest({ 'x/index.ts': {} }), {
+    extensions: [{ name: 'head', route: () => kind === 'array'
+      ? { methods: ['head'], handlers: [head] } : { handlers: { head: [head] } } }],
+  });
+  expect((await app.request('/x', { method: 'HEAD' })).status).toBe(204);
+  expect((await app.request('/x')).status).toBe(404);
+  expect((await app.request('/x', { method: 'POST' })).status).toBe(404);
+  expect(seen).toEqual(['HEAD']);
+  expect(new Set(app.routes.map(route => route.method))).toEqual(new Set(['GET']));
+});
+
+it('runs GET and HEAD extension chains once each for HEAD and keeps native GET dispatch', async () => {
+  const seen: string[] = [];
+  const record = (name: string): Handler => async (_c, next) => { seen.push(name); await next(); };
+  const app = createApp(manifest({ 'index.ts': { onGet: text('get') } }), {
+    extensions: [{ name: 'both', route: () => ({ handlers: { GET: [record('get')], HEAD: [record('head')] } }) }],
+  });
+  expect((await app.request('/', { method: 'HEAD' })).status).toBe(200);
+  expect(seen).toEqual(['get', 'head']);
+  seen.length = 0;
+  expect(await (await app.request('/')).text()).toBe('get');
+  expect(seen).toEqual(['get']);
 });

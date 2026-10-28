@@ -58,6 +58,11 @@ export function createApp<E extends Env = Env>(manifest: Manifest, options: Crea
       const addition = extension.route?.(view);
       return addition ? [{ ...addition, extension: extension.name }] : [];
     });
+    for (const addition of additions) {
+      if (Array.isArray(addition.handlers) && !addition.methods?.length) {
+        throw new RouteValidationError([`extension ${addition.extension} for ${route.file} returns array handlers without methods; declare methods or use a handler map`]);
+      }
+    }
     const contributions = additions.flatMap(x => x.page ? [{ extension: x.extension, page: x.page }] : []);
     const page = Object.hasOwn(route.module, 'default')
       ? options.pages?.handler(view, contributions.map(x => x.page), contributions) : undefined;
@@ -96,7 +101,8 @@ export function createApp<E extends Env = Env>(manifest: Manifest, options: Crea
       }),
       ...(typeof route.module.onRequest === 'function' ? [route.module.onRequest as Handler] : []),
       methodDispatch];
-    app.on([...methods], route.path, handlers[0]!, ...handlers.slice(1));
+    // Hono dispatches HEAD through GET; the extension chains above retain the actual method.
+    app.on([...new Set([...methods].map(method => method === 'HEAD' ? 'GET' : method))], route.path, handlers[0]!, ...handlers.slice(1));
   }
   for (const mw of plan.lateMiddlewares) app.use(mw.path, once(mw.handler, mw.module));
   return app;

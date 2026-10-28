@@ -31,15 +31,15 @@ export interface ResolvedRoute {
   file: string;
   module: ModuleNs;
   /** Layouts in outermost-to-innermost order, including head-only layouts. */
-  layouts: ModuleNs[];
+  layouts: readonly ModuleNs[];
   /** Source ids parallel to layouts; absent for hand-written metadata-free manifests. */
-  layoutFiles: (string | undefined)[];
+  layoutFiles: readonly (string | undefined)[];
   root?: ModuleNs;
   rootFile?: string;
-  middleware: MiddlewareHandler[];
+  middleware: readonly MiddlewareHandler[];
   /** Parallel to middleware; identity is the namespace, never the default function. */
-  middlewareModules: ModuleNs[];
-  middlewareFiles: (string | undefined)[];
+  middlewareModules: readonly ModuleNs[];
+  middlewareFiles: readonly (string | undefined)[];
   directory: string;
 }
 export interface RoutePlan {
@@ -53,7 +53,8 @@ export interface RouterExtension {
   name: string;
   route?(route: ResolvedRoute): {
     methods?: string[];
-    /** Array handlers run only for methods; map keys also declare methods. */
+    /** Array handlers require methods; map keys also declare methods. GET includes HEAD.
+     * HEAD registers as GET for Hono routing, but its handlers run only for HEAD requests. */
     handlers?: Handler[] | Record<string, Handler[]>;
     page?: Record<string, unknown>;
   } | void;

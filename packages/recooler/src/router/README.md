@@ -19,7 +19,10 @@ app's `onError`/`notFound` using the API of your Hono version.
 `errors`, and `warnings` without constructing Hono. `createApp` rejects errors with
 `RouteValidationError` before registration and reports near-miss export warnings via
 `options.warn` (defaults to `console.warn`). Namespace exports are authoritative, including
-re-exports. Manifest version is 1; `layoutFile` and parallel `middlewareFiles` are optional
+re-exports. An own route `default` export must be a function, even without a page adapter.
+Custom parameter patterns must be nonempty and compile as regular expressions; `[[rest]]`
+names cannot contain `{`. These errors identify the source file before any requests run.
+Manifest version is 1; `layoutFile` and parallel `middlewareFiles` are optional
 source ids relative to srcDir in POSIX form; they never determine middleware identity or scope.
 `Manifest.rootFile` is optional. Resolved routes expose `layoutFiles` (parallel to layouts,
 undefined where metadata was omitted), `rootFile`, and scoped `middlewareFiles` (also
@@ -46,7 +49,9 @@ preserved. It can return additional `methods`, `handlers` and `page` extras. Met
 uppercased; array handlers run only for the declared methods. A handler map such as
 `handlers: { POST: [actionHandler] }` also declares its method keys. `ALL` covers every
 method, and GET includes HEAD. Handlers follow scoped middleware and precede onRequest
-and method dispatch. Extensions with array handlers must declare their methods.
+and method dispatch. Extensions with array handlers must declare a nonempty `methods` list, otherwise
+startup throws `RouteValidationError`. HEAD declarations register as GET for Hono routing;
+their handlers run only for HEAD requests, alongside any GET handlers.
 Whether selected handlers should precede scoped middleware remains an open question tied
 to htmx D5 (guard-rendered forms).
 Action handlers should return their response for a matching action and call `next()` when

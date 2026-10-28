@@ -59,9 +59,9 @@ export function routePathShape(path: string): string {
 const usePath = (path: string) => path === '/' ? '*' : path + '/*';
 const has = (ns: ModuleNs, key: string) => Object.hasOwn(ns, key);
 function terminalHandlers(ns: ModuleNs): [string, string][] {
-  if (has(ns, 'onRequest')) return [['every method', 'onRequest']];
-  const result: [string, string][] = has(ns, 'default') ? [['GET', 'the page']] : [];
-  for (const [name, method] of Object.entries(methodExports)) if (has(ns, name)) result.push([method, name]);
+  if (has(ns, 'onRequest') && typeof ns.onRequest === 'function') return [['every method', 'onRequest']];
+  const result: [string, string][] = has(ns, 'default') && typeof ns.default === 'function' ? [['GET', 'the page']] : [];
+  for (const [name, method] of Object.entries(methodExports)) if (has(ns, name) && typeof ns[name] === 'function') result.push([method, name]);
   return result.sort((a, b) => lexical(a.join(), b.join()));
 }
 
@@ -75,6 +75,11 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
   const allMiddleware: LocatedMiddleware[] = [];
   const routesByDir = new Map<string, string>();
   const layoutsByDir = new Map<string, string>();
+  function sourceFile(node: DirNode): string | undefined {
+    const file = node.route?.file ?? node.layoutFile ?? node.middlewareFiles?.[0];
+    if (file) return file;
+    for (const child of node.children) { const file = sourceFile(child); if (file) return file; }
+  }
   function walk(node: DirNode, segments: string[], inside: boolean) {
     const directory = '/' + segments.join('/');
     const canonical = '/' + segments.map(routeSegment).join('/');
@@ -82,6 +87,21 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
     inside ||= node.group;
     const dir = { node, directory, canonical, depth: segments.length, inside };
     dirs.push(dir);
+    const invalid = (reason: string) => plan.errors.push(`invalid route directory ${directory} (${sourceFile(node) ?? directory}): ${reason}`);
+    const segment = node.segment;
+    const converted = routeSegment(segment);
+    if (segment.startsWith('[[') && segment.endsWith(']]') && segment.slice(2, -2).includes('{')) {
+      invalid('catch-all parameter names cannot contain {; use [[rest]]');
+    } else if (segment.startsWith('[') && segment.endsWith(']') && converted === segment) {
+      invalid('could not convert bracket parameter; use a name and a balanced pattern, e.g. [n{[0-9]+}]');
+    } else if (converted.startsWith(':') && converted.includes('{')) {
+      const pattern = converted.slice(converted.indexOf('{') + 1, -1);
+      if (!pattern) invalid('parameter patterns cannot be empty');
+      else {
+        try { new RegExp(pattern); }
+        catch (error) { invalid(`invalid parameter pattern ${JSON.stringify(pattern)}: ${String(error)}`); }
+      }
+    }
     if (node.group !== isGroupSegment(node.segment)) plan.errors.push(`directory ${directory} has inconsistent group metadata`);
     if (node.path !== path) plan.errors.push(`directory ${directory} has path ${node.path}, expected ${path}`);
     if (node.layout) {
@@ -102,6 +122,7 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
     } else plan.middlewares.push(...middleware);
     if (node.route) {
       const { file, module } = node.route;
+      if (has(module, 'default') && typeof module.default !== 'function') plan.errors.push(`page default export in ${file} is not a function`);
       const other = routesByDir.get(canonical);
       if (other) plan.errors.push(`only one route may be used per path, found ${other} and ${file} for ${canonical}`);
       routesByDir.set(canonical, file);
@@ -148,7 +169,7 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
     }
     shapes.set(shape, [...(shapes.get(shape) ?? []), route]);
   }
-  plan.routes.sort((a, b) => compareRouteShapes(a.path, b.path) || Number(has(b.module, 'default')) - Number(has(a.module, 'default')) || lexical(a.path, b.path) || lexical(a.directory, b.directory));
+  plan.routes.sort((a, b) => compareRouteShapes(a.path, b.path) || Number(typeof b.module.default === 'function') - Number(typeof a.module.default === 'function') || lexical(a.path, b.path) || lexical(a.directory, b.directory));
   return plan;
 }
 
