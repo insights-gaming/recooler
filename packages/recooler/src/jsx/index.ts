@@ -169,7 +169,10 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
           // The engine already awaits the shell before writing. Await it here too,
           // so async status changes and thrown Responses precede response creation.
           await shell;
-          if (ctx.req.method === 'HEAD' && body instanceof ReadableStream) await body.cancel();
+          if (ctx.req.method === 'HEAD' && body instanceof ReadableStream) {
+            await body.cancel();
+            body = '';
+          }
           return ctx.newResponse(body, { headers: { 'content-type': 'text/html' } });
         } catch (error) {
           if (body instanceof ReadableStream) await body.cancel().catch(cancelError => { console.error(cancelError); });

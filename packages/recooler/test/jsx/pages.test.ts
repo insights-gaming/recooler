@@ -372,6 +372,7 @@ describe('Suspense streaming', () => {
       await reader.cancel('disconnected');
       for (let i = 0; i < 5; i++) {
         const head = await a.request('/', { method: 'HEAD' });
+        expect(head.status).toBe(200);
         expect(await head.text()).toBe('');
       }
       await vi.waitFor(() => expect((globalThis as any).SUSPENSE_ROOT.requests.size).toBe(0));
