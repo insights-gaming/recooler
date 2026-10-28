@@ -112,7 +112,7 @@ The Farm plugin's 0.0.27 behaviour was settled through several rounds of adversa
 
 **Pages**
 - **Head chain:** root, then layouts from root to leaf, then the route. Each entry is resolved at runtime: a function extends the head so far, an object replaces it, and nullish is skipped. Every export form is recognised, because the TS runtime reads module namespaces.
-- **Head isolation:** head data is isolated per request. 0.0.27's shallow copy still lets deep mutations accumulate (§2).
+- **Head isolation:** plain head containers are copied per request to isolate mutations made by later head functions through `prev`. 0.0.27's shallow copy lets these deep mutations accumulate (§2).
 - **Default root:** `root?.default ?? DefaultRootHOC`. The default `<meta charset="utf-8">` is added only when no head meta declares a charset.
 
 **htmx transform**: §3.1 lists the behaviours to preserve, including the 0.0.27 additions.
@@ -299,7 +299,7 @@ Most of this moves directly from 0.0.27's `src/helpers.ts`:
   - It handles a `Response` thrown during render.
   - Layouts without a default export don't wrap.
   - Its options replace `route_handler_factory` and `ResolvedTemplate`, and it includes `suspenseCleanupScriptMiddleware`.
-- **Head chain:** as in the reference behaviour. A head that resolves to something other than a function, a plain object or nullish (e.g. a Promise) is an error, not an empty head. Each request gets its own deep copy of every object entry in the chain (`structuredClone` of plain data), so neither `prev.metas[0].content += …` nor a mutated module-level constant can leak between requests.
+- **Head chain:** as in the reference behaviour. A head that resolves to something other than a function, a plain object or nullish (e.g. a Promise) is an error, not an empty head. Each request copies the plain objects and arrays in every applied head entry and function result, so mutations made by later head functions through `prev` (such as `prev.metas[0].content += …`) cannot leak between requests. Non-plain values retain their identity and rendering behavior. A function that mutates its own module constant or a shared non-plain value can still leak state.
 - **Exports:**
   - `ErrorBoundary`, which re-throws a `Response`
   - `Suspense`
@@ -307,7 +307,7 @@ Most of this moves directly from 0.0.27's `src/helpers.ts`:
   - `DefaultRootHOC`
   - the `global.d.ts` types `RouteProps`, `RouteHead` and `RouteHeadFn`
 - **Client scripts:**
-  - The root HOC gets `scripts: string[]` (URLs) from extensions instead of an inline `clientScript` string. *This breaks custom roots; keep accepting the string form for one release.*
+  - For 0.1.x the root HOC keeps its optional `clientScript?: string` second argument (never an array). Extensions supply external URL arrays through `props.scripts`; new roots read them there.
   - The page adapter emits `<body data-recooler-route="…">` (or a meta tag when the root renders its own body) and never an inline script, so it stays independent of htmx and needs no CSP nonce (§3.4).
 
 ## Part 3: htmx (`recooler/htmx`)

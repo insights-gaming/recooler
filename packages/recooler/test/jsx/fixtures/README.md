@@ -30,16 +30,27 @@ node "$oracle/capture-farm.mjs" "$fixtures"
 - custom-root `/`: root head extension and a legacy onLoad client script
 
 Type imports point at the adapter solely to typecheck fixtures in this workspace;
-Farm erases them. The custom root accepts both the old string and new URL array
+Farm erases them. The custom root keeps the verbatim 0.0.27 implementation and its optional string
 argument. Its legacy inline branch runs only in the Farm capture.
 
 `equivalence.test.ts` imports these exact page/layout namespaces into a handwritten
 router manifest. It compares complete strings after exactly these intended changes:
 
-1. The default root adds `data-recooler-route` to body. A custom root gets a
-   `meta[name=recooler-route]` at the start of its Content slot.
-2. The adapter does not emit the legacy inline onLoad client script. The htmx
-   extension's future URL entry owns loading and invoking onLoad.
+1. The default root adds `data-recooler-route` to body, valued with the manifest
+   pattern (route groups stripped). A custom body gets a
+   `meta[name=recooler-route]` at the start of its Content slot; a root wrapping
+   `DefaultRootHOC` uses only its body marker.
+2. Deep head isolation protects against mutations by later head functions through
+   `prev`. 0.0.27 leaked these mutations across requests and routes.
+3. A head from `export * from` is applied; 0.0.27 ignored it.
+4. The `?script` endpoint is gone.
+5. The legacy inline onLoad script is gone; the htmx extension's future URL entry
+   owns loading and invoking onLoad.
+6. A Response thrown inside ErrorBoundary returns its status (for example 303),
+   instead of 200 with `<pre>[object Response]</pre>`. See
+   [the migration guide](../../../../../docs/migration-0.1.md).
+7. `RouteProps` gains `route`, `scripts`, and `clientScript`. They are visible if a
+   page spreads all its props onto an HTML element.
 
 There is no whitespace normalization or broad script/attribute stripping.
 `exports/` separately covers real namespace imports for the head export forms.
