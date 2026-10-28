@@ -117,7 +117,8 @@ export default () => <form hx-post={() => 'ROUTE_ACTION_BODY_SECRET'}><button id
   const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
   for (const suffix of ['', '?recooler-handlers']) {
     const response = await fetch(origin + '/@fs' + path.join(outside, 'secret.tsx') + suffix);
-    assert(response.status >= 400); assert(!(await response.text()).includes("'OUTSIDE_SECRET'"));
+    // Vite reports a denied handler module load as a transform error.
+    assert.equal(response.status, suffix ? 500 : 403); assert(!(await response.text()).includes("'OUTSIDE_SECRET'"));
   }
   console.log(JSON.stringify({ clientSecurity: true, maps: true, userEntries: true, preloads: true, drift: true, versionGuard: true, fsAllow: true }));
 } finally { await server?.close(); await rm(outside, { recursive: true, force: true }); await rm(root, { recursive: true, force: true }); }

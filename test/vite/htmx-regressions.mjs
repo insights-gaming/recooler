@@ -91,7 +91,7 @@ try {
             return `${result.status}:${await result.text()}`;
           }));
           if (JSON.stringify(bodies) === JSON.stringify(expected.map(body => '200:' + body))) {
-            // Chokidar suppresses same-file inotify changes for 50ms after an
+            // Chokidar suppresses same-file changes for 50ms after an
             // event. Separate scripted edits after observing each response.
             await new Promise(resolve => setTimeout(resolve, 60));
             return actions;

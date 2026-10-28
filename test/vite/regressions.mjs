@@ -24,8 +24,8 @@ const waitFor = async (check) => {
   const end = Date.now() + 10000;
   while (true) {
     if (await check()) {
-      // Chokidar drops same-file changes within 50ms on inotify. Let the
-      // observed update leave that window before making the next edit.
+      // Chokidar throttles same-file changes for 50ms on every platform.
+      // Let the observed update leave that window before the next edit.
       await new Promise(resolve => setTimeout(resolve, 60));
       return;
     }

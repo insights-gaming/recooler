@@ -218,7 +218,6 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
   };
   const sourceWatchDirs = new Map<string, { watcher: FSWatcher; dev: number; ino: number }>();
   let sourceQueue = Promise.resolve();
-  let firstSourceWatch = true;
   const watchSource = async () => {
     // Only direct children matter for root.tsx. If srcDir is missing, watch an
     // existing ancestor non-recursively, then descend when its children appear.
@@ -228,16 +227,16 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
         const current = await stat(dir).catch(error => {
           if (error.code !== 'ENOENT') throw error;
         });
-        if (current?.dev === watched.dev && current.ino === watched.ino) continue;
+        if (current?.dev === watched.dev && (!current.ino || !watched.ino || current.ino === watched.ino)) continue;
         watched.watcher.close(); watchers.delete(watched.watcher); sourceWatchDirs.delete(dir);
       }
-      // Keep a parent watch even when the source already exists.
-      let dir = firstSourceWatch ? path.dirname(srcDir) : srcDir;
+      let dir = srcDir;
       let current;
       while (true) {
         try { current = await stat(dir); break; }
         catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          if (path.dirname(dir) === dir) throw error;
           dir = path.dirname(dir);
         }
       }
@@ -250,7 +249,6 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
           }
         });
         sourceWatchDirs.set(dir, { watcher, dev: current.dev, ino: current.ino });
-        firstSourceWatch = false;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
@@ -263,7 +261,7 @@ export async function watchRoutes(options: WatchOptions = {}): Promise<{ close()
       if (filename && path.resolve(routesDir, filename) === out) return;
       run();
     });
-    await watchSource();
+    await (sourceQueue = sourceQueue.then(watchSource));
     options.onReady?.();
     // Initial generation uses the same queue as debounced events and close().
     queue = queue.then(generate);

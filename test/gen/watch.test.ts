@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { mkdirSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -133,4 +133,57 @@ it('uses only non-recursive ancestor watches for a missing nested srcDir', async
       await vi.waitFor(() => expect(results.at(-1)).not.toContain('rootFile:'), { timeout: 10000 });
     }
   } finally { await watcher.close(); }
+}, 30000);
+
+for (const replacement of ['remove', 'rename']) {
+  it(`reattaches an existing srcDir after ${replacement}`, async () => {
+    const cwd = await fixture();
+    const source = path.join(cwd, 'source');
+    await mkdir(source);
+    const results: string[] = [];
+    const watcher = await watchRoutes({ cwd, srcDir: 'source', routesDir: 'src/routes', out: 'generated/routes.ts',
+      onResult: result => results.push(result.code) });
+    try {
+      if (replacement === 'remove') await rm(source, { recursive: true });
+      else await rename(source, path.join(cwd, 'old-source'));
+      await mkdir(source);
+      await writeFile(path.join(source, 'root.tsx'), 'export const head = {};');
+      await vi.waitFor(() => expect(results.at(-1)).toContain('rootFile: "root.tsx"'), { timeout: 10000 });
+      await rm(path.join(source, 'root.tsx'));
+      await vi.waitFor(() => expect(results.at(-1)).not.toContain('rootFile:'), { timeout: 10000 });
+    } finally { await watcher.close(); }
+  }, 30000);
+}
+
+it('serializes source enrollment behind initial readiness', async () => {
+  const cwd = await fixture();
+  const source = path.join(cwd, 'src');
+  const original = await vi.importActual<typeof import('node:fs')>('node:fs');
+  const implementation = vi.mocked(fsWatch).getMockImplementation()!;
+  const started = deferred(), release = deferred();
+  let sourceWatches = 0;
+  const watch = (dir: string, options: { recursive?: boolean }, listener: (event: string, filename: string | null) => void) => {
+    if (String(dir) !== source) return original.watch(dir, options, listener);
+    sourceWatches++;
+    return original.watch(dir, options, (event, filename) => {
+      if (String(filename).startsWith('.recooler-watch-ready-')) {
+        // Deliver a source event while holding the native readiness event.
+        listener('rename', 'root.tsx');
+        started.resolve();
+        void release.promise.then(() => listener(event, filename));
+      } else listener(event, filename);
+    });
+  };
+  vi.mocked(fsWatch).mockImplementation(watch as typeof fsWatch);
+  const pending = watchRoutes({ cwd });
+  let watcher: Awaited<typeof pending> | undefined;
+  try {
+    await started.promise;
+    await new Promise(done => setTimeout(done, 150));
+    expect(sourceWatches).toBe(1);
+  } finally {
+    release.resolve();
+    try { watcher = await pending; }
+    finally { await watcher?.close(); vi.mocked(fsWatch).mockImplementation(implementation); }
+  }
 }, 30000);
