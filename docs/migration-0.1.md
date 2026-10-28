@@ -206,9 +206,9 @@ env.ACTION_SECRET`; env functions are cached per env object identity in a WeakMa
 Use a new env object or recreate the app to rotate a key within the same env. Missing/empty secrets fail startup or the first request
 with actions. `secret: false` now throws; use `secret: { unsafeUnsigned: true }` only for local
 development. This disables D6 replay protection (including unused barrel actions)
-while retaining CSRF and reachability checks. The Vite plugin rejects
-this mode in production using the exported `unsafeUnsignedMarker` on the extension.
-Each `htmx()` creation in this mode logs a runtime warning. The production guard also covers custom entries. The Vite plugin derives app
+while retaining CSRF and reachability checks. The Vite production flag enforces
+the startup guard, including custom entries. Each `htmx()` creation in this mode
+logs a runtime warning. The Vite plugin derives app
 identity from the nearest package.json name and package-relative source directory,
 then includes the server environment (plus a per-server nonce in dev). An unnamed
 package must set `recooler({ htmx: { namespace: 'my-app' } })` or add a package name;

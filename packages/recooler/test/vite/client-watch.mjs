@@ -9,10 +9,10 @@ await mkdir(path.join(packageDir, '.cache'), { recursive: true });
 const root = await mkdtemp(path.join(packageDir, '.cache/client-watch-'));
 const write = async (name, code) => { await mkdir(path.dirname(path.join(root, name)), { recursive: true }); await writeFile(path.join(root, name), code); };
 const watchers = [];
-let completed = 0, error;
+let completed = 0, serverCompleted = 0, error;
 const nextBuild = async previous => {
   const deadline = Date.now() + 15000;
-  while (completed <= previous) {
+  while (completed <= previous || serverCompleted < completed) {
     if (error) throw error;
     assert(Date.now() < deadline, 'ordered client watch rebuild');
     await new Promise(resolve => setTimeout(resolve, 25));
@@ -30,7 +30,10 @@ try {
       const build = builder.build;
       builder.build = async environment => {
         const result = await build(environment);
-        if (result?.on) { watchers.push(result); result.on('event', e => { if (e.code === 'ERROR') error = e.error; }); }
+        if (result?.on) { watchers.push(result); result.on('event', e => {
+          if (e.code === 'ERROR') error = e.error;
+          if (e.code === 'END') serverCompleted++;
+        }); }
         return result;
       };
     } } }, ...recooler({ htmx: {} }),
@@ -38,6 +41,8 @@ try {
   ], ssr: { noExternal: true }, build: { ssr: 'src/entry.ts', outDir: 'server', watch: { buildDelay: 30 },
     rolldownOptions: { output: { entryFileNames: 'app.mjs' } } } });
   await builder.buildApp();
+  // Client writeBundle can finish before the server watcher enrolls its files.
+  // Await the complete watch cycle before making the next edit.
   const first = await nextBuild(0);
   assert(!first.includes('"/b"'));
   const previous = completed;

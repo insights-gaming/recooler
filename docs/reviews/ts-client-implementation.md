@@ -92,3 +92,88 @@ canceled and warn. currentTarget cannot be reconstructed after dispatch. If CSP
 blocks the dev inline watchdog itself, use the browser's CSP diagnostics. Loading
 failures reject the latest `globalThis.__recooler_ready` promise. Keep versioned
 old slices during rolling deployments and include the entry query in cache keys.
+
+
+## Integration follow-up (2026-10-28)
+
+Continued the interrupted merge at `4934d9e` in the same worktree/branch.
+`83ce40c` completes the merge of `072bf82`; `3100dd6` checkpoints the requested
+integration changes. No merge abort or push. The handoff records final HEAD.
+This section supersedes the earlier verification counts and merge limitations.
+
+### Merge resolution
+
+- `src/vite/htmx.ts` combines the client build/queue/maps/watch work with
+  router-resolved layout/root seeds, shared reverse propagation, active-app-only
+  empty dev registration, ungated action transforms, environment/dev namespaces,
+  versioned defining-module hashes, targeted table invalidation and safe map skips.
+  Both server actions and client slices propagate through the same resolved chains.
+- `src/vite/index.ts` keeps client entry/preloads/legacy wiring alongside the
+  exact-manifest colon-path loader, action-dependency crawl and namespace wiring.
+- `test/vite/vite.test.ts` retains both branches' regression suites. The Phase 4b
+  direct renderChunk test now awaits its async hook and supplies the merged hash
+  context. Integration found and fixed the root client pattern becoming `/.`.
+- Client slices now require the exact cached server-transform input instead of
+  falling back to disk. The macro drift test and new alias-layout/root client
+  execution test pass. JS/map scans assert that neither the signing namespace
+  nor the defining server module hash enters browser output. Client source-map
+  redaction, input preservation, early cancellation/replay, fs boundaries, bans,
+  deterministic versions, memoization, opaque slices and ordered watch builds
+  remain covered by the existing fixes 1–11 suites.
+
+### Requested behavior
+
+1. Initialization observes marker identity, route and version after every settled
+   swap, covering HX-Location, plain hx-get + hx-push-url body swaps and boosts.
+   Real history back restores handlers/onLoad once despite both lifecycle events.
+   In-place marker changes initialize too; stale asynchronous initialization
+   cannot clear the queue for another active route.
+2. The full real-htmx harness runs on 2.0.11 and 1.9.12, including delayed defaults,
+   legacy cached imports, modern roots, route swaps and real history. htmx 1's
+   synchronous load trigger precedes wildcard listener installation; that fixture
+   uses `load delay:1ms`, now documented, while the 2.x test stays synchronous.
+3. Missing, empty or whitespace package names fail both build and dev startup
+   unless htmx.namespace is set. The nearest unnamed package cannot borrow a
+   named ancestor's identity. Override and named-app replay tests pass. Existing
+   test/conformance fixture packages now declare names.
+4. Vite base already supplies the required rooted asset prefix; no clientBase API
+   is needed. A new Cloudflare build + Miniflare fixture runs front/admin Workers
+   with separate assets and a real service binding. Both modern and legacy roots
+   fetch their entry, preloads and two routes' lazy slices through `/_admin/` and
+   run their own handlers. The front's conflicting entry is never executed.
+5. The migration guide documents Workers behind a path-prefix proxy, public
+   redacted-only client maps (off by default), provisioning RECOOLER_SECRET,
+   CLOUDFLARE_ENV for dev/preview builds, and the unchanged Context result behind
+   `return await next()` when an inner handler returns undefined.
+
+### Final verification
+
+| Check | Result |
+| --- | --- |
+| pnpm install | pass |
+| recooler package suite | **48 files, 1,435 passed** |
+| recooler typecheck and build | pass |
+| conformance typecheck | pass |
+| CONFORMANCE_REBUILD=1, targets ts,farm-0.0.27 | **1,054 passed, 7 expected skips** |
+| Plain, Cloudflare 1.65.0 and v2 beta client integrations | pass in package suite |
+| Real htmx 2.0.11 and 1.9.12 | pass in package suite |
+| Two-Worker prefix proxy, modern and legacy roots | pass in package suite |
+| Playground typecheck/build/check | pass, 2 tests |
+| Client build watch | pass; waits for full server watch cycle before edits |
+| Phase 4b warm | default/warmup/manifest-first all 200, complete table |
+| Phase 4b cf-colonfix | / and /test both 200 in v1/v2 dev and build/preview |
+| Phase 4b strict colon loading without scratch loader | / and /test both 200 in v1/v2 dev |
+| Phase 4b samepath and cross-app | own requests 200; replays 404 |
+
+Reviewer scripts were copied from `/private/tmp/r4b/scripts` into
+`/private/tmp/ts-client-r4b/scripts`, redirecting only checkout/fixture paths.
+Copies of fixtures declare package names under the new contract; the samepath
+script assigns distinct A/B names and resets the initial page to A, as in the
+Phase 4b implementation rerun. Original review fixtures/scripts remain untouched.
+The strict-loader check additionally runs cf.mjs without cf-colonfix's broad
+scratch hook. Package tests also exercise strict colon paths on both versions.
+
+Raw local logs: `/private/tmp/ts-client-package.log`,
+`/private/tmp/ts-client-conformance.log`, `/private/tmp/ts-client-typecheck.log`,
+`/private/tmp/ts-client-htmx1.log`, `/private/tmp/ts-client-htmx2.log`,
+`/private/tmp/ts-client-proxy.log`, and `/private/tmp/ts-client-r4b-*.log`.
