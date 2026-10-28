@@ -68,7 +68,7 @@ function isPlainObject(value: unknown): value is RouteHead {
 function copyContainers(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
   if (!Array.isArray(value) && !isPlainObject(value)) return value;
   if (seen.has(value)) return seen.get(value);
-  const copy: Record<string, unknown> | unknown[] = Array.isArray(value) ? [] : Object.create(Object.getPrototypeOf(value));
+  const copy: Record<string, unknown> | unknown[] = Array.isArray(value) ? new Array(value.length) : Object.create(Object.getPrototypeOf(value));
   seen.set(value, copy);
   for (const key of Object.keys(value)) {
     Object.defineProperty(copy, key, { value: copyContainers((value as Record<string, unknown>)[key], seen),
@@ -84,6 +84,12 @@ function copyHead(value: unknown, source: string): RouteHead {
   return copyContainers(value) as RouteHead;
 }
 
+function throwHeadError(error: unknown, source: string): never {
+  if (error instanceof Response) throw error;
+  const message = `Head in ${source}: ${error instanceof Error ? error.message : String(error)}`;
+  throw error instanceof TypeError ? new TypeError(message, { cause: error }) : new Error(message, { cause: error });
+}
+
 /** Resolve live namespace exports, starting at the last replacing object. */
 async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<RouteHead> {
   // TODO: use required router source metadata once the router branch lands.
@@ -92,7 +98,10 @@ async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<Rou
     { module: route.root, source: files.rootFile ?? `root (used by ${route.file})` },
     ...route.layouts.map((module, i) => ({ module, source: files.layoutFiles?.[i] ?? `layout ${i + 1} (used by ${route.file})` })),
     { module: route.module, source: route.file },
-  ].map(({ module, source }) => ({ entry: module?.head, source }));
+  ].map(({ module, source }) => {
+    try { return { entry: module?.head, source }; }
+    catch (error) { return throwHeadError(error, source); }
+  });
   let start = 0;
   for (const [i, { entry }] of entries.entries()) {
     if (entry != null && typeof entry !== 'function') start = i;
@@ -104,9 +113,7 @@ async function resolveHead(route: ResolvedRoute, ctx: RouteContext): Promise<Rou
       const result: unknown = typeof entry === 'function' ? await (entry as RouteHeadFn)(ctx, head) : entry;
       head = result == null ? {} : copyHead(result, source);
     } catch (error) {
-      if (error instanceof Response) throw error;
-      const message = `Head in ${source}: ${error instanceof Error ? error.message : String(error)}`;
-      throw error instanceof TypeError ? new TypeError(message, { cause: error }) : new Error(message, { cause: error });
+      throwHeadError(error, source);
     }
   }
   return head;

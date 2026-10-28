@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createElement as h, dangerouslyPreventEscaping, Fragment, type Component, type ResolvedTemplateProps } from 'easy-jsx-html-engine';
 import { Hono, type Context } from 'hono';
-import { createApp, type DirNode, type Manifest, type ModuleNs, type RouterExtension } from '../../src/router/index.js';
+import { createApp, type DirNode, type Manifest, type ModuleNs, type RouterExtension, type ResolvedRoute } from '../../src/router/index.js';
 import { createElement, DefaultRootHOC, ErrorBoundary, jsxPages, renderHeadElements, Suspense, type JSXPagesOptions, type RouteHead, type RouteProps } from '../../src/jsx/index.js';
 import { jsx, jsxs } from '../../src/jsx/jsx-runtime.js';
 import { SpreadWrapper, NestedSpreadWrapper } from './fixtures/runtime-wrapper.js';
@@ -138,6 +138,24 @@ describe('jsxPages', () => {
       const response = await a.request('/');
       expect(response.status).toBe(500);
       expect(await response.text()).toContain(source);
+    }
+  });
+
+  it('uses supplied root/layout filenames, including errors reading the head export itself', async () => {
+    for (const source of ['src/root.tsx', 'src/routes/layout.tsx']) {
+      const module = { get head() { throw new Error('export getter'); } };
+      const route: ResolvedRoute & { rootFile: string; layoutFiles: string[] } = {
+        path: '/', file: 'src/routes/index.tsx', module: { default: Page },
+        root: source === 'src/root.tsx' ? module : undefined,
+        layouts: source === 'src/routes/layout.tsx' ? [module] : [],
+        rootFile: 'src/root.tsx', layoutFiles: ['src/routes/layout.tsx'],
+        middleware: [], middlewareModules: [], directory: 'src/routes',
+      };
+      const a = new Hono().get('/', jsxPages().handler(route, [])!);
+      a.onError((error, ctx) => ctx.text(error.message, 500));
+      const response = await a.request('/');
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe(`Head in ${source}: export getter`);
     }
   });
 
