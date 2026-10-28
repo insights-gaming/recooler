@@ -10,6 +10,7 @@ export default defineConfig({
         test: { name, include: ['test/router/**/*.test.ts'] },
       })),
       { test: { name: 'gen', include: ['test/gen/**/*.test.ts'] } },
+      { test: { name: 'recooler', include: ['test/**/*.test.ts'], exclude: ['test/router/**', 'test/gen/**'] } },
     ],
   },
 });

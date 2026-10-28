@@ -30,7 +30,7 @@ export function mergePageExtras(extras: Record<string, unknown>[]): Record<strin
   return merged;
 }
 
-/** Minimal Hono-compatible compose, including after-next response replacement. */
+/** Minimal compose with Hono finalization semantics and double-next detection. */
 function dispatch(handlers: Handler[], c: Context, next: Next): Promise<void> {
   let index = -1;
   async function run(i: number): Promise<void> {

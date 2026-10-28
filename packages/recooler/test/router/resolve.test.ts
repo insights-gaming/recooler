@@ -107,3 +107,21 @@ it('warns for near misses without invoking them', () => {
   createApp(manifest({ 'index.ts': { onget: handler, OnPost: handler, onrequest: handler, onLoad: handler } }), { warn: w => warnings.push(w) });
   expect(warnings).toEqual(['WARNING: found export onget but expected onGet in routes/index.ts', 'WARNING: found export OnPost but expected onPost in routes/index.ts', 'WARNING: found export onrequest but expected onRequest in routes/index.ts']);
 });
+
+it('shares layouts and group middleware across [id] and :id directory aliases', () => {
+  const layout = { head: {} }, middleware = mw();
+  const plan = resolveRoutes(manifest({
+    '(g)/[id]/layout.ts': layout, '(g)/[id]/middleware.ts': middleware,
+    '(g)/:id/index.tsx': page,
+  }));
+  expect(plan.errors).toEqual([]);
+  expect(plan.routes[0]!.layouts).toEqual([layout]);
+  expect(plan.routes[0]!.middlewareModules).toEqual([middleware]);
+});
+
+it('orders late prefix middleware by directory paths, before appending /*', () => {
+  const plan = resolveRoutes(manifest({
+    '(a)/(b)/[[rest]]/middleware.ts': mw(), '(g)/[[rest]]/x/middleware.ts': mw(),
+  }));
+  expect(plan.lateMiddlewares.map(m => m.path)).toEqual(['/:rest{.+}/x/*', '/:rest{.+}/*']);
+});

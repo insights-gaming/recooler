@@ -53,21 +53,22 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
   const plan: RoutePlan = { routes: [], middlewares: [], lateMiddlewares: [], errors: [], warnings: [] };
   if (manifest.version !== 1) plan.errors.push(`unsupported manifest version ${manifest.version}`);
   const dirs: { node: DirNode; directory: string; canonical: string; depth: number; inside: boolean }[] = [];
+  const allMiddleware: ResolvedMiddleware[] = [];
   const routesByDir = new Map<string, string>();
   const layoutsByDir = new Map<string, string>();
-  function walk(node: DirNode, segments: string[], layouts: ModuleNs[], chain: ResolvedMiddleware[], inside: boolean) {
+  function walk(node: DirNode, segments: string[], inside: boolean) {
     const directory = '/' + segments.join('/');
     const canonical = '/' + segments.map(routeSegment).join('/');
     const path = routePathWithoutGroups(canonical);
     inside ||= node.group;
     dirs.push({ node, directory, canonical, depth: segments.length, inside });
+    if (node.group !== isGroupSegment(node.segment)) plan.errors.push(`directory ${directory} has inconsistent group metadata`);
     if (node.path !== path) plan.errors.push(`directory ${directory} has path ${node.path}, expected ${path}`);
     if (node.layout) {
       const file = node.layoutFile ?? `${directory}/layout`;
       const other = layoutsByDir.get(canonical);
       if (other) plan.errors.push(`only one layout may be used per path, found ${other} and ${file} for ${canonical}`);
       layoutsByDir.set(canonical, file);
-      layouts = [...layouts, node.layout];
     }
     const middleware = node.middleware.map((module, i): ResolvedMiddleware => {
       const file = node.middlewareFiles?.[i] ?? `${directory}/middleware[${i}]`;
@@ -75,8 +76,8 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
       else if (typeof module.default !== 'function') plan.errors.push(`middleware ${file} default export is not a function`);
       return { path: usePath(path), file, module, handler: module.default as MiddlewareHandler };
     });
+    allMiddleware.push(...middleware);
     if (inside) {
-      chain = [...chain, ...middleware];
       if (!node.group) plan.lateMiddlewares.push(...middleware);
     } else plan.middlewares.push(...middleware);
     if (node.route) {
@@ -89,17 +90,28 @@ export function resolveRoutes(manifest: Manifest): RoutePlan {
         if (expected && expected !== name) plan.warnings.push(`WARNING: found export ${name} but expected ${expected} in ${file}`);
         if ((expected === name) && typeof module[name] !== 'function') plan.errors.push(`handler ${name} in ${file} is not a function`);
       }
-      plan.routes.push({ path, file, module, layouts, root: manifest.root, middleware: chain.map(m => m.handler), middlewareModules: chain.map(m => m.module), directory: canonical });
+      plan.routes.push({ path, file, module, layouts: [], root: manifest.root, middleware: [], middlewareModules: [], directory: canonical });
     }
-    for (const child of [...node.children].sort((a, b) => lexical(a.segment, b.segment))) walk(child, [...segments, child.segment], layouts, chain, inside);
+    for (const child of [...node.children].sort((a, b) => lexical(a.segment, b.segment))) walk(child, [...segments, child.segment], inside);
   }
-  walk(manifest.tree, [], [], [], false);
+  walk(manifest.tree, [], false);
   const dirByFile = new Map<string, (typeof dirs)[number]>();
   for (const dir of dirs) for (let i = 0; i < dir.node.middleware.length; i++) dirByFile.set(dir.node.middlewareFiles?.[i] ?? `${dir.directory}/middleware[${i}]`, dir);
   const compareMiddleware = (a: ResolvedMiddleware, b: ResolvedMiddleware) => {
     const x = dirByFile.get(a.file)!, y = dirByFile.get(b.file)!;
-    return x.depth - y.depth || compareRoutePaths(a.path, b.path) || lexical(x.canonical, y.canonical) || lexical(a.file, b.file);
+    return x.depth - y.depth || compareRoutePaths(routePathWithoutGroups(x.canonical), routePathWithoutGroups(y.canonical)) || lexical(x.canonical, y.canonical) || lexical(a.file, b.file);
   };
+  allMiddleware.sort(compareMiddleware);
+  const ancestor = (parent: string, child: string) => parent === '/' || parent === child || child.startsWith(parent + '/');
+  // Alias directories such as [id] and :id share the reference's normalized layout/middleware
+  // path, even when their files occupy distinct filesystem branches.
+  for (const route of plan.routes) {
+    route.layouts = dirs.filter(d => d.node.layout && ancestor(d.canonical, route.directory))
+      .sort((a, b) => a.depth - b.depth).map(d => d.node.layout!);
+    const scoped = allMiddleware.filter(m => { const dir = dirByFile.get(m.file)!; return dir.inside && ancestor(dir.canonical, route.directory); });
+    route.middleware = scoped.map(m => m.handler);
+    route.middlewareModules = scoped.map(m => m.module);
+  }
   plan.middlewares.sort(compareMiddleware);
   plan.lateMiddlewares.sort(compareMiddleware);
   // Conflict checks retain regex patterns, unlike the ordering comparator.
