@@ -31,7 +31,7 @@ export async function load({ packageRoot, packageOut, spec, mode = 'probe' }) {
       if (!routes.has(entry.path)) routes.set(entry.path, { path: entry.path, methods: [], actions: entry.actions.map(({ method, id }) => ({ method, id })), page: entry.handler.kind === 'page' ? entry.handler : null });
       routes.get(entry.path).methods.push(entry.method);
     }
-    return { ...app, ...(mode === 'probe' ? { catalog: { middleware: entries.filter(e => e.handler.kind === 'middleware').map(e => ({path: e.path, file: e.handler.file, export: e.handler.export})), routes: [...routes.values()], middlewarePrefixes: entries.filter(e => e.handler.kind === 'middleware').map(e => e.path) }, diagnostics: { entries } } : {}),
+    return { ...app, sourceRoot: spec.sourceRoot ?? 'src', ...(mode === 'probe' ? { catalog: { middleware: entries.filter(e => e.handler.kind === 'middleware').map(e => ({path: e.path, file: e.handler.file, export: e.handler.export})), routes: [...routes.values()], middlewarePrefixes: entries.filter(e => e.handler.kind === 'middleware').map(e => e.path) }, diagnostics: { entries } } : {}),
       canonicalActionId(id) { return canonicalActionId(entries, id); },
       actionUrl(request) {
         return resolveActionUrl(entries, request, secret);
@@ -44,7 +44,8 @@ export const fixtureOutcomes = { undefinedHandlerStatus: 500 };
 export function canonicalActionId(entries, id) {
   const matches = new Set(entries.flatMap(entry => (entry.actions || []).filter(action => action.runtimeId === id || action.id === id).map(action => action.id)));
   if (matches.size > 1) throw new Error(`Ambiguous canonical action ID: ${id}`);
-  return matches.size ? [...matches][0] : id;
+  if (!matches.size) throw new Error(`Unknown canonical action ID: ${id}`);
+  return [...matches][0];
 }
 export function resolveActionUrl(entries, request, secret) {
   const matches = new Map();

@@ -5,6 +5,9 @@ import { getActionRegistry, findRegisteredAction } from 'recooler/htmx/runtime';
 export * from 'recooler/router';
 export * from 'recooler/htmx';
 
+import { sourceFile } from './source-label.mjs';
+const sourceRoot = /* equivalence-source-root */ 'src';
+const source = file => sourceFile(file, sourceRoot);
 const actionOptions = [];
 const wrap = (fn, label) => {
   if (typeof fn !== 'function') return fn;
@@ -16,7 +19,7 @@ const wrap = (fn, label) => {
 const hoc = (fn, label) => typeof fn !== 'function' ? fn : function (...args) {
   return wrap(Reflect.apply(fn, this, args), label);
 };
-const label = (file, exported = 'default') => ({ file: `src/${file}`, export: exported });
+const label = (file, exported = 'default') => ({ file: source(file), export: exported });
 function namespace(ns, file, kind) {
   if (!ns) return ns;
   const copy = Object.create(null);
@@ -31,7 +34,7 @@ function namespace(ns, file, kind) {
 export function htmx(options) {
   const registry = getActionRegistry(options.namespace);
   for (const methods of registry.values()) for (const actions of Object.values(methods)) {
-    for (const id of Object.keys(actions)) actions[id] = wrap(actions[id], { kind: 'action', id: `src/${id}` });
+    for (const id of Object.keys(actions)) actions[id] = wrap(actions[id], { kind: 'action', id: source(id) });
   }
   actionOptions.push(options);
   return originalHtmx(options);
@@ -68,7 +71,7 @@ export function createApp(manifest, options = {}) {
       for (const config of actionOptions) for (const module of config.table[route.file] || []) {
         for (const [method, table] of Object.entries(getActionRegistry(config.namespace).get(module) || {})) {
           methods.add(method);
-          for (const id of Object.keys(table)) actions.push({ method, id: `src/${id}`, runtimeId: id, namespace: config.namespace, base: (config.base ?? "").replace(/\/$/, ""), moduleHash: findRegisteredAction([module], method, id, config.namespace).moduleHash });
+          for (const id of Object.keys(table)) actions.push({ method, id: source(id), runtimeId: id, namespace: config.namespace, base: (config.base ?? "").replace(/\/$/, ""), moduleHash: findRegisteredAction([module], method, id, config.namespace).moduleHash });
         }
       }
     }

@@ -129,6 +129,8 @@ For `text/html`, SHA-256 covers the UTF-8 body after these explicit substitution
 2. Canonicalize every `action` query value through the adapter's runtime-to-source
    identity map. Legacy IDs are the canonical package-relative source IDs; the 0.1
    adapter maps runtime IDs to those IDs. Re-encode with `encodeURIComponent`.
+   The reserved invalid-probe sentinel `__unknown__` stays literal when echoed
+   in HTML; every other unmapped application ID throws.
    Only `sig` and `signature` values become `<volatile>`. Action changes remain
    significant in all responses, including otherwise identical cases. Paths,
    parameter names, scopes and surrounding HTML remain significant.
@@ -271,6 +273,9 @@ memory, leaving the Farm fixtures usable by their original adapter.
 
 Additional private per-package options are:
 
+- `sourceRoot`: package-relative source root matching `routes.srcDir`, default `src`.
+  Use `.` for package-root sources. Instrumentation and HTML audits use it for
+  both module and action source labels.
 - `actionSecret`: a nonempty synthetic test key, required outside fixtures.
   It is injected into request bindings, never compiled into the application.
 - `secretBinding`: binding name, default `RECOOLER_SECRET`, matching the port.
@@ -345,6 +350,8 @@ The Chromium runner accepts private `steps` with `action` equal to `goto` (`path
 (`expression`, exact `value`), or `back`. Each step may have a `name`.
 `resources` can serve local stub files with `url` (Playwright glob), `file`, and
 `contentType`. `assetPrefix` requires successful asset loads beneath that prefix.
-It records completed checks, local 404s, assets and uncaught exceptions. Use it
+It records completed checks, local 404s, assets, uncaught exceptions, console
+errors (including MIME/CSP failures), and non-2xx local action responses. Any of
+these failures makes the runner exit nonzero. Use it
 with both real Workers, synthetic auth/services and stable DOM assertions. Never
 ship test-only routes or real credentials in public fixtures or private patches.

@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { normalizeHtml, responseRecord } from './traces.mjs';
+import { sourceFile } from './source-label.mjs';
 const [beforeFile, afterFile, output, rulesFile] = process.argv.slice(2);
 if (!beforeFile || !afterFile || !output || !resolve(output).startsWith('/private/tmp/')) throw new Error('Usage: audit.mjs BEFORE.json AFTER.json /private/tmp/AUDIT');
 await mkdir(output, { recursive: true });
@@ -14,7 +15,7 @@ const sha = value => createHash('sha256').update(value).digest('hex');
 const pick = trace => Object.fromEntries(Object.entries(trace).filter(([key]) => ['status','headers','htmlDigest','bodyBase64','error','errorMessage','returnedType'].includes(key)));
 // These substitutions are deliberately an audit layer, not equivalence allowances.
 // The compared digest still includes every script and client wrapper change.
-export function frameworkHtml(html, canonicalActionId) {
+export function frameworkHtml(html, canonicalActionId, sourceRoot = 'src') {
   return normalizeHtml(html, canonicalActionId)
     .replace(/\n    at [^\n<]*/g, '')
     .replace(/<script>\(\(\)=>\{(?:(?!<\/script>)[\s\S])*?window\.\$handlers=(?:(?!<\/script>)[\s\S])*?\}\)\(\)<\/script>/g, '')
@@ -26,7 +27,7 @@ export function frameworkHtml(html, canonicalActionId) {
       const legacy = code.match(/^\$handlers\[&quot;([^&]+)&quot;\]\.call\(this, event\)$/);
       const current = code.startsWith('(self.$rc||') && code.match(/\(&quot;([^&]+)&quot;,null,this,event\)$/);
       if (legacy) return attr + 'HANDLER:' + legacy[1] + '"';
-      if (current) return attr + 'HANDLER:src/' + current[1] + '"';
+      if (current) return attr + 'HANDLER:' + sourceFile(current[1], sourceRoot) + '"';
       return whole;
     })
     .replace(/(hx-(?:get|post|put|patch|delete)=")([^"]+)/g, (_, attr, url) => attr + url.replace(/%5F/gi, '_'))
@@ -38,13 +39,13 @@ for (const rule of rules) {
   if (!['before','after'].includes(rule.side) || !rule.find || typeof rule.replace !== 'string' || !rule.reason?.trim()) throw new Error('Audit rules require side, exact literal find/replace and reason');
   rule.applied = 0;
 }
-const review = (html, side, canonical) => {
+const review = (html, side, app) => {
   for (const rule of rules.filter(rule => rule.side === side)) {
     const count = html.split(rule.find).length - 1;
     rule.applied += count;
     html = html.replaceAll(rule.find, rule.replace);
   }
-  return frameworkHtml(html, canonical);
+  return frameworkHtml(html, app.canonicalActionId, app.sourceRoot);
 };
 const records = [];
 for (const name of ['router', 'admin']) {
@@ -71,7 +72,7 @@ for (const name of ['router', 'admin']) {
         const prefix=`${name}-${index}`;
         await writeFile(join(output,prefix+'-before.html'),br[j].body);
         await writeFile(join(output,prefix+'-after.html'),ar[j].body);
-        const reviewedBefore=review(br[j].body,'before',b.canonicalActionId),reviewedAfter=review(ar[j].body,'after',a.canonicalActionId);
+        const reviewedBefore=review(br[j].body,'before',b),reviewedAfter=review(ar[j].body,'after',a);
         const same=reviewedBefore===reviewedAfter;
         if(!same){await writeFile(join(output,prefix+'-before-reviewed.html'),reviewedBefore);await writeFile(join(output,prefix+'-after-reviewed.html'),reviewedAfter);}
         records.push({name,index,statusBefore:br[j].status,statusAfter:ar[j].status,rawBefore:sha(br[j].body),rawAfter:sha(ar[j].body),reviewedBefore:sha(reviewedBefore),reviewedAfter:sha(reviewedAfter),same,replayMatches:true});

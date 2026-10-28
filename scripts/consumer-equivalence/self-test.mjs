@@ -138,7 +138,7 @@ await dispatchCase({ actionUrl: request => { calls.push(request); return '/signe
 assert.equal(calls.length, 1);
 console.log('Runtime render calls, response mutations, NonResponse, action URL hook and expected-difference checks passed');
 
-const { resolveActionUrl } = await import('./adapters/recooler-0.1.mjs');
+const { resolveActionUrl, canonicalActionId } = await import('./adapters/recooler-0.1.mjs');
 const actionRequest = {action: {routeId: '/form', actionId: 'known', method: 'POST'}};
 assert.throws(() => resolveActionUrl([], actionRequest, 'synthetic'), /found 0/);
 assert.throws(() => resolveActionUrl(['a', 'b'].map(routeId => ({path:'/form', routeId, actions:[{id:'known',runtimeId:'runtime',method:'POST'}]})), actionRequest, 'synthetic'), /found 2/);
@@ -147,3 +147,30 @@ assert.deepEqual(canonicalCatalog({routes:[], middlewarePrefixes:['/*']}, 'admin
 assert.equal(compareTraces(expected,actual,[{...entry,fields:['status','headers'],values:{...entry.values,headers:{before:pinValue(undefined),after:pinValue({location:'/'})}}}]).equal,false,'partially stale allowance');
 assert.deepEqual(canonicalCatalog({routes:[{path:'/:rest{.+}',methods:['GET','ALL'],actions:[],page:null}],middlewarePrefixes:[]}),canonicalCatalog({routes:[{path:'/:rest{.+}',methods:['ALL'],actions:[],page:null}],middlewarePrefixes:[]}));
 assert.notDeepEqual(canonicalCatalog({routes:[],middlewarePrefixes:['/nested/*']}),canonicalCatalog({routes:[],middlewarePrefixes:['/nested*']}));
+
+const identities = [{actions:[{id:'app/routes/form.tsx:0',runtimeId:'routes/form.tsx:0'}]}];
+assert.equal(canonicalActionId(identities, 'routes/form.tsx:0'), 'app/routes/form.tsx:0');
+assert.equal(canonicalActionId(identities, 'app/routes/form.tsx:0'), 'app/routes/form.tsx:0');
+assert.throws(() => canonicalActionId(identities, 'missing'), /Unknown canonical action/);
+assert.throws(() => canonicalActionId([...identities, {actions:[{id:'other',runtimeId:'routes/form.tsx:0'}]}], 'routes/form.tsx:0'), /Ambiguous canonical action/);
+const { sourceFile } = await import('./source-label.mjs');
+assert.equal(sourceFile('routes/form.tsx', 'app'), 'app/routes/form.tsx');
+assert.equal(sourceFile('root.tsx', '.'), 'root.tsx');
+assert.equal(sourceFile('../shared/action.ts:0', 'app'), 'shared/action.ts:0');
+const { EventEmitter } = await import('node:events');
+const { observeBrowserFailures, assertBrowserSuccess } = await import('./browser-smoke.mjs');
+const smokePage = new EventEmitter();
+const smoke = observeBrowserFailures(smokePage, 'http://localhost', '/assets/');
+const respond = (path, status) => smokePage.emit('response', {url:()=>'http://localhost'+path,status:()=>status});
+respond('/assets/client.js', 200);
+respond('/form?action=known', 204);
+assertBrowserSuccess(smoke, '/assets/');
+smokePage.emit('console', {type:()=>'error',text:()=>'Refused script: MIME or CSP'});
+assert.throws(() => assertBrowserSuccess(smoke), /consoleErrors/);
+smoke.consoleErrors.length = 0;
+respond('/form?action=known', 403);
+assert.throws(() => assertBrowserSuccess(smoke), /failedActions/);
+console.log('Source roots, strict canonical IDs and browser failure checks passed');
+
+assert.equal(normalizeHtml('<a href="/?action=__unknown__">probe</a>', id => { throw new Error(id); }), '<a href="/?action=__unknown__">probe</a>');
+assert.throws(() => normalizeHtml('<a href="/?action=missing">app</a>', id => canonicalActionId([], id)), /Unknown canonical action/);

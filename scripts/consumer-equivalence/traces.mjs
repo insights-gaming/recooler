@@ -57,7 +57,11 @@ export function normalizeHtml(html, canonicalActionId = id => id) {
     .replace(/<meta\b(?=[^>]*\sname="recooler-route"(?=\s|\/?>))[^>]*\/?\s*>/gi, '')
     .replace(/\sdata-recooler-route(?=[\s/>=])(?:="[^"]*")?/g, '')
     .replace(/((?:\?|&amp;|&)(action|sig|signature)=)([^"'\s<>&]*)/g, (_, prefix, key, value) =>
-      prefix + (key === 'action' ? encodeURIComponent(canonicalActionId(decodeURIComponent(value))) : '<volatile>'))
+      prefix + (key === 'action'
+        // Invalid-action probes can echo their reserved literal in page URLs.
+        // Keep that exact sentinel significant without mapping it as a real action.
+        ? encodeURIComponent(decodeURIComponent(value) === '__unknown__' ? '__unknown__' : canonicalActionId(decodeURIComponent(value)))
+        : '<volatile>'))
     .replace(/(\bid="s:[prs])\d+("|')/g, '$1<stream>$2')
     .replace(/(suspense\.tp\()\d+(\))/g, '$1<stream>$2');
 }

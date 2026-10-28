@@ -272,9 +272,20 @@ and the legacy inline `import()` URL. `htmx.base` separately restores the stripp
 prefix on signed action URLs. Keep the second Worker's own client build output
 attached to its asset binding. The front Worker must forward every `/_admin/*`
 request, including `/_admin/assets/*`, to that Worker before serving its own
-assets. The second Worker then receives `/assets/*` and serves its own entry and
-chunks. Do not copy the second app's files into the front Worker's asset set.
+assets. If the proxy strips the prefix, the second Worker receives `/assets/*`. If it
+preserves page paths, the second Worker also receives `/_admin/assets/*`. Make
+the second Worker serve both asset spellings through its asset binding (rewrite
+only the prefixed asset pathname to `/assets/*` before fetching that binding).
+Vite `base` sets public URLs; it does not rename the files in the asset store.
+This also permits either Worker to deploy first during a proxy migration. Prefer
+deploying the router first on the initial rollout, then verify both spellings.
+Do not copy the second app's files into the front Worker's asset set.
 Use a rooted base with a trailing slash; relative Vite bases are build errors.
+
+Keep the route contract explicit: the example above assumes the proxy strips the
+prefix from page and action paths, so `htmx.base` restores it. When the proxy
+preserves page/action paths and the manifest already includes `/_admin`, leave
+`htmx.base` unset. Vite `base` remains `/_admin/` in either case.
 
 ## Browser handlers and custom roots (Phase 5)
 
@@ -487,8 +498,9 @@ export default createApp<RouteEnv>(manifest, {
 });
 ```
 
-Declare `RECOOLER_SECRET: string` in the application's Worker Bindings (and in
-its `RouteEnv` augmentation). Supply `htmx<YourEnv>` explicitly when a custom
+Declare `RECOOLER_SECRET` in the application's secret configuration and regenerate
+Worker Bindings. Have `RouteEnv` reference those generated bindings; see the
+generated-environment checklist below. Supply `htmx<YourEnv>` explicitly when a custom
 entry needs a typed binding callback; the surrounding `createApp<YourEnv>` does
 not infer that generic for a nested call. Provision the binding for every Worker
 that renders or dispatches actions. Do not turn it into a Vite define. Import
@@ -513,7 +525,7 @@ Absolute `link:` dependencies may be serialized as relative lockfile paths.
 Check those paths after moving or cloning a temporary workspace, especially with
 frozen installs.
 
-htmx 2's normal XHR headers include `HX-Request: true` and `HX-Current-URL`.
+htmx 1 and 2's normal XHR headers include `HX-Request: true` and `HX-Current-URL`.
 `HX-Current-URL` is **not** a substitute for the provenance check. Browsers send
 `Sec-Fetch-Site: same-origin` for same-origin requests; scripts cannot set that
 Fetch Metadata header themselves. Non-browser/manual clients must send the HX
@@ -566,9 +578,11 @@ or URLs: compiler source roots may also change their module-ID prefix.
 Give an admin Worker behind a service-binding proxy its external Vite prefix,
 for example `base: '/_admin/'`. A routing-only Worker should use
 `recooler({ htmx: false })` to avoid emitting a competing client entry. Vite base
-controls asset URLs; confirm what path the receiving asset store expects. If the
-proxy preserves page paths that already include the prefix, strip the prefix only
-for its asset requests before calling the admin service. Test both Workers together
+controls asset URLs; confirm what path the receiving asset store expects. As described in
+"Workers behind a path-prefix proxy", make the receiving Worker serve both
+`/assets/*` and `/_admin/assets/*` through its own asset binding. A front proxy
+may also strip the prefix only for asset requests, but the receiving Worker must
+support the old proxy during rollout. Test both Workers together
 and fetch the entry, route modules, preloads and lazy chunks through the front URL.
 Do not infer asset reachability from a successful individual Worker build.
 
@@ -579,8 +593,13 @@ and deployment-only flags; avoid a second hand-copied map. Vite's `preview` mode
 can select a Cloudflare `develop` environment; those names need not be identical.
 Build CI Workers with `CLOUDFLARE_ENV=production vite build --mode production`, then
 deploy the generated config identified by `.wrangler/deploy/config.json`.
-A legacy `wrangler deploy --define FLAG:1` cannot replace a define already folded
-by Vite: preserve that override in the Vite deployment profile too. Keep generation
+Wrangler's `--define` is ignored for Vite output: put deployment values in the
+Vite deployment profile and remove the inert flag from that deploy path.
+Deploy modes should default to deployed values; require an explicit local mode
+or flag for local dev and preview. Put security-relevant build constants behind
+a bundle assertion in CI, and fail before upload if the emitted Worker does not
+contain the expected deployed value. A tiny build-time assertion retained in the
+bundle can make this check independent of dead-code elimination. Keep generation
 deterministic and verify the generator leaves the committed files unchanged.
 
 For manifest-generated secret types, add `RECOOLER_SECRET` to `secrets.required`

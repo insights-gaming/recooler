@@ -43,6 +43,8 @@ const instrumentation = {
     if (id !== shimId) return;
     instrumented = true;
     return (await readFile(join(here, 'vite-instrument.mjs'), 'utf8'))
+      .replace("/* equivalence-source-root */ 'src'", JSON.stringify(spec.sourceRoot ?? 'src'))
+      .replace("'./source-label.mjs'", JSON.stringify(join(here, 'source-label.mjs')))
       .replaceAll("'recooler/router'", JSON.stringify(join(recoolerRoot, 'dist/router/index.js')))
       .replaceAll("'recooler/htmx'", JSON.stringify(join(recoolerRoot, 'dist/htmx/index.js')));
   },
