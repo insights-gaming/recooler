@@ -1,0 +1,282 @@
+{
+  "name": "s2: earlier segments, nested catch-alls and dot-star specificity",
+  "source": "agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s2.json; src/routes.rs static_segment_before_param_before_catch_all/deeper_and_shallower_paths",
+  "requests": [
+    {
+      "name": "GET /top/new",
+      "path": "/top/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>top-new</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /top/5",
+      "path": "/top/5",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>top-id</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /blog/new",
+      "path": "/blog/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>blog-slug</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /blog/x",
+      "path": "/blog/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>blog-slug</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /other/new",
+      "path": "/other/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>section-new</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /x/b",
+      "path": "/x/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>x-c</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /y/b",
+      "path": "/y/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>section-b</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /new/edit",
+      "path": "/new/edit",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>new-x</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /zz/edit",
+      "path": "/zz/edit",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>section-edit</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /new/zz",
+      "path": "/new/zz",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>new-x</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/a/b/edit",
+      "path": "/files/a/b/edit",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>files-rest-edit</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/a/edit",
+      "path": "/files/a/edit",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>files-rest-edit</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/a",
+      "path": "/files/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>files-id</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/static",
+      "path": "/files/static",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>files-static</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/a/b",
+      "path": "/files/a/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>files-rest</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /files/edit",
+      "path": "/files/edit",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>files-id</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /opt",
+      "path": "/opt",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>all</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /opt/",
+      "path": "/opt/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>opt-pstar</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /opt/fixed",
+      "path": "/opt/fixed",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>opt-fixed</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /opt/a",
+      "path": "/opt/a",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>opt-pstar</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /opt/a/b",
+      "path": "/opt/a/b",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>opt-pstar</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /opt/a/x",
+      "path": "/opt/a/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>opt-q-x</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /zzz",
+      "path": "/zzz",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>all</p>"
+        ],
+        "trace": []
+      }
+    }
+  ]
+}

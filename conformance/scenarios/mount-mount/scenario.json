@@ -1,0 +1,39 @@
+{
+  "name": "mount-mount: group guard after public action fall-through under mount",
+  "source": "agent-a661255d0075a9714.jsonl probe-extra; docs/reviews/0.0.27.md groupMiddleware",
+  "requests": [
+    {
+      "name": "POST /app/posts/new",
+      "path": "/app/posts/new",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      },
+      "mount": {
+        "type": "mount",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "GET /app/posts/new",
+      "path": "/app/posts/new",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-posts-new</p>"
+        ],
+        "trace": []
+      },
+      "mount": {
+        "type": "mount",
+        "prefix": "/app"
+      }
+    }
+  ]
+}

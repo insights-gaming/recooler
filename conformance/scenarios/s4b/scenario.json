@@ -1,0 +1,239 @@
+{
+  "name": "s4b: guard runs after public action registration falls through; identical paths use separate methods",
+  "source": "agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s4.json + 8e48a9b1 main transcript rv5/sc/s4b correction",
+  "requests": [
+    {
+      "name": "GET /about",
+      "path": "/about",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-about</p>"
+        ],
+        "trace": [
+          "public-group"
+        ]
+      }
+    },
+    {
+      "name": "POST /about",
+      "path": "/about",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "POST /about?action=bogus",
+      "path": "/about?action=bogus",
+      "method": "POST",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "unknown action",
+        "trace": [
+          "public-group"
+        ]
+      }
+    },
+    {
+      "name": "PUT /about",
+      "path": "/about",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /hook",
+      "path": "/hook",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-hook</p>"
+        ],
+        "trace": [
+          "public-group",
+          "onRequest public-hook"
+        ]
+      }
+    },
+    {
+      "name": "POST /hook",
+      "path": "/hook",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "public-group",
+          "onRequest public-hook",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "PUT /hook",
+      "path": "/hook",
+      "method": "PUT",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "public-group",
+          "onRequest public-hook"
+        ]
+      }
+    },
+    {
+      "name": "POST /plainpage",
+      "path": "/plainpage",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /x",
+      "path": "/x",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "POST /x",
+      "path": "/x",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "HEAD /x",
+      "path": "/x",
+      "method": "HEAD",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "",
+        "trace": [
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "OPTIONS /about",
+      "path": "/about",
+      "method": "OPTIONS",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    },
+    {
+      "name": "GET /dup",
+      "path": "/dup",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>a-pub-dup</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "POST /dup",
+      "path": "/dup",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by b-adm-group",
+        "trace": [
+          "b-adm-group"
+        ]
+      }
+    },
+    {
+      "name": "HEAD /about",
+      "path": "/about",
+      "method": "HEAD",
+      "expect": {
+        "status": 200,
+        "includes": [],
+        "body": "",
+        "trace": [
+          "public-group"
+        ]
+      }
+    },
+    {
+      "name": "action 0 from /about",
+      "method": "POST",
+      "action": {
+        "page": "/about",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action public-about"
+        ],
+        "trace": [
+          "public-group"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    }
+  ]
+}

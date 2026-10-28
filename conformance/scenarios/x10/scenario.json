@@ -1,0 +1,249 @@
+{
+  "name": "x10: nested dispatch, mounted guards and repeated identical Request object",
+  "source": "agent-ab598d8d56091e5e8.jsonl rv4/sc x10 and probe-x10.mjs",
+  "requests": [
+    {
+      "name": "GET /admin",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/admin"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin (2)",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>admin user=alice</p>"
+        ],
+        "trace": [
+          "auth@/admin",
+          "admin-dir user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "GET /admin/hook",
+      "path": "/admin/hook",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "auth@/admin/hook",
+          "admin-dir user=alice",
+          "hook"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "GET /admin/nope",
+      "path": "/admin/nope",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "admin-dir user=undefined"
+        ]
+      }
+    },
+    {
+      "name": "GET /proxy",
+      "path": "/proxy",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED",
+        "trace": [
+          "proxy",
+          "auth@/admin"
+        ]
+      }
+    },
+    {
+      "name": "GET /proxy (2)",
+      "path": "/proxy",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>admin user=alice</p>"
+        ],
+        "trace": [
+          "proxy",
+          "auth@/admin",
+          "admin-dir user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      }
+    },
+    {
+      "name": "GET /inner",
+      "path": "/inner",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED",
+        "trace": [
+          "inner",
+          "auth@/admin"
+        ]
+      }
+    },
+    {
+      "name": "route mount, unauthorized",
+      "path": "/app/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/app/admin"
+        ]
+      },
+      "headers": {},
+      "mount": {
+        "type": "route",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "route mount, authorized",
+      "path": "/app/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>admin user=alice</p>"
+        ],
+        "trace": [
+          "auth@/app/admin",
+          "admin-dir user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      },
+      "mount": {
+        "type": "route",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "basePath mount, unauthorized",
+      "path": "/app/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/app/admin"
+        ]
+      },
+      "headers": {},
+      "mount": {
+        "type": "basePath",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "basePath mount, authorized",
+      "path": "/app/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>admin user=alice</p>"
+        ],
+        "trace": [
+          "auth@/app/admin",
+          "admin-dir user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      },
+      "mount": {
+        "type": "basePath",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "mount mount, unauthorized",
+      "path": "/app/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/admin"
+        ]
+      },
+      "headers": {},
+      "mount": {
+        "type": "mount",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "mount mount, authorized",
+      "path": "/app/admin",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>admin user=alice</p>"
+        ],
+        "trace": [
+          "auth@/admin",
+          "admin-dir user=alice"
+        ]
+      },
+      "headers": {
+        "x-auth": "yes"
+      },
+      "mount": {
+        "type": "mount",
+        "prefix": "/app"
+      }
+    },
+    {
+      "name": "same Request dispatched twice",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED",
+        "trace": [
+          "auth@/admin"
+        ]
+      },
+      "repeat": 2
+    }
+  ]
+}

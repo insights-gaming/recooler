@@ -1,0 +1,192 @@
+{
+  "name": "s3: group-only and plain prefix middleware, nested depth and unmatched paths",
+  "source": "agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s3.json",
+  "requests": [
+    {
+      "name": "GET /admin",
+      "path": "/admin",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/sub",
+      "path": "/admin/sub",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-group",
+        "trace": [
+          "root",
+          "admin-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/help",
+      "path": "/admin/help",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-admin-help</p>"
+        ],
+        "trace": [
+          "root",
+          "public-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /admin/nope",
+      "path": "/admin/nope",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-dir",
+        "trace": [
+          "root",
+          "admin-dir"
+        ]
+      }
+    },
+    {
+      "name": "GET /about",
+      "path": "/about",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>public-about</p>"
+        ],
+        "trace": [
+          "root",
+          "public-group"
+        ]
+      }
+    },
+    {
+      "name": "GET /secure",
+      "path": "/secure",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by secure-dir",
+        "trace": [
+          "root",
+          "secure-dir"
+        ]
+      }
+    },
+    {
+      "name": "GET /secure/x",
+      "path": "/secure/x",
+      "method": "GET",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by secure-dir",
+        "trace": [
+          "root",
+          "secure-dir"
+        ]
+      }
+    },
+    {
+      "name": "GET /deep/x",
+      "path": "/deep/x",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>g-deep-h-x</p>"
+        ],
+        "trace": [
+          "root",
+          "g-group",
+          "g-deep-dir",
+          "h-group",
+          "h-x-dir"
+        ]
+      }
+    },
+    {
+      "name": "GET /deep",
+      "path": "/deep",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "g-deep-dir"
+        ]
+      }
+    },
+    {
+      "name": "GET /deep/nope",
+      "path": "/deep/nope",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "root",
+          "g-deep-dir"
+        ]
+      }
+    },
+    {
+      "name": "GET /nothing",
+      "path": "/nothing",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "POST /about",
+      "path": "/about",
+      "method": "POST",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "POST /admin/help",
+      "path": "/admin/help",
+      "method": "POST",
+      "expect": {
+        "status": 401,
+        "includes": [],
+        "body": "BLOCKED by admin-dir",
+        "trace": [
+          "root",
+          "admin-dir"
+        ]
+      }
+    }
+  ]
+}

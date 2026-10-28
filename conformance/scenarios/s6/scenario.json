@@ -1,0 +1,297 @@
+{
+  "name": "s6: dots, adjacent groups and group index paths strip consistently from action URLs",
+  "source": "agent-a9b2b4dbc360a7e35.jsonl rv2/specs/s6.json",
+  "requests": [
+    {
+      "name": "GET /dotted",
+      "path": "/dotted",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>dotted</p>"
+        ],
+        "trace": [
+          "mw-a.b"
+        ]
+      }
+    },
+    {
+      "name": "action 0 from /dotted",
+      "method": "POST",
+      "action": {
+        "page": "/dotted",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action dotted"
+        ],
+        "trace": [
+          "mw-a.b"
+        ]
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "GET /ver/7",
+      "path": "/ver/7",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>ver-id</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /ver/7",
+      "method": "POST",
+      "action": {
+        "page": "/ver/7",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action ver-id"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "GET /adj",
+      "path": "/adj",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>adj</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /adj",
+      "method": "POST",
+      "action": {
+        "page": "/adj",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action adj"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "GET /n",
+      "path": "/n",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>n-inner</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /n",
+      "method": "POST",
+      "action": {
+        "page": "/n",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action n-inner"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "GET /",
+      "path": "/",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>only-root</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /",
+      "method": "POST",
+      "action": {
+        "page": "/",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action only-root"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "GET /m/s1",
+      "path": "/m/s1",
+      "method": "GET",
+      "expect": {
+        "status": 200,
+        "includes": [
+          "<p>m-slug</p>"
+        ],
+        "trace": []
+      }
+    },
+    {
+      "name": "action 0 from /m/s1",
+      "method": "POST",
+      "action": {
+        "page": "/m/s1",
+        "attribute": "hx-post",
+        "index": 0
+      },
+      "headers": {
+        "HX-Request": "true"
+      },
+      "form": {},
+      "expect": {
+        "status": 200,
+        "includes": [
+          "action m-slug"
+        ],
+        "trace": []
+      },
+      "changes": [
+        {
+          "decision": "D3",
+          "reason": "Resolve rendered URL, including future absolute and mounted URLs."
+        },
+        {
+          "decision": "D6",
+          "reason": "Resolve rendered URL, including future signatures."
+        },
+        {
+          "decision": "D7",
+          "reason": "Valid action requests include HX-Request for the TS target."
+        }
+      ]
+    },
+    {
+      "name": "GET /n/",
+      "path": "/n/",
+      "method": "GET",
+      "expect": {
+        "status": 404,
+        "includes": [],
+        "body": "404 Not Found",
+        "trace": []
+      }
+    }
+  ]
+}

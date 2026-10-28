@@ -38,7 +38,9 @@ export const farmTarget: Target = {
       hash.update(new Uint8Array(await readFile(file)));
       hash.update("\0");
     }
-    const cache = path.resolve(process.env.CONFORMANCE_CACHE ?? path.join(packageDir, ".cache"), hash.digest("hex"));
+    // Keep builds under the installed workspace: Farm's native resolver does not
+    // consistently follow node_modules links when the build root is outside it.
+    const cache = path.join(packageDir, ".cache", hash.digest("hex"));
     const resultPath = path.join(cache, "result.json");
     let cached = true;
     try { await access(resultPath); } catch { cached = false; }
