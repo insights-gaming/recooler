@@ -56,7 +56,8 @@
     "prepack": "tsc",
     "build": "farm-plugin-tools build --platform --cargo-name farm_plugin_recooler -p farm_plugin_recooler --release",
     "prepublishOnly": "farm-plugin-tools prepublish",
-    "test": "tsc && node --test tests/*.test.mjs"
+    "test": "tsc && node --test tests/*.test.mjs",
+    "test:conformance": "pnpm --filter recooler-conformance test"
   },
   "files": [
     "scripts",

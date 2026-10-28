@@ -54,12 +54,30 @@ importers:
 
   conformance:
     devDependencies:
+      '@farmfe/core':
+        specifier: 1.7.11
+        version: 1.7.11(@types/node@22.1.0)(supports-color@7.2.0)
+      '@farmfe/plugin-react':
+        specifier: 1.2.6
+        version: 1.2.6
+      '@types/node':
+        specifier: ^22.1.0
+        version: 22.1.0
+      easy-jsx-html-engine:
+        specifier: 0.1.13
+        version: 0.1.13
+      farm-recooler-oracle:
+        specifier: npm:farm-plugin-recooler@0.0.27
+        version: farm-plugin-recooler@0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.13.14)
       hono:
         specifier: ^4.13.14
         version: 4.13.14
       recooler:
         specifier: workspace:*
         version: link:../packages/recooler
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@22.1.0)(vite@8.3.5(@types/node@22.1.0))
@@ -215,12 +233,14 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@farmfe/core-linux-x64-musl@1.7.11':
     resolution: {integrity: sha512-fiy7TsuVJ+zlo07KsDg3kFPZRF1tsGIExz7/gE6UUdPe9riD497RyFeW9XCEUSH277ts3x8RNJhhe2PUFUUpBw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@farmfe/core-win32-arm64-msvc@1.7.11':
     resolution: {integrity: sha512-LHohE598uAMu90xPckXGLDdEJkJGXwpxc9CPKadMaBlm7kBOXz+C50s6XwT8SEXPuP1CsSYkrLYWBMR5PlkA9g==}
@@ -261,18 +281,21 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@farmfe/plugin-react-linux-arm64-musl@1.2.6':
     resolution: {integrity: sha512-e1OFg8d1VnEGcg08ewTxJVbv6ie1e8U8fUSABbEUePKzeom8cfC9P4jadACw08M2Ls4YnOlLPFLTSlVCg9Xhew==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@farmfe/plugin-react-linux-x64-gnu@1.2.6':
     resolution: {integrity: sha512-0WFKSkPv/NK7A/czyluS0V+h/qxIb6jILUh82RyOfVjCit0WGPDVN/IH/ZIp2qMGdjtP9er8u4yt4zNGKrHZNQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@farmfe/plugin-react-linux-x64-musl@1.2.6':
     resolution: {integrity: sha512-X386lU5+4ELeaIS3c2xgB4cUjry12HUF3/lJWje2hV0SvGHwErkM07HhjbQd/XsJyg6dP8YnAn3RkuYFiwoTog==}
@@ -1139,8 +1162,20 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
+  farm-plugin-recooler-darwin-arm64@0.0.27:
+    resolution: {integrity: sha512-9JW9PrNMxy5QqE+39mBuCx4CysGX42BzeIH3hWt8FftWnHuCk5xomTTtY8xG1Co+qGbId51wOmD1WItZ8rig1A==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
   farm-plugin-recooler-darwin-x64@0.0.0:
     resolution: {integrity: sha512-MCQJWixm2OO5gzGLr2MHYpyaGidFbrVJjpuX6dnQGGH8NK2TkK3hhxjv8FSYn9EWvT9kyfFkeDfbTII+8bSGbg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  farm-plugin-recooler-darwin-x64@0.0.27:
+    resolution: {integrity: sha512-TzPxZbtiSlL/9MK6qfKZyTel3JwIfEOJeE9oBEY53FKqkxNWrDFTmh1N630DRlfenSdKRe1Xkfz4Tr3Q9UDXTA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
@@ -1151,11 +1186,25 @@ packages:
     cpu: [arm64]
     os: [linux]
 
+  farm-plugin-recooler-linux-arm64-gnu@0.0.27:
+    resolution: {integrity: sha512-f6ll7DDw40M42cWBckcZ0A8fLWo5KafbgwkzTwHqW7vmB+eKh5oPk3qA20oh4MILXHnur2GWSTsgAaDyf2lf+Q==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
   farm-plugin-recooler-linux-arm64-musl@0.0.0:
     resolution: {integrity: sha512-JVl135erC+0V5xFwnkSg4A0kYqvf65um3tfmQF903R7zSHyT6nd6qvZfvyxD8ehSVT0/3DaGJgKiB0d14ONZ0A==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+
+  farm-plugin-recooler-linux-arm64-musl@0.0.27:
+    resolution: {integrity: sha512-2utHyLR25dco/fvtUvXbDAizqMFzQUEFWix4ZyK1kcnB/lwrFlIa5BPLcKnMGrLqvMjEpwWYmsZE/Od8c9iOag==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
 
   farm-plugin-recooler-linux-x64-gnu@0.0.0:
     resolution: {integrity: sha512-KReobYvBdFvjP+fT/2w2rFFZDB+eAdDwq4fZV80LtrCaTcmN90PJuJg7CQyMRLv/CAix8j/2ygNZVMpu85mHkg==}
@@ -1163,14 +1212,34 @@ packages:
     cpu: [x64]
     os: [linux]
 
+  farm-plugin-recooler-linux-x64-gnu@0.0.27:
+    resolution: {integrity: sha512-TyWAQ8V1wWzAaqgtD5gYs963/RyHjElOffXMYpuYb05oud9vnfXp+o/u0Y6aiQlSuCZjwz644kJJsQWwly4yzA==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
   farm-plugin-recooler-linux-x64-musl@0.0.0:
     resolution: {integrity: sha512-HAyBJJ6btGfL0P51SlkNNyzR329Vz5LwRUFSg1Nl5Kl/fDQfUC0Mno/W29YIK2i/VK6yuULgzWDxfLzsui3whQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
 
+  farm-plugin-recooler-linux-x64-musl@0.0.27:
+    resolution: {integrity: sha512-P1Yx7gyGdUDQBTRghttCmbgDJUnsJCBAtudh41xdcAFEjIo0/sqKDq6nzltbuw4tBAtR4CnTWNT7/aXCvj03KQ==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
   farm-plugin-recooler-win32-arm64-msvc@0.0.0:
     resolution: {integrity: sha512-Ubs1odOWlBe/GyqdPRHGi/tGAeoXNXRQnyO0fbE4sKtxBdYMbC0PevVoSPa9d1XsP2yQMGCo6ZPLw5p+/cSFYw==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [win32]
+
+  farm-plugin-recooler-win32-arm64-msvc@0.0.27:
+    resolution: {integrity: sha512-Fu+VtJZKRhVVBloBT/9W2bW56b1V5Fpyg2yD9W7XqaeWqLaga8IM+GxYuz9dS1Nyziw7fq73tzSDFCeQXa8Neg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
@@ -1181,11 +1250,29 @@ packages:
     cpu: [ia32]
     os: [win32]
 
+  farm-plugin-recooler-win32-ia32-msvc@0.0.27:
+    resolution: {integrity: sha512-yjJg1R3lTuAOZ65eJNNLxO2k3Ng6zNJYaCGfzOWlRrxCG8HmovnYgDy53Zh4glPkukAMXJt8HVN5DDXdsTTuSA==}
+    engines: {node: '>= 10'}
+    cpu: [ia32]
+    os: [win32]
+
   farm-plugin-recooler-win32-x64-msvc@0.0.0:
     resolution: {integrity: sha512-nAnxElHC+xZ+Bac2YQrlwtqPwu5KMCDSDOgSAKzC5WCBtg0vrKD4win0mGF3ciySYoruLacw+Fuf8IOPvINPNg==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  farm-plugin-recooler-win32-x64-msvc@0.0.27:
+    resolution: {integrity: sha512-OFagHVh8dRID2AYyM3neeYryKNB3dr6G5mjp6rhkGNtBsiwAUmqejNRH4mxaNnggJ7moo7SGAk4oOaMcrmFmMA==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  farm-plugin-recooler@0.0.27:
+    resolution: {integrity: sha512-QYC0yP0CVfeBtuZ/0McCObGbdkj/VtAgF9m4PBZZJ1zwmJXLqwLRjsQGDdv3BehbI3k8pPba9rNUsOYYguzTVA==}
+    peerDependencies:
+      easy-jsx-html-engine: ^0.1.3
+      hono: ^4.12.0
 
   farm-plugin-replace-dirname-darwin-arm64@0.2.1:
     resolution: {integrity: sha512-9FThv/qoFuj3cJjv9P6YnXbBwPQ5TwGjnr50ejXdZn13Ehz0+7w7EscbRsZHNvT7p24p6i0Y9NUSallcWc2syw==}
@@ -1204,18 +1291,21 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   farm-plugin-replace-dirname-linux-arm64-musl@0.2.1:
     resolution: {integrity: sha512-m3gH8ggczbRYTHZSNp3LjIQIcqhvDO4O78bxXc8O1ozKD8M47/YfQLyQV06M7H4rZ8s6XV3Bb1kAcRAASp3M5A==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   farm-plugin-replace-dirname-linux-x64-gnu@0.2.1:
     resolution: {integrity: sha512-MehKkoM2RFw3sCnEu9nCbXKjxtC3hfTad0h/dC+Z8iEBcLEReVLoNzHWWUa6BxkxqDtB82/BWO/ObSUj/VUnwQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   farm-plugin-replace-dirname-linux-x64-musl@0.2.1:
     resolution: {integrity: sha512-o1qPZi16N/sHOteZYJVv6UmZFK3QKpVQrywk/4spJI0mPH9A9Y+G6iBE2Tqjb3d+1Hb6phr++EBJHZ2x1ajtGQ==}
@@ -3123,29 +3213,71 @@ snapshots:
   farm-plugin-recooler-darwin-arm64@0.0.0:
     optional: true
 
+  farm-plugin-recooler-darwin-arm64@0.0.27:
+    optional: true
+
   farm-plugin-recooler-darwin-x64@0.0.0:
+    optional: true
+
+  farm-plugin-recooler-darwin-x64@0.0.27:
     optional: true
 
   farm-plugin-recooler-linux-arm64-gnu@0.0.0:
     optional: true
 
+  farm-plugin-recooler-linux-arm64-gnu@0.0.27:
+    optional: true
+
   farm-plugin-recooler-linux-arm64-musl@0.0.0:
+    optional: true
+
+  farm-plugin-recooler-linux-arm64-musl@0.0.27:
     optional: true
 
   farm-plugin-recooler-linux-x64-gnu@0.0.0:
     optional: true
 
+  farm-plugin-recooler-linux-x64-gnu@0.0.27:
+    optional: true
+
   farm-plugin-recooler-linux-x64-musl@0.0.0:
+    optional: true
+
+  farm-plugin-recooler-linux-x64-musl@0.0.27:
     optional: true
 
   farm-plugin-recooler-win32-arm64-msvc@0.0.0:
     optional: true
 
+  farm-plugin-recooler-win32-arm64-msvc@0.0.27:
+    optional: true
+
   farm-plugin-recooler-win32-ia32-msvc@0.0.0:
+    optional: true
+
+  farm-plugin-recooler-win32-ia32-msvc@0.0.27:
     optional: true
 
   farm-plugin-recooler-win32-x64-msvc@0.0.0:
     optional: true
+
+  farm-plugin-recooler-win32-x64-msvc@0.0.27:
+    optional: true
+
+  farm-plugin-recooler@0.0.27(easy-jsx-html-engine@0.1.13)(hono@4.13.14):
+    dependencies:
+      easy-jsx-html-engine: 0.1.13
+      hono: 4.13.14
+    optionalDependencies:
+      farm-plugin-recooler-darwin-arm64: 0.0.27
+      farm-plugin-recooler-darwin-x64: 0.0.27
+      farm-plugin-recooler-linux-arm64-gnu: 0.0.27
+      farm-plugin-recooler-linux-arm64-musl: 0.0.27
+      farm-plugin-recooler-linux-x64-gnu: 0.0.27
+      farm-plugin-recooler-linux-x64-musl: 0.0.27
+      farm-plugin-recooler-win32-arm64-msvc: 0.0.27
+      farm-plugin-recooler-win32-ia32-msvc: 0.0.27
+      farm-plugin-recooler-win32-x64-msvc: 0.0.27
 
   farm-plugin-replace-dirname-darwin-arm64@0.2.1:
     optional: true
