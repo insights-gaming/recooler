@@ -68,7 +68,8 @@ Same-site alone does not suffice. The
 request URL's origin is always allowed; `trustedOrigins` adds exact origins via
 an array or `(origin, context) => boolean | Promise<boolean>`.
 
-A synchronous HMAC-SHA256 signs a versioned JSON tuple of route file, exact
+A synchronous HMAC-SHA256 caches the keyed inner/outer pad compression states
+per resolved secret and signs a versioned JSON tuple of route file, exact
 pathname, uppercase method, action ID and exact serialized scope. Every URL,
 including an action without captures, is signed. Signatures are compared without
 data-dependent early exit for equal-length strings. There is no expiry or session

@@ -1,4 +1,4 @@
-import { base64url, hmacSha256 } from './crypto.js';
+import { base64url, createHmacSha256 } from './crypto.js';
 import { serializeScope } from './scope.js';
 
 export interface ActionAddress {
@@ -14,12 +14,12 @@ export type ActionSigner = (address: Omit<ActionAddress, 'scope'>, json: string)
 
 export function createActionSigner(secret: string): ActionSigner {
   const encode = new TextEncoder();
-  const key = encode.encode(secret);
+  const hmac = createHmacSha256(encode.encode(secret));
   return (address, json) => {
     // A versioned tuple avoids delimiter ambiguity in user-controlled strings.
     const message = JSON.stringify(['recooler.action.v1', address.routeId, address.pathname,
       address.method.toUpperCase(), address.actionId, json]);
-    return base64url(hmacSha256(key, encode.encode(message)));
+    return base64url(hmac(encode.encode(message)));
   };
 }
 

@@ -41,23 +41,16 @@ function rotr(x: number, n: number): number {
   return (x >>> n) | (x << (32 - n));
 }
 
-function sha256(data: Uint8Array): Uint8Array {
-  const length = data.length;
-  const padded = new Uint8Array(((length + 9 + 63) >> 6) << 6);
-  padded.set(data);
-  padded[length] = 0x80;
+const SHA256_INITIAL = new Uint32Array([
+  0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
+  0x1f83d9ab, 0x5be0cd19,
+]);
 
-  const view = new DataView(padded.buffer);
-  view.setUint32(padded.length - 8, Math.floor(length / 0x20000000));
-  view.setUint32(padded.length - 4, (length << 3) >>> 0);
-
-  const h = new Uint32Array([
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
-    0x1f83d9ab, 0x5be0cd19,
-  ]);
+/** Compress complete blocks into a private state, without appending padding. */
+function compress(data: Uint8Array, h: Uint32Array): void {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const w = new Uint32Array(64);
-
-  for (let offset = 0; offset < padded.length; offset += 64) {
+  for (let offset = 0; offset < data.length; offset += 64) {
     for (let i = 0; i < 16; i++) {
       w[i] = view.getUint32(offset + i * 4);
     }
@@ -94,6 +87,19 @@ function sha256(data: Uint8Array): Uint8Array {
     h[6] = h[6]! + g;
     h[7] = h[7]! + hh;
   }
+}
+
+function sha256(data: Uint8Array, initial = SHA256_INITIAL, prefixLength = 0): Uint8Array {
+  const length = data.length;
+  const padded = new Uint8Array(((length + 9 + 63) >> 6) << 6);
+  padded.set(data);
+  padded[length] = 0x80;
+  const totalLength = prefixLength + length;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor(totalLength / 0x20000000));
+  view.setUint32(padded.length - 4, (totalLength << 3) >>> 0);
+  const h = new Uint32Array(initial);
+  compress(padded, h);
 
   const out = new Uint8Array(32);
   const outView = new DataView(out.buffer);
@@ -104,19 +110,19 @@ function sha256(data: Uint8Array): Uint8Array {
   return out;
 }
 
-export function hmacSha256(key: Uint8Array, message: Uint8Array): Uint8Array {
+/** Cache both keyed pad compression states once per secret; never retain message buffers. */
+export function createHmacSha256(key: Uint8Array): (message: Uint8Array) => Uint8Array {
   const block = new Uint8Array(64);
   block.set(key.length > 64 ? sha256(key) : key);
-
-  const inner = new Uint8Array(64 + message.length);
-  const outer = new Uint8Array(64 + 32);
-  for (let i = 0; i < 64; i++) {
-    inner[i] = block[i]! ^ 0x36;
-    outer[i] = block[i]! ^ 0x5c;
-  }
-  inner.set(message, 64);
-  outer.set(sha256(inner), 64);
-
-  return sha256(outer);
+  const innerPad = block.map(byte => byte ^ 0x36);
+  const outerPad = block.map(byte => byte ^ 0x5c);
+  const innerState = new Uint32Array(SHA256_INITIAL);
+  const outerState = new Uint32Array(SHA256_INITIAL);
+  compress(innerPad, innerState);
+  compress(outerPad, outerState);
+  return message => sha256(sha256(message, innerState, 64), outerState, 64);
 }
 
+export function hmacSha256(key: Uint8Array, message: Uint8Array): Uint8Array {
+  return createHmacSha256(key)(message);
+}
