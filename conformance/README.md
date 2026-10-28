@@ -18,9 +18,15 @@ CONFORMANCE_DIRS=../fixtures/example/scenario CONFORMANCE_SCENARIOS=scenario pnp
 
 `ts` requires built `recooler/router`, `recooler/jsx` and `recooler/vite` entrypoints. Run `pnpm --filter recooler build` first. Set `CONFORMANCE_ALLOW_SKIP=1` to opt into skipping a missing entrypoint; broken builds still fail. JSX is evaluated through its Vite bundle because the engine cannot load as native Node ESM.
 
-The adapter uses `recooler()` and `ssr.noExternal: true`, emits a single self-contained SSR module per content hash, imports it in the runner's realm, and calls `fetch`. Every import receives a fresh instance query; bundled dependencies therefore reset too, even when source-identical scenarios reuse bytes or `CONFORMANCE_REBUILD=1` overwrites the same output. The TS hash includes source names/bytes, adapter/builder, compiled recooler implementation, lockfile, tsconfig, Node version, platform and architecture. Legacy `farm-plugin-recooler/helpers` imports map to `recooler/jsx` for the shared page/root helpers.
+The adapter uses `recooler()` and `ssr.noExternal: true`, emits a single self-contained SSR module per content hash, imports it in the runner's realm, and calls `fetch`. Before each scenario import, both targets delete the engine’s `globalThis.SUSPENSE_ROOT` (counter and request map). Every TS import receives a fresh instance query; bundled dependencies therefore reset too, even when source-identical scenarios reuse bytes or `CONFORMANCE_REBUILD=1` overwrites the same output. The TS hash includes source names/bytes, adapter/builder, compiled recooler implementation, package.json exports, lockfile, tsconfig, production mode and `NODE_ENV=production`, Node version, platform and architecture. The builder child always receives `NODE_ENV=production`, independently of Vitest’s test environment. Legacy `farm-plugin-recooler/helpers` imports map to `recooler/jsx` for the shared page/root helpers.
 
-Until the htmx branch is integrated, `Target.skipReason` reports explicit scenario skips for extracted actions, reserved `action` probes, htmx settings, client-chunk assertions, source `hx-*` action/event attributes and `onLoad`/action helpers. Mixed routing/action scenarios skip as a whole; their routing checks are not counted as passing. Ordinary Hono `onPost` handlers do not imply htmx and do run. The adapter does not claim client chunk support yet.
+The Vite plugin does not yet wire the integrated htmx transform into action
+dispatch or browser builds. Individual request checks carry `requires: ["htmx"]`
+when they depend on extracted actions, reserved action queries, rendered action
+URLs/events, client chunks, or middleware fall-through through an action
+registration. `Target.requestSkipReason` exposes these as explicit skips; other
+requests in the same scenario still run. Source attributes alone never skip a
+scenario. Ordinary `onPost` handlers and all five `q6` requests run.
 
 Each directory contains `src/` and `scenario.json`. The source tree follows the normal `root.tsx`, `routes/**/index.tsx`, `layout.tsx`, and `middleware[@name].ts` conventions. Imported support files live in `src/lib` or `src/components`. Recovered fixture sources preserve their original import spelling; the runner uses NodeNext and `.js` imports.
 
@@ -42,6 +48,7 @@ Each directory contains `src/` and `scenario.json`. The source tree follows the 
     },
     {
       "name": "submit rendered action",
+      "requires": ["htmx"],
       "method": "POST",
       "action": { "page": "/protected", "attribute": "hx-post", "index": 0 },
       "headers": { "x-auth": "yes" },
@@ -55,7 +62,7 @@ Each directory contains `src/` and `scenario.json`. The source tree follows the 
 
 Assertions support exact `body`, `includes`, `excludes`, regex `matches`, regex occurrence `counts`, selected `headers` (null means absent), and ordered `trace`. Every request specifies a status. `traceExcludes` rejects particular middleware/action trace entries. `clientIncludes` and `clientExcludes` inspect the concatenated contents of **all emitted browser chunks**, including lazy handler chunks. These require `BuiltApp.clientChunks`, keyed by served URL; an adapter cannot substitute server output or omit lazy chunks. A positive handler-code assertion accompanies the server-only exclusion, so an empty chunk map fails. `inlineScriptExcludes` forbids handler-code markers inside script elements while permitting unrelated bootstrap and cleanup scripts. `noClientEntry` rejects script references to the app's emitted client URLs and requires a nonempty chunk map, even on handler-free pages. `root-scripts` also requires route metadata (`data-recooler-route` on the body, or a `recooler-route` meta tag for a root that owns its body).
 
-A build-error scenario replaces `requests` with `"buildError": "diagnostic substring"`, or an array of required substrings. `buildErrors: { "ts": ["src/routes/a/index.tsx", "src/routes/b/index.tsx", "GET"] }` supplies a complete target-specific diagnostic override, independent of Rust's English phrasing. Every array element is required independently, so route order is irrelevant. `BuildResult.kind = "buildError"` also represents startup validation errors. m14 (namespace object) and m15 (class) independently require `src/routes/middleware.ts` and `must export a middleware function`. Classes must be rejected despite `typeof value === "function"`, for example by checking the `class` prefix of `Function.prototype.toString.call(value)`. m17 throws during module loading before namespace validation is possible; it remains a documented known issue rather than asserting an unreachable startup diagnostic.
+A build-error scenario replaces `requests` with `"buildError": "diagnostic substring"`, or an array of required substrings. `buildErrors: { "ts": ["src/routes/a/index.tsx", "src/routes/b/index.tsx", "GET"] }` supplies a complete target-specific diagnostic override, independent of Rust's English phrasing. Every array element is required independently, so route order is irrelevant. `BuildResult.kind = "buildError"` also represents startup validation errors. m14 (namespace object) and m15 (class) independently require `routes/middleware.ts` on TS (`src/routes/middleware.ts` on Farm) and `must export a middleware function`. Classes must be rejected despite `typeof value === "function"`, for example by checking the `class` prefix of `Function.prototype.toString.call(value)`. m17 throws during module loading before namespace validation is possible; it remains a documented known issue rather than asserting an unreachable startup diagnostic.
 
 Action requests resolve URLs from rendered `hx-*` or `data-hx-*` attributes, including HTML entity decoding and relative resolution against the rendered page. `action.headers` authenticates the render request; the outer `headers` authenticates the action request. `action.response` reads a previously named response instead, for nested forms returned in fragments. Both rendering and submitting use `request.mount`. `action.path` retains the extracted query (including signature/scope) but sends it to another path. `action.oraclePath` corrects only the oracle's unprefixed mount URLs; TS must submit its extracted URL unchanged for ordinary mounted actions. `ts: { "htmxOptions": { "base": "/m" } }` configures `htmx({ base: "/m" })` for the prefix-stripping `mount()` scenario. `action.tamper` supports `drop-sig`, `flip-sig`, `scope` and `method`; method changes POST to GET (or another method to POST) while retaining the extracted query. A missing attribute or unsuccessful render fails the test. Known-invalid `?action=` probes deliberately specify the unknown query value directly.
 
@@ -75,29 +82,25 @@ The recovered middleware records ordered entries in `globalThis.__t`. The common
 
 Farm builds run in separate Node processes with `persistentCache: false`, no decorators, and a single ESM output. The npm alias `farm-recooler-oracle` prevents pnpm from resolving the oracle to the local workspace package. The adapter explicitly maps `farm-plugin-recooler/helpers` to that published package. A custom Farm logger throws after reporting errors, preserving diagnostics instead of exiting the runner. Native crashes and timeouts fail as infrastructure errors and cannot satisfy a build-error expectation.
 
-Outputs and build diagnostics are cached in ignored `conformance/.cache/<sha256>/`. The key includes source paths and bytes, plugin options, builder and adapter code, lockfile, Node version, platform and architecture. Expectations are checked on every run even when the build is reused. Filenames use code-point sorting for deterministic cache keys. Imports include the scenario directory as a URL query, so identical source trees reuse bytes while getting independent module instances, including during a forced rebuild. `CONFORMANCE_REBUILD=1` forces recompilation. Keep the cache in the workspace: Farm's native resolver fails to resolve JSX dependencies from some external build roots despite `node_modules` symlinks. External scenario trees are copied into this cache before compiling and are never modified.
+Outputs and build diagnostics are cached in ignored `conformance/.cache/<sha256>/` (Farm) and `ts-<implementation hash>-<source hash>/` (TS). TS evicts incompatible implementation/mode caches and superseded scenario source entries; a small index preserves content reuse across identical scenarios. The key includes source paths and bytes, plugin options, builder and adapter code, lockfile, Node version, platform and architecture. Expectations are checked on every run even when the build is reused. Filenames use code-point sorting for deterministic cache keys. Imports include the scenario directory as a URL query, so identical source trees reuse bytes while getting independent module instances, including during a forced rebuild. `CONFORMANCE_REBUILD=1` forces recompilation. Keep the cache in the workspace: Farm's native resolver fails to resolve JSX dependencies from some external build roots despite `node_modules` symlinks. External scenario trees are copied into this cache before compiling and are never modified.
 
-Oracle defects are documented under [known-issues](known-issues/README.md). Seven TS-only scenarios cover their intended 0.1.0 contracts, including the new root `scripts: string[]` signature; m17 remains only a known issue. They are skipped on Farm instead of freezing broken oracle behaviour. Legacy `Root(Content, clientScript)` fixtures remain to exercise the one-release compatibility shim.
+Oracle defects are documented under [known-issues](known-issues/README.md). Seven TS-only scenarios cover their intended 0.1.0 contracts, including the root’s `props.scripts: string[]` contract; its second HOC argument remains `clientScript?: string`; m17 remains only a known issue. They are skipped on Farm instead of freezing broken oracle behaviour. Legacy `Root(Content, clientScript)` fixtures remain to exercise the one-release compatibility shim.
 
 The [review response](REVIEW-RESPONSE.md) records the per-finding changes, verification commands and mutation results. The source tree contains **123 scenarios**: 116 oracle scenarios (477 request checks and 35 diagnostic checks) and seven TS-only scenarios (five request checks and two startup diagnostics). The suite also has 21 request/runner contract checks and two TS adapter cache/feature checks.
 
 ## TS integration results (2026-10-27)
 
-The non-htmx run executes 84 scenarios: 82 pass and two have incorrect diagnostic expectations. All HTTP assertions pass after the explicit D4 annotation below. 39 scenarios (327 checks) skip for unimplemented htmx features. These skips are never reported as passes.
+The Vite review fixes use production builds, source-relative diagnostics and
+request-level feature tags. Duplicate-layout diagnostics name only the conflicting
+`routes/layout.jsx` and `routes/layout.tsx` files; alias collisions name
+`routes/:id/layout.tsx` and `routes/[id]/layout.tsx`. The unrelated page files are
+not required. Leading spaces in the TS expectations reject absolute paths.
 
-- **Router bug fixed separately:** `m15` exported a class. `typeof class === "function"` previously admitted it as middleware; startup now rejects class/non-callable defaults with a middleware diagnostic. A regression test runs on Hono 4.12, 4.13 and 5. `m14`'s namespace object receives the same diagnostic contract. No JSX source changes were necessary.
-- **Intended diagnostic ID difference:** c1, c2, c3, c3b, c4, c7; d1, d2, d4, d5, d6, d7, d9, d10, d11; error-layout-alias, error-param-alias; m14, m15; p1, p2, p3, p5, p8, p10, p11 now have explicit `buildErrors.ts` annotations using `srcDir`-relative manifest IDs (`routes/...`), as designed in plan §1.1. Oracle expectations are unchanged. p5 also rejects nonportable backslash directory names, while still reporting its method conflict.
-- **Intended D4 HTML difference:** `head-isolation` has an explicit request-level TS expectation for `<body data-recooler-route="/">`. Its head contents, mutation isolation, charset counts, page contents and middleware trace assertions remain the same.
-- **Wrong expectation, left failing:** `error-duplicate-layout` requires `src/routes/index.tsx` in a duplicate-layout diagnostic. The generator correctly reports `src/routes/layout.jsx` and `src/routes/layout.tsx`, plus “only one layout file may be used per directory”. The unrelated page is not the cause. Its expectation is preserved for review.
-- **Wrong expectation, left failing:** `error-layout-alias` requires `routes/[id]/index.tsx` in a layout-path collision. The generator correctly reports `routes/:id/layout.tsx` and `routes/[id]/layout.tsx`, plus “only one layout may be used per path”. The unrelated page is not the cause. The `srcDir` prefix annotation is applied, but the incorrect page assertion remains for review.
+Package tests cover real Vite SSR CLI builds, custom server environments,
+third-party JSX dependencies, plain dev requests and route watching, default-only
+virtual exports, a production SSR source map, actual Vitest startup/imports,
+per-file JSX configuration, and generation failure/overlay/recovery. Cloudflare
+v1/v2 build and dev checks are recorded in the Vite review response.
 
-Package tests cover a real Vite SSR CLI build, plain dev HTTP request and added-route watch, default-only virtual exports, a thrown route error whose SSR map resolves to `src/routes/index.tsx:3`, and Cloudflare 1.65 build plus a local workerd dev HTTP request with a custom environment name. Cache tests verify byte reuse, dependency state reset across identical scenarios, and forced rebuilds.
-
-
-Final verification on Node 22.22.2, Vite 8.3.5 and Cloudflare plugin 1.65.0:
-
-- `pnpm --filter recooler test`: **590 passed**.
-- Package typecheck/build and conformance typecheck: **passed**.
-- TS target: **190 passed, 327 skipped, 2 failed** target checks; **213 passed, 327 skipped, 2 failed** including the 23 harness/adapter checks.
-- Farm 0.0.27: **512 passed, 7 skipped, 0 failed** target checks; **535 passed, 7 skipped, 0 failed** including the same 23 harness/adapter checks.
-- Combined `CONFORMANCE_TARGETS=farm-0.0.27,ts`: **725 passed, 334 skipped, 2 failed** (shared checks run once). The two failures are the wrong expectations described above; the suite intentionally remains red until they are reviewed.
+Final counts and verification commands are recorded in
+[the Vite review response](../docs/reviews/ts-vite-review-response.md).

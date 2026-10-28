@@ -4,9 +4,9 @@
   "buildError": "only one layout file may be used per directory",
   "buildErrors": {
     "ts": [
-      "src/routes/index.tsx",
-      "src/routes/layout.jsx",
-      "src/routes/layout.tsx"
+      " routes/layout.jsx",
+      " routes/layout.tsx",
+      "only one layout file may be used per directory"
     ]
   }
 }

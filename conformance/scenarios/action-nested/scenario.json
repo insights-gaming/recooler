@@ -49,6 +49,9 @@
           "decision": "D7",
           "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -83,6 +86,9 @@
           "decision": "D7",
           "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -117,6 +123,9 @@
           "decision": "D7",
           "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -152,6 +161,9 @@
           "decision": "D7",
           "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     }
   ]

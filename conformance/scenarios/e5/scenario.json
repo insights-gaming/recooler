@@ -34,7 +34,10 @@
       },
       "headers": {
         "x-auth": "1"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "POST /posts/a (2)",
@@ -48,7 +51,10 @@
           "pub",
           "admin"
         ]
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "action 0 from /posts/a",
@@ -88,6 +94,9 @@
           "decision": "D7",
           "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -138,6 +147,9 @@
           "decision": "D7",
           "reason": "Runner supplies HX-Request: true, same-origin Origin and Sec-Fetch-Site on action requests."
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     }
   ]

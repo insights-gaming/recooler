@@ -1,5 +1,5 @@
-import type { BuildResult, Scenario, Target } from "../target.js";
-import { access, cp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import type { BuildResult, ScenarioRequest, Target } from "../target.js";
+import { access, cp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -52,51 +52,79 @@ const builder = fileURLToPath(new URL("./ts-build.mjs", import.meta.url));
 const execute = promisify(execFile);
 let importGeneration = 0;
 
-/** Feature detection keeps mixed routing/action fixtures honest until htmx is
- * available. Do not turn an unimplemented feature into a successful response. */
-export async function tsSkipReason(dir: string, scenario: Scenario): Promise<string | undefined> {
-  const expectations = (scenario.requests ?? []).flatMap(request => [request.expect, ...(request.repeatExpect ?? []), ...(request.changes ?? []).flatMap(c => c.ts ? [c.ts] : [])]);
-  if (scenario.ts?.htmxOptions || scenario.requests?.some(r => r.action || /[?&]action=/.test(r.path ?? ""))) {
-    return "htmx actions, signing and CSRF are not implemented yet";
-  }
-  if (expectations.some(e => e.clientIncludes || e.clientExcludes || e.noClientEntry || e.inlineScriptExcludes)) {
-    return "htmx client chunks are not implemented yet";
-  }
-  for (const file of await filesUnder(path.join(dir, "src"))) {
-    const source = await readFile(file, "utf8");
-    if (/\b(?:data-)?hx-(?:get|post|put|patch|delete|on(?:[:-][\w-]+)?)(?=[\s"\x27=\]:])|\b(?:onLoad|wrapAction|actionScope|handlerScope)\b/.test(source)) {
-      return "htmx form actions and event handlers are not implemented yet";
-    }
-  }
+/** Feature tags apply to requests, so mixed scenarios still exercise routing. */
+export function tsRequestSkipReason(request: ScenarioRequest): string | undefined {
+  if (request.requires?.includes("htmx")) return "htmx dispatch and client chunks are not implemented yet";
 }
+
+const buildMode = "production";
+const buildNodeEnv = "production";
+let prunedNamespace: string | undefined;
 
 /** Deterministic location for build bytes and diagnostics, also used by cache verification. */
 export async function tsCacheDirectory(scenarioDir: string): Promise<string> {
   const hash = createHash("sha256");
-  hash.update(`ts/vite-8.3.5/${process.version}/${process.platform}/${process.arch}`);
-  for (const file of [builder, fileURLToPath(import.meta.url), path.join(packageDir, "../pnpm-lock.yaml"), path.join(packageDir, "tsconfig.json"), ...await filesUnder(implementation)]) {
+  hash.update(`ts/vite-8.3.5/${process.version}/${process.platform}/${process.arch}/mode=${buildMode}/NODE_ENV=${buildNodeEnv}`);
+  for (const file of [builder, fileURLToPath(import.meta.url), path.join(packageDir, "../pnpm-lock.yaml"), path.join(packageDir, "tsconfig.json"), path.join(implementation, "../package.json"), ...await filesUnder(implementation)]) {
     hash.update(path.relative(packageDir, file));
     hash.update(new Uint8Array(await readFile(file)));
     hash.update("\0");
   }
+  const namespace = hash.digest("hex");
+  const sources = createHash("sha256");
   const src = path.join(scenarioDir, "src");
   for (const file of await filesUnder(src)) {
-    hash.update(path.relative(src, file));
-    hash.update("\0");
-    hash.update(new Uint8Array(await readFile(file)));
-    hash.update("\0");
+    sources.update(path.relative(src, file));
+    sources.update("\0");
+    sources.update(new Uint8Array(await readFile(file)));
+    sources.update("\0");
   }
-  return path.join(packageDir, ".cache", "ts-" + hash.digest("hex"));
+  return path.join(packageDir, ".cache", `ts-${namespace}-${sources.digest("hex")}`);
 }
 
 export const tsTarget: Target = {
   name: "ts",
   expectationFamily: "ts",
   unavailable: tsUnavailable,
-  skipReason: tsSkipReason,
+  requestSkipReason: tsRequestSkipReason,
   async build(scenarioDir: string): Promise<BuildResult> {
     const src = path.join(scenarioDir, "src");
     const cache = await tsCacheDirectory(scenarioDir);
+    const cacheRoot = path.dirname(cache);
+    const namespace = path.basename(cache).split('-')[1]!;
+    await mkdir(cacheRoot, { recursive: true });
+    // Drop incompatible implementation/mode caches, including the old ts-<hash> format.
+    if (prunedNamespace !== namespace) {
+      for (const entry of await readdir(cacheRoot)) {
+        if (entry.startsWith('ts-') && entry !== 'ts-index.json' && !entry.startsWith(`ts-${namespace}-`)) {
+          await rm(path.join(cacheRoot, entry), { recursive: true, force: true });
+        }
+      }
+      prunedNamespace = namespace;
+    }
+    const indexPath = path.join(cacheRoot, 'ts-index.json');
+    let index: Record<string, string> = {};
+    try { index = JSON.parse(await readFile(indexPath, 'utf8')); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    for (const scenario of Object.keys(index)) {
+      try { await access(scenario); } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        delete index[scenario];
+      }
+    }
+    const previous = index[scenarioDir];
+    index[scenarioDir] = path.basename(cache);
+    await writeFile(indexPath, JSON.stringify(index));
+    if (previous && previous !== path.basename(cache) && !Object.values(index).includes(previous)) {
+      await rm(path.join(cacheRoot, previous), { recursive: true, force: true });
+    }
+    const retained = new Set(Object.values(index));
+    for (const entry of await readdir(cacheRoot)) {
+      if (entry.startsWith(`ts-${namespace}-`) && !retained.has(entry)) {
+        await rm(path.join(cacheRoot, entry), { recursive: true, force: true });
+      }
+    }
     const resultPath = path.join(cache, "result.json");
     let cached = true;
     try { await access(resultPath); } catch { cached = false; }
@@ -108,7 +136,7 @@ export const tsTarget: Target = {
       await writeFile(path.join(cache, "package.json"), '{"type":"module"}\n');
       let logs: string;
       try {
-        const result = await execute(process.execPath, [builder, cache], { cwd: cache, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
+        const result = await execute(process.execPath, [builder, cache], { cwd: cache, env: { ...process.env, NODE_ENV: buildNodeEnv }, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
         logs = result.stdout + result.stderr;
       } catch (error) {
         const failure = error as Error & { stdout?: string; stderr?: string; signal?: string };
@@ -123,8 +151,8 @@ export const tsTarget: Target = {
     if (!result.ok) return { kind: "buildError", error: result.error ?? "" };
     let app: import("hono").Hono;
     try {
-      // inlineDynamicImports + noExternal:true isolates all dependency state,
-      // including when identical sources reuse cached bytes or are rebuilt.
+      // Bundling isolates module state; the engine also stores state on globalThis.
+      delete (globalThis as { SUSPENSE_ROOT?: unknown }).SUSPENSE_ROOT;
       const url = pathToFileURL(path.join(cache, "dist/app.mjs")).href;
       const module = await import(/* @vite-ignore */ `${url}?scenario=${encodeURIComponent(scenarioDir)}&instance=${importGeneration++}`);
       app = module.default;

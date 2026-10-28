@@ -25,7 +25,7 @@ The virtual module exports **only default**, equivalent to
 use your own `createApp` entry and the generated manifest. The plugin array
 keeps route generation separate from app wiring; future htmx integration can
 add plugins and extensions without replacing the platform's app builder.
-There is no htmx transform, action dispatch or client entry yet.
+The plugin does not yet wire the htmx transform into action dispatch or a client entry.
 
 For a virtual-only SSR build, use `build: { ssr: true, rolldownOptions: {
 input: 'virtual:recooler/app' } }`. Vite treats a string `build.ssr` as a real

@@ -16,7 +16,10 @@
       "action": {
         "page": "/",
         "attribute": "hx-post"
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     },
     {
       "name": "cross-site POST",
@@ -51,6 +54,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -85,6 +91,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -118,6 +127,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     },
     {
@@ -150,6 +162,9 @@
             ]
           }
         }
+      ],
+      "requires": [
+        "htmx"
       ]
     }
   ]

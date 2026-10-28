@@ -44,7 +44,8 @@ for (const name of selected) {
           });
         } else {
           for (const request of scenario.requests!) {
-            test(request.name, async () => {
+            const requestSkip = target.requestSkipReason?.(request);
+            test.skipIf(!!requestSkip)(request.name + (requestSkip ? ` (skipped: ${requestSkip})` : ""), async () => {
               const firstExpected = expectationFor(request, scenario, target);
               const results = await performRequest(request, fetch, responses, target);
               for (const [index, actual] of results.entries()) {

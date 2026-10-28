@@ -7,6 +7,7 @@ import path from "node:path";
 import type { BuildResult, Scenario, Target } from "../target.js";
 
 const execute = promisify(execFile);
+let importGeneration = 0;
 const packageDir = fileURLToPath(new URL("../../", import.meta.url));
 const builder = fileURLToPath(new URL("./farm-build.mjs", import.meta.url));
 // This is already a bundled ESM app; no application-source transforms are needed.
@@ -69,7 +70,8 @@ export const farmTarget: Target = {
     if (!result.ok) {
       return { kind: "buildError", error: (result.error ?? "") + "\n" + await readFile(path.join(cache, "build.log"), "utf8") };
     }
-    const { default: app } = await nativeImport(pathToFileURL(path.join(cache, "dist/main.js")).href + "?scenario=" + encodeURIComponent(scenarioDir));
+    delete (globalThis as { SUSPENSE_ROOT?: unknown }).SUSPENSE_ROOT;
+    const { default: app } = await nativeImport(pathToFileURL(path.join(cache, "dist/main.js")).href + "?scenario=" + encodeURIComponent(scenarioDir) + "&instance=" + importGeneration++);
     if (typeof app?.fetch !== "function") throw new Error(`Farm output has no default fetch(): ${cache}`);
     return { kind: "app", fetch: app.fetch.bind(app), hono: app as unknown as import("hono").Hono };
   },

@@ -4,9 +4,8 @@
   "buildError": "only one layout may be used per path",
   "buildErrors": {
     "ts": [
-      "routes/:id/layout.tsx",
-      "routes/[id]/index.tsx",
-      "routes/[id]/layout.tsx"
+      " routes/:id/layout.tsx",
+      " routes/[id]/layout.tsx"
     ]
   }
 }

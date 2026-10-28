@@ -25,6 +25,7 @@ export interface Target {
   unavailable?(): Promise<string | undefined>;
   /** Explicit unsupported-feature skip; always surfaced in the suite name. */
   skipReason?(scenarioDir: string, scenario: Scenario): Promise<string | undefined>;
+  requestSkipReason?(request: ScenarioRequest): string | undefined;
   build(scenarioDir: string, scenario: Scenario): Promise<BuildResult>;
 }
 
@@ -55,6 +56,8 @@ export interface IntentionalChange {
 }
 
 export interface ScenarioRequest {
+  /** Checks that require action dispatch or emitted browser chunks. */
+  requires?: "htmx"[];
   name: string;
   path?: string;
   method?: string;

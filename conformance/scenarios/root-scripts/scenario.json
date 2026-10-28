@@ -1,6 +1,6 @@
 {
   "name": "root-scripts: custom root receives script URL array",
-  "source": "docs/plans/typescript-rewrite.md Part 2 root HOC scripts array",
+  "source": "docs/plans/typescript-rewrite.md Part 2 root props.scripts URL array",
   "targets": [
     "ts"
   ],
@@ -24,7 +24,10 @@
         "inlineScriptExcludes": [
           "root-scripts-handler"
         ]
-      }
+      },
+      "requires": [
+        "htmx"
+      ]
     }
   ]
 }

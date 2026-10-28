@@ -8,7 +8,7 @@ import path from 'node:path';
 const root = process.argv[2];
 try {
   await build({
-    root, configFile: false, logLevel: 'warn',
+    root, mode: 'production', configFile: false, logLevel: 'warn',
     plugins: recooler(),
     resolve: { alias: { 'farm-plugin-recooler/helpers': 'recooler/jsx' } },
     ssr: { noExternal: true },
