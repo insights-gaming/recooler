@@ -35,7 +35,7 @@ export default () => <><Button value="page"/><Outside/><Dependency/><p>{cycle}</
   }}/>
   <button hx-on:click={() => console.log('CLIENT_BODY_MUST_BE_ABSENT')}/>
 </>;\n`;
-let server, builtPreview;
+let server, builtPreview, auxiliary;
 try {
   await mkdir(path.join(root, 'node_modules'));
   await symlink(packageDir, path.join(root, 'node_modules/recooler'), 'dir');
@@ -60,13 +60,21 @@ try {
   await write('src/entry.ts', `import app from 'virtual:recooler/app'; app.onError(error => Response.json({ stack: error.stack }, { status: 500 })); export default app;`);
   await write('.dev.vars', `RECOOLER_SECRET=${secret}\n`);
   if (kind === 'beta') await write('cloudflare.config.ts', `export default { worker: { name: 'htmx-worker', entrypoint: './src/entry.ts', compatibilityDate: '2026-10-20', compatibilityFlags: ['nodejs_compat'], env: { RECOOLER_SECRET: { type: 'secret' } } } };`);
-  else if (cf) await write('wrangler.json', JSON.stringify({ name: 'htmx_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: ['nodejs_als'] }));
+  else if (cf) {
+    auxiliary = await mkdtemp(path.join(cacheDir, 'htmx-aux-'));
+    await mkdir(path.join(auxiliary, 'src'));
+    await writeFile(path.join(auxiliary, 'package.json'), '{"type":"module"}');
+    await writeFile(path.join(auxiliary, 'src/index.ts'), `export default { fetch: () => new Response('auxiliary worker') };`);
+    await writeFile(path.join(auxiliary, 'wrangler.json'), JSON.stringify({ name: 'aux_worker', main: 'src/index.ts', compatibility_date: '2026-10-20' }));
+    await write('src/routes/aux/index.ts', `export const onGet = c => c.env.AUX.fetch('http://aux/');`);
+    await write('wrangler.json', JSON.stringify({ name: 'htmx_worker', main: 'src/entry.ts', compatibility_date: '2026-10-20', compatibility_flags: ['nodejs_als'], services: [{ binding: 'AUX', service: 'aux_worker' }] }));
+  }
   const beta = kind === 'beta' ? (await import(new URL('../../../../spikes/phase1/node_modules/cloudflare-vite-beta/dist/index.mjs', import.meta.url))).cloudflare : undefined;
   const make = () => ({
     root, configFile: false, logLevel: 'warn', mode: 'production',
     plugins: [
-      ...(cf ? [beta ? beta({ persistState: false, inspectorPort: false, types: { generate: false } }) : cloudflare({ configPath: path.join(root, 'wrangler.json'), persistState: false, inspectorPort: false })] : []),
-      ...recooler({ serverEnvironment: selected }),
+      ...(cf ? [beta ? beta({ persistState: false, inspectorPort: false, types: { generate: false } }) : cloudflare({ configPath: path.join(root, 'wrangler.json'), auxiliaryWorkers: [{ configPath: path.join(auxiliary, 'wrangler.json') }], persistState: false, inspectorPort: false })] : []),
+      ...recooler(kind === 'cloudflare' ? {} : { serverEnvironment: selected }),
     ],
     // Deliberately try to externalize/prebundle our action dependency. recooler
     // must keep it in the selected server's source pipeline.
@@ -107,7 +115,9 @@ try {
   if (!cf) {
     assert.equal((await builtApp.fetch(new Request('http://test/'))).status, 200, 'Node process.env fallback');
     delete process.env.RECOOLER_SECRET;
-    assert.equal((await builtApp.fetch(new Request('http://test/'), {})).status, 500, 'missing request secret');
+    const missing = await builtApp.fetch(new Request('http://test/'), {});
+    assert.equal(missing.status, 500, 'missing request secret');
+    assert.match((await missing.json()).stack, /recooler:.*RECOOLER_SECRET.*\.dev.vars.*process.env/);
     process.env.RECOOLER_SECRET = secret;
   }
   const html = await (await requestBuilt('/?dynamic=1')).text();
@@ -150,8 +160,14 @@ try {
   await server.listen();
   const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
   const request = (url, init) => fetch(new URL(url, origin), init);
+  if (kind === 'cloudflare') {
+    assert.equal(await (await request('/aux')).text(), 'auxiliary worker');
+    const auxSource = await server.environments.aux_worker.transformRequest(path.join(auxiliary, 'src/index.ts'));
+    assert(!auxSource.code.includes('recooler/htmx/runtime'), 'idle auxiliary environments must not receive registrations');
+  }
   const [devGraph] = await Promise.all([inspectGraph(request), inspectGraph(request)]);
-  assert.deepEqual(devGraph, builtGraph);
+  assert.deepEqual(devGraph.table, builtGraph.table);
+  assert.notEqual(devGraph.namespace, builtGraph.namespace, 'dev server nonce isolates build registrations');
   const initial = await (await request('/')).text();
   assert.equal(await (await submit(request, actions(initial)[2])).text(), '<p>page:Ada</p>');
   const editStart = performance.now();
@@ -187,7 +203,10 @@ try {
     server = await createServer({ ...make(), server: { middlewareMode: true, ws: false } });
     const restarted = (await server.environments.ssr.runner.import('/src/entry.ts')).default;
     assert.equal((await restarted.fetch(new Request('http://test/'), { RECOOLER_SECRET: secret })).status, 200);
-    assert.deepEqual(Object.keys(registry.get('components/Button.tsx')), []);
+    const restartedGraph = await (await restarted.fetch(new Request('http://test/table'), { RECOOLER_SECRET: secret })).json();
+    assert.notEqual(restartedGraph.namespace, graph.namespace);
+    const currentRegistry = globalThis[Symbol.for('recooler.htmx.actions.v2')].get(restartedGraph.namespace);
+    assert.deepEqual(Object.keys(currentRegistry.get('components/Button.tsx')), []);
   }
   console.log(JSON.stringify({ kind, build: true, devRequest: true, actionRemoval: true, editResponseMs, sourceMap: cf ? undefined : 'src/routes/index.tsx:10' }));
 } finally {
@@ -196,4 +215,5 @@ try {
   if (previousSecret === undefined) delete process.env.RECOOLER_SECRET;
   else process.env.RECOOLER_SECRET = previousSecret;
   await rm(root, { recursive: true, force: true });
+  if (auxiliary) await rm(auxiliary, { recursive: true, force: true });
 }

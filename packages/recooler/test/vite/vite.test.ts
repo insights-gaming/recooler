@@ -90,3 +90,14 @@ test('watch builds retain unchanged actions and discard removed actions', async 
   });
   expect(result.stdout).toContain('"cachedActions":true');
 }, 65000);
+
+for (const runtime of ['node', 'workerd']) {
+  test(`htmx canonical layouts, table parity, source maps and full edit matrix on ${runtime}`, async () => {
+    const result = await execute(process.execPath, [fileURLToPath(new URL('./htmx-regressions.mjs', import.meta.url)), ...(runtime === 'workerd' ? ['--cloudflare'] : [])], {
+      timeout: 120000, maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, NODE_ENV: 'production', WRANGLER_SEND_METRICS: 'false' },
+    });
+    expect(result.stdout).toContain('"editMatrix":true');
+    expect(result.stdout).toContain('"tableParity":true');
+  }, 130000);
+}

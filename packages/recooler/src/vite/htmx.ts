@@ -1,5 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import MagicString from 'magic-string';
 import { normalizePath } from 'vite';
@@ -26,6 +28,7 @@ export function canonicalId(id: string): string {
 }
 
 interface State {
+  tableLoaded: boolean;
   epoch: number;
   modules: Map<string, { actions: boolean; htmx: boolean }>;
   cached?: { epoch: number; table: ActionTable; enabled: boolean };
@@ -34,18 +37,39 @@ interface State {
   transforms: Map<string, { source: string; kind: string; result: TransformResult }>;
 }
 
+/** Shared by build and dev: propagate each action identity through reverse static edges. */
+function propagateActions(parents: Map<string, Set<string>>, actionModules: Iterable<[string, string]>): Map<string, Set<string>> {
+  const reachable = new Map<string, Set<string>>();
+  for (const [id, action] of actionModules) {
+    const queue = [id];
+    const seen = new Set<string>();
+    for (let index = 0; index < queue.length; index++) {
+      const current = queue[index]!;
+      if (seen.has(current)) continue;
+      seen.add(current);
+      let actions = reachable.get(current);
+      if (!actions) reachable.set(current, actions = new Set());
+      actions.add(action);
+      queue.push(...parents.get(current) ?? []);
+    }
+  }
+  return reachable;
+}
+
 /** Server graph ownership is separate from the app entry, for Phase 5/custom entries. */
 export function htmxPlugin(options: RecoolerOptions) {
   let roots: ReturnType<typeof locations>;
   let serving = false;
-  let files: string[] = [];
+  let routeSeeds: { file: string; chain: string[] }[] = [];
+  const dependencyRoots = new Set<string>();
   const kinds = new Map<string, 'route' | 'layout' | 'root'>();
-  let namespace: string;
+  let projectNamespace: string;
+  const namespaceFor = (name: string) => projectNamespace + ':' + name;
   let generationFailed = false;
   const states = new Map<string, State>();
   const stateFor = (name: string) => {
     let value = states.get(name);
-    if (!value) states.set(name, value = { epoch: 0, modules: new Map(), outputs: new Map(), transforms: new Map() });
+    if (!value) states.set(name, value = { tableLoaded: false, epoch: 0, modules: new Map(), outputs: new Map(), transforms: new Map() });
     return value;
   };
   const selected = (environment: { name: string; config: { consumer: string } }) =>
@@ -54,20 +78,6 @@ export function htmxPlugin(options: RecoolerOptions) {
     const canonical = canonicalId(id);
     const at = canonical.indexOf('?');
     return normalizePath(path.relative(roots.srcDir, at < 0 ? canonical : canonical.slice(0, at))) + (at < 0 ? '' : canonical.slice(at));
-  };
-  const seeds = () => {
-    const root = files.find(file => file === normalizePath(path.join(roots.srcDir, 'root.tsx')));
-    const layouts = new Map(files.filter(file => /\/layout\.[jt]sx?$/.test(file)).map(file => [path.dirname(file), file]));
-    return files.filter(file => /\/index\.[jt]sx?$/.test(file)).map(file => {
-      const chain = [file];
-      for (let directory = path.dirname(file);; directory = path.dirname(directory)) {
-        const layout = layouts.get(directory);
-        if (layout) chain.push(layout);
-        if (directory === roots.routesDir || path.dirname(directory) === directory) break;
-      }
-      if (root) chain.push(root);
-      return { file, chain };
-    });
   };
   // Do not walk into our own table (custom entries can import it), or inject a
   // registration into framework internals, which would create runtime cycles.
@@ -123,7 +133,7 @@ export function htmxPlugin(options: RecoolerOptions) {
           nodes.set(node.id, node);
           await Promise.all(node.deps.map(discover));
         };
-        const routes = seeds();
+        const routes = routeSeeds;
         await Promise.all(routes.flatMap(route => route.chain).map(discover));
         const parents = new Map<string, Set<string>>();
         await Promise.all([...nodes.values()].map(async node => {
@@ -138,22 +148,8 @@ export function htmxPlugin(options: RecoolerOptions) {
         // Propagate only action identities through reverse static edges. Each
         // (action, importer) pair is visited once; cycles need no recursive
         // promise or special evaluation ordering.
-        const reachable = new Map<string, Set<string>>();
-        for (const id of nodes.keys()) {
-          if (!state.modules.get(id)?.actions) continue;
-          const action = relative(id);
-          const queue = [id];
-          const seen = new Set<string>();
-          for (let index = 0; index < queue.length; index++) {
-            const current = queue[index]!;
-            if (seen.has(current)) continue;
-            seen.add(current);
-            let actions = reachable.get(current);
-            if (!actions) reachable.set(current, actions = new Set());
-            actions.add(action);
-            queue.push(...parents.get(current) ?? []);
-          }
-        }
+        const reachable = propagateActions(parents, [...nodes.keys()]
+          .filter(id => state.modules.get(id)?.actions).map(id => [id, relative(id)]));
         const table: Record<string, string[]> = Object.create(null);
         await Promise.all(routes.map(async ({ file, chain }) => {
           if (!(await edges(file))?.page) return;
@@ -165,7 +161,7 @@ export function htmxPlugin(options: RecoolerOptions) {
           table[relative(file)] = [...actions].sort();
         }));
         if (epoch !== state.epoch) continue;
-        const enabled = options.htmx !== false && (options.htmx !== undefined || [...state.modules.values()].some(m => m.htmx));
+        const enabled = options.htmx !== false;
         state.cached = { epoch, table, enabled };
         return state.cached;
       }
@@ -186,7 +182,8 @@ export function htmxPlugin(options: RecoolerOptions) {
       states.clear();
       roots = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root });
       serving = config.command === 'serve';
-      namespace = 'recooler:' + createHash('sha256').update(normalizePath(roots.srcDir)).digest('hex').slice(0, 24);
+      projectNamespace = 'recooler:' + createHash('sha256').update(normalizePath(roots.srcDir)).digest('hex').slice(0, 24)
+        + (serving ? ':' + randomUUID() : '');
     },
     watchChange(file) {
       if (serving) return;
@@ -205,10 +202,12 @@ export function htmxPlugin(options: RecoolerOptions) {
       // importing an invalid manifest only repeats the same diagnostic.
       if (generationFailed) return [];
       const state = stateFor(this.environment.name);
-      const active = options.htmx !== undefined || [...state.modules.values()].some(module => module.htmx);
-      if (!active && !(sourcePattern.test(context.file) && context.type !== 'delete' && (await context.read()).includes('hx-'))) return;
+      if (!state.tableLoaded) return;
       state.epoch++;
-      this.environment.moduleGraph.invalidateAll();
+      // Vite invalidates the changed module normally. Refresh the table and its
+      // importers, retaining unchanged transforms while reloading the runner.
+      const table = this.environment.moduleGraph.getModuleById(internalTable);
+      if (table) this.environment.moduleGraph.invalidateModule(table);
       this.environment.hot.send({ type: 'full-reload', path: '*' });
       return [];
     },
@@ -220,6 +219,8 @@ export function htmxPlugin(options: RecoolerOptions) {
     async load(id) {
       if (id !== internalTable) return;
       if (!selected(this.environment)) this.error('recooler: virtual:recooler/htmx requires the selected server environment');
+      stateFor(this.environment.name).tableLoaded = true;
+      const namespace = namespaceFor(this.environment.name);
       const data = serving ? JSON.stringify(await devTable(this.environment as DevEnvironment)) : token;
       return { code: `const data = JSON.parse(${JSON.stringify(data)});\nexport const table = data.table;\nexport const enabled = data.enabled;\nexport const namespace = ${JSON.stringify(namespace)};\n`, map: null };
     },
@@ -230,13 +231,16 @@ export function htmxPlugin(options: RecoolerOptions) {
         id = canonicalId(id);
         const moduleKind = kinds.get(id.split('?')[0]!) ?? 'component';
         const state = stateFor(this.environment.name);
+        if (serving && !state.tableLoaded) return;
+        const namespace = namespaceFor(this.environment.name);
         const previous = serving ? state.transforms.get(id) : undefined;
         const result = previous?.source === code && previous.kind === moduleKind ? previous.result : transform(code, {
           id, relativePath: relative(id), mode: 'server', moduleKind,
           clientBannedImports: options.htmx && options.htmx.clientBannedImports,
-          codegen: { registerActions: input => emitRegistration(input).replace(/\);$/, `, ${JSON.stringify(namespace)});`) },
+          codegen: { registerActions: input => emitRegistration({ ...input, namespace,
+            moduleHash: createHash('sha256').update(code).digest('hex') }) },
         });
-        // invalidateAll must refresh module evaluation, but scope analysis is
+        // Full runner reloads refresh module evaluation, but scope analysis is
         // pure. Keep one source version per module across full dev reloads.
         if (serving) state.transforms.set(id, { source: code, kind: moduleKind, result });
         for (const diagnostic of result.diagnostics) {
@@ -258,37 +262,43 @@ export function htmxPlugin(options: RecoolerOptions) {
     renderChunk(code) {
       if (!selected(this.environment) || !code.includes(token)) return;
       const state = stateFor(this.environment.name);
-      // Cache bridge calls AND copied adjacency once per render pass.
-      const adjacency = new Map<string, { deps: readonly string[]; page: boolean } | undefined>();
-      const edges = (id: string) => {
-        if (!adjacency.has(id)) {
-          const info = this.getModuleInfo(id);
-          adjacency.set(id, !info ? undefined : { deps: [...info.importedIds], page: info.exports.includes('default') });
+      // Discover each static edge once; share reverse propagation with dev.
+      const nodes = new Map<string, { deps: readonly string[]; page: boolean }>();
+      const parents = new Map<string, Set<string>>();
+      const queue = routeSeeds.flatMap(route => route.chain);
+      for (let index = 0; index < queue.length; index++) {
+        const id = queue[index]!;
+        if (nodes.has(id)) continue;
+        const info = this.getModuleInfo(id);
+        if (!info) continue;
+        nodes.set(id, { deps: info.importedIds, page: info.exports.includes('default') });
+        for (const dependency of info.importedIds) {
+          let importers = parents.get(dependency);
+          if (!importers) parents.set(dependency, importers = new Set());
+          importers.add(id);
+          queue.push(dependency);
         }
-        return adjacency.get(id);
-      };
+      }
+      const reachable = propagateActions(parents, [...nodes.keys()]
+        .filter(id => state.modules.get(canonicalId(id))?.actions).map(id => [id, relative(id)]));
       const table: Record<string, string[]> = Object.create(null);
-      for (const { file, chain } of seeds()) {
-        if (!edges(file)?.page) continue;
-        const seen = new Set<string>();
-        const actions = new Set<string>();
-        const visit = (id: string) => {
-          if (seen.has(id)) return;
-          seen.add(id);
-          const node = edges(id);
-          if (!node) return;
-          if (state.modules.get(canonicalId(id))?.actions) actions.add(relative(id));
-          node.deps.forEach(visit);
-        };
-        chain.forEach(visit);
+      for (const { file, chain } of routeSeeds) {
+        if (!nodes.get(file)?.page) continue;
+        const actions = new Set(chain.flatMap(id => [...reachable.get(id) ?? []]));
         table[relative(file)] = [...actions].sort();
       }
       const enabled = options.htmx !== false && (options.htmx !== undefined || [...state.modules.values()].some(m => m.htmx));
       const ms = new MagicString(code);
       const needle = JSON.stringify(token);
       const start = code.indexOf(needle);
+      if (start < 0) this.error('recooler: action table placeholder must remain a string literal');
       ms.overwrite(start, start + needle.length, JSON.stringify(JSON.stringify({ table, enabled })));
-      return { code: ms.toString(), map: ms.generateMap({ hires: true, includeContent: true }) };
+      // With no later code on this line, expanding the literal cannot move
+      // any mapped code. Minified/combined lines need a composed boundary map.
+      const lineEnd = code.indexOf('\n', start);
+      const suffix = code.slice(start + needle.length, lineEnd < 0 ? undefined : lineEnd);
+      return { code: ms.toString(), map: /^[\s);]*$/.test(suffix) ? null
+        : ms.generateMap({ hires: 'boundary', includeContent: true }) };
     },
   };
 
@@ -304,6 +314,11 @@ export function htmxPlugin(options: RecoolerOptions) {
         if (!serving || !selected(this.environment) || options.htmx === false || !source(id)) return;
         id = canonicalId(id);
         const state = stateFor(this.environment.name);
+        if (!state.tableLoaded) return;
+        const file = id.split('?')[0]!;
+        const inside = (directory: string) => file.startsWith(directory + '/');
+        if (!inside(normalizePath(roots.srcDir)) && ![...dependencyRoots].some(inside) && !state.transforms.has(id)) return;
+        const namespace = namespaceFor(this.environment.name);
         if (state.outputs.get(id) === code && state.modules.get(id)?.actions) return;
         state.modules.set(id, { actions: false, htmx: code.includes('hx-') });
         state.epoch++;
@@ -317,9 +332,29 @@ export function htmxPlugin(options: RecoolerOptions) {
   };
   return {
     plugins: [plugin, registration],
+    actionDependencies(names: readonly string[], root: string) {
+      const require = createRequire(path.join(root, 'package.json'));
+      dependencyRoots.clear();
+      for (const name of names) {
+        // resolve() follows workspace symlinks as well as pnpm's package store.
+        let file: string;
+        try { file = require.resolve(name); } catch { continue; }
+        for (let directory = path.dirname(file); path.dirname(directory) !== directory; directory = path.dirname(directory)) {
+          try {
+            if (JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8')).name === name) {
+              dependencyRoots.add(normalizePath(directory));
+              break;
+            }
+          } catch { /* Keep walking to the package root. */ }
+        }
+      }
+    },
     generationFailed(failed: boolean) { generationFailed = failed; },
     generated(result: GenerateResult) {
-      files = result.files.map(normalizePath);
+      const files = result.files.map(normalizePath);
+      const absolute = (file: string) => normalizePath(path.resolve(roots.srcDir, file));
+      routeSeeds = result.routes.map(({ file, layoutFiles, rootFile }) => ({ file: absolute(file),
+        chain: [file, ...layoutFiles, rootFile].filter((file): file is string => file !== undefined).map(absolute) }));
       kinds.clear();
       for (const file of files) {
         if (/\/index\.[jt]sx?$/.test(file)) kinds.set(file, 'route');

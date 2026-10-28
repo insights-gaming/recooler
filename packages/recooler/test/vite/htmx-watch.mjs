@@ -47,6 +47,7 @@ try {
   let urls = actions(await page(app));
   assert.equal(urls.length, 2);
   assert.equal(await (await post(app, urls[1])).text(), 'other');
+  const initialPage = urls[0];
   const oldOther = urls[1];
   let previous = completed;
   await write('src/components/Other.tsx', `export const Other = () => <p>other removed</p>;`);
@@ -55,7 +56,16 @@ try {
   assert.equal(urls.length, 1);
   assert.equal(await (await post(app, urls[0])).text(), 'page', 'unchanged page action survives a cached rebuild');
   assert.equal((await post(app, oldOther)).status, 404);
-  const oldPage = urls[0];
+  assert.equal(await (await post(app, initialPage)).text(), 'page', 'URLs from unchanged defining modules survive rebuilds');
+  previous = completed;
+  await write('src/routes/index.tsx', `import { Other } from '../components/Other'; export default () => <><form hx-post={() => 'inserted'}/><form hx-post={() => 'page'}/><Other/></>;`);
+  app = await nextBuild(previous);
+  urls = actions(await page(app));
+  assert.equal(urls.length, 2);
+  assert.equal((await post(app, initialPage)).status, 404, 'old position zero cannot invoke the newly inserted action');
+  assert.equal(await (await post(app, urls[0])).text(), 'inserted');
+  assert.equal(await (await post(app, urls[1])).text(), 'page');
+  const oldPage = urls[1];
   previous = completed;
   await write('src/routes/index.tsx', `import { Other } from '../components/Other'; export default () => <><p>all actions removed</p><Other/></>;`);
   app = await nextBuild(previous);

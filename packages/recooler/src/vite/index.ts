@@ -134,6 +134,7 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
         },
       });
       noExternal = [...new Set([...noExternal, ...crawled.ssr.noExternal, ...(options.htmx && options.htmx.actionDependencies || [])])];
+      htmx.actionDependencies(noExternal, root);
     },
     configEnvironment(_name, config) {
       if ((config.consumer ?? (_name === 'client' ? 'client' : 'server')) !== 'server') return;
@@ -170,7 +171,7 @@ export function recooler(options: RecoolerOptions = {}): Plugin[] {
       const settings = options.htmx || {};
       const binding = JSON.stringify(settings.secretBinding ?? 'RECOOLER_SECRET');
       const imports = options.htmx === false ? '' : `import { htmx } from 'recooler/htmx';\nimport { table, namespace, enabled } from ${JSON.stringify(tableId)};\n`;
-      const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, namespace, secret: env => env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined), base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
+      const extensions = options.htmx === false ? '' : `, extensions: enabled ? [htmx({ table, namespace, secret: env => { const value = env?.[${binding}] ?? (typeof process !== 'undefined' ? process.env?.[${binding}] : undefined); if (typeof value !== 'string' || !value) throw new Error(${JSON.stringify('recooler: htmx actions require a nonempty ' + (settings.secretBinding ?? 'RECOOLER_SECRET') + ' binding; set it in .dev.vars for local Workers, a deployed Worker secret, or process.env on Node')}); return value; }, base: ${JSON.stringify(settings.base)}, trustedOrigins: ${JSON.stringify(settings.trustedOrigins)} })] : []`;
       // Loading the table first pretransforms route closures in parallel. The
       // module runner otherwise lowers/evaluates manifest imports serially.
       // All registrations still evaluate before createApp consumes the table.
