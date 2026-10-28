@@ -29,9 +29,29 @@ const routes = ${JSON.stringify(pages)};
 const version = ${JSON.stringify(version)};
 const handlers = globalThis.$handlers ??= Object.create(null);
 const modules = new Map(), jobs = new WeakMap(), started = new WeakMap(), completed = new WeakMap();
+const instances = new Map();
 const report = error => typeof globalThis.reportError === 'function' ? globalThis.reportError(error) : console.error(error);
 const markers = () => [...document.querySelectorAll('[data-recooler-marker]')];
 const signature = node => node.dataset.recoolerRoute + '@' + node.dataset.recoolerVersion;
+const current = (node, instance) => instances.get(node) === instance && node.isConnected && signature(node) === instance.key;
+function cleanup(instance) {
+  const fn = instance.cleanup;
+  instance.cleanup = undefined;
+  if (fn) { try { Promise.resolve(fn()).catch(report); } catch (error) { report(error); } }
+}
+function prune() {
+  for (const [node, instance] of instances) {
+    if (current(node, instance)) continue;
+    instances.delete(node);
+    jobs.delete(node); started.delete(node); completed.delete(node);
+    cleanup(instance);
+  }
+}
+function retain(node, instance, value) {
+  if (typeof value !== 'function') return;
+  instance.cleanup = value;
+  if (!current(node, instance)) cleanup(instance);
+}
 function reloadOnce(key, message) {
   try {
     if (!sessionStorage.getItem(key)) {
@@ -85,6 +105,8 @@ async function initializeNode(node) {
   const existing = jobs.get(node);
   if (existing?.key === key) return existing.promise;
   if (!checkVersion(node)) return;
+  const instance = instances.get(node) ?? { key };
+  instances.set(node, instance);
   const page = routes[node.dataset.recoolerRoute];
   const run = async () => {
     // Static route modules register namespaces synchronously before DCL.
@@ -93,14 +115,18 @@ async function initializeNode(node) {
     if (missing.length) await Promise.all(missing.map(load));
     const values = (page?.slices ?? []).map(id => modules.get(id));
     if (values.some(value => value instanceof Promise)) await Promise.all(values);
-    if (!node.isConnected || signature(node) !== key || started.get(node) === key) return;
+    if (!current(node, instance) || started.get(node) === key) return;
     started.set(node, key);
     const value = page?.onLoad && modules.get(page.onLoad);
     const module = value instanceof Promise ? await value : value;
     if (typeof module?.onLoad === 'function') {
-      try { Promise.resolve(module.onLoad()).catch(report); } catch (error) { report(error); }
+      try {
+        const result = module.onLoad();
+        if (typeof result === 'function') retain(node, instance, result);
+        else Promise.resolve(result).then(value => retain(node, instance, value)).catch(report);
+      } catch (error) { report(error); }
     }
-    if (node.isConnected && signature(node) === key) completed.set(node, key);
+    if (current(node, instance)) completed.set(node, key);
   };
   const promise = run().catch(error => {
     reloadOnce('recooler:import:' + (version || 'dev'),
@@ -114,6 +140,7 @@ function init() {
   if (document.readyState === 'loading') {
     return globalThis.__recooler_ready = new Promise(resolve => document.addEventListener('DOMContentLoaded', () => resolve(init()), { once: true }));
   }
+  prune();
   const ready = Promise.all(markers().map(initializeNode));
   // Observe every public readiness promise even when the caller ignores it.
   ready.catch(report);
@@ -186,6 +213,9 @@ globalThis.$rc = dispatch;
 for (const args of globalThis.$rq ?? []) dispatch(...args, true);
 delete globalThis.$rq;
 for (const name of ['htmx:afterSwap', 'htmx:afterSettle', 'htmx:historyRestore']) document.addEventListener(name, init);
+document.addEventListener('htmx:beforeHistorySave', () => queueMicrotask(prune));
+new MutationObserver(prune).observe(document, { childList: true, subtree: true, attributes: true,
+  attributeFilter: ['data-recooler-route', 'data-recooler-version'] });
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
 else queueMicrotask(init);
 ${dev ? `globalThis.__recooler_entry_loaded = true;` : ''}

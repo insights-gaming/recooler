@@ -74,6 +74,29 @@ try {
     export const onLoad = () => { inc('streamLoads'); (globalThis.order ??= []).push('onLoad'); };
     const Child = async () => { await new Promise(r => setTimeout(r, 200)); return <button id="streamed" hx-on:click={() => inc('streamClicks')}>streamed</button>; };
     export default props => <Suspense rid={props.rid} fallback={<p id="fallback">waiting</p>}><Child/></Suspense>;`);
+  for (const route of ['a', 'b']) await write(`src/routes/cleanup-${route}/index.tsx`, `${inc}
+    export const head = { scripts: [{ src: '/htmx.js' }] };
+    export const onLoad = () => {
+      inc('cleanupLoads${route.toUpperCase()}'); (globalThis.cleanupLog ??= []).push('${route} load');
+      const drop = () => inc('cleanupDrops${route.toUpperCase()}'); window.addEventListener('cleanup-drop', drop);
+      return () => {
+        window.removeEventListener('cleanup-drop', drop); globalThis.cleanupLog.push('${route} cleanup');
+        if (globalThis.throwCleanup) { globalThis.throwCleanup = false; throw new Error('cleanup failed'); }
+      };
+    };
+    export default () => <><a id="cleanup-tob" href="/cleanup-b" hx-boost="true">B</a>
+      <button id="cleanup-open" hx-get="/cleanup-fragment" hx-target="#cleanup-modal">open</button>
+      <button id="cleanup-async" hx-get="/cleanup-async" hx-target="#cleanup-modal">async</button>
+      <button id="cleanup-clear" hx-get="/cleanup-clear" hx-target="#cleanup-modal">clear</button><div id="cleanup-modal"/></>;`);
+  await write('src/routes/cleanup-fragment/index.tsx', `${inc}
+    export const onLoad = () => { inc('cleanupFragmentLoads'); globalThis.cleanupLog.push('fragment load');
+      return () => { inc('cleanupFragments'); globalThis.cleanupLog.push('fragment cleanup'); }; };
+    export default () => <p id="cleanup-fragment">fragment</p>;`);
+  await write('src/routes/cleanup-async/index.tsx', `${inc}
+    export const onLoad = () => { inc('cleanupAsyncLoads'); return new Promise(resolve => {
+      globalThis.finishCleanup = () => resolve(() => { inc('cleanupAsyncs'); globalThis.cleanupLog.push('async cleanup'); });
+    }); };
+    export default () => <p id="cleanup-pending">pending</p>;`);
   server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     try {
@@ -86,6 +109,7 @@ try {
       }
       requests.push(req.method + ' ' + url.pathname);
       if (url.pathname === '/relocate') { res.setHeader('HX-Location', '/c'); return res.end(); }
+      if (url.pathname === '/cleanup-clear') return res.end('<p id="cleanup-empty">empty</p>');
       if (url.pathname.startsWith('/m/')) { res.statusCode = url.pathname === '/m/before' ? 200 : 204; return res.end(url.pathname === '/m/before' ? '<p>done</p>' : ''); }
       const response = await app.fetch(new Request(new URL(req.url, origin), { headers: req.headers }), { RECOOLER_SECRET: 'browser-test' });
       res.statusCode = response.status; res.setHeader('Content-Type', 'text/html');
@@ -182,6 +206,30 @@ try {
     assert.deepEqual(page.errors, []); assert.deepEqual(await page.evaluate(() => globalThis.unhandled), []);
     assert.deepEqual(page.warnings, []);
     await page.close();
+    // Teardown: boosts and cached Back retire old listeners before destination onLoad.
+    const cleanup = await open('/cleanup-a');
+    await cleanup.click('#cleanup-tob'); await cleanup.waitForFunction(() => globalThis.cleanupLoadsB === 1);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a cleanup', 'b load']);
+    await cleanup.goBack(); await cleanup.waitForFunction(() => globalThis.cleanupLoadsA === 2); await sleep(80);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog), ['a load', 'a cleanup', 'b load', 'b cleanup', 'a load']);
+    await cleanup.evaluate(() => window.dispatchEvent(new Event('cleanup-drop')));
+    assert.deepEqual(await cleanup.evaluate(() => [globalThis.cleanupDropsA, globalThis.cleanupDropsB ?? 0]), [1, 0]);
+    await cleanup.click('#cleanup-open'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 1);
+    await cleanup.click('#cleanup-clear'); await cleanup.waitForFunction(() => globalThis.cleanupFragments === 1);
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupLoadsA), 2, 'fragment removal retains the surrounding page');
+    await cleanup.click('#cleanup-async'); await cleanup.waitForFunction(() => globalThis.cleanupAsyncLoads === 1);
+    await cleanup.evaluate(() => globalThis.__recooler_ready);
+    await cleanup.click('#cleanup-clear'); await cleanup.waitForSelector('#cleanup-empty');
+    await cleanup.evaluate(() => globalThis.finishCleanup()); await cleanup.waitForFunction(() => globalThis.cleanupAsyncs === 1);
+    await cleanup.click('#cleanup-open'); await cleanup.waitForFunction(() => globalThis.cleanupFragmentLoads === 2);
+    await cleanup.evaluate(() => { globalThis.throwCleanup = true; });
+    await cleanup.click('#cleanup-tob'); await cleanup.waitForFunction(() => globalThis.cleanupLoadsB === 2); await sleep(80);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.cleanupLog.slice(-3)), ['a cleanup', 'fragment cleanup', 'b load']);
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupFragments), 2);
+    assert.equal(await cleanup.evaluate(() => globalThis.cleanupAsyncs), 1);
+    assert.deepEqual(cleanup.errors, ['cleanup failed']);
+    assert.deepEqual(await cleanup.evaluate(() => globalThis.unhandled), []);
+    await cleanup.close();
     // Native modules hold DCL while initial handler assets are unavailable.
     block = new Promise(r => { release = () => { block = undefined; r(); }; });
     const early = await browser.newPage(); let dclFired = false; early.on('domcontentloaded', () => { dclFired = true; });
@@ -213,7 +261,7 @@ try {
     await recovered.click('#handler'); assert.equal(await recovered.evaluate(() => globalThis.destinationClicks), 1);
     assert.deepEqual(await recovered.evaluate(() => globalThis.unhandled), []); await recovered.close();
     console.log(JSON.stringify({ chromium: true, major, legacy, hxLocation: true, pushUrl: true, initialBeforeDCL: true, streamedBeforeDCL: true,
-      requestCounts: 'one per action; no loop', history: 'a b c back b', fragment: true, retry: true }));
+      requestCounts: 'one per action; no loop', history: 'a b c back b', fragment: true, teardown: true, retry: true }));
   }
   // Persistent import failures reload once across the same page version, then stop.
   const broken = await open(); fail = true; const requestStart = count('/b');

@@ -264,13 +264,22 @@ Handlers run immediately when their slice registers, independent of marker
 completion or onLoad. Loaded root/layout handlers therefore survive body swaps.
 Route onLoad runs at DOMContentLoaded or immediately if parsing has finished,
 sees the complete DOM, and is never awaited. Rejections go to reportError (with a
-console.error fallback). Root/layout onLoad stays ignored.
+console.error fallback). It may return a cleanup function, or a promise resolving
+to one; other return values are ignored. Return a function that removes listeners
+on window/document or releases other page resources. Root/layout onLoad stays ignored.
 
 The entry exports init() and observes afterSwap, afterSettle and historyRestore.
 Only client-bearing pages get a trailing template[data-recooler-marker] with route
 and version. It survives table parsing and htmx 1 history; handler-free pages emit
 no marker. Body attributes are never a fallback. New markers run their own route
 onLoad once; unchanged markers do not rerun, and history restoration does rerun.
+When a marker leaves the document or its route/version changes, its cleanup runs
+once. init() cleans up retired markers before invoking any new marker's onLoad,
+including boosts, fragment swaps and Back. DOM changes are also observed; htmx's
+beforeHistorySave queues a check after the outgoing history DOM detaches, without
+retiring markers retained by a partial navigation. A cleanup resolving after its
+marker retires runs immediately. Cleanup errors use the same reportError path and
+do not block other cleanups or onLoad calls. Full page unload does not run cleanups.
 
 Only confirm is canceled/deferred while handlers load. All other missing handlers,
 including config-request/before-request, drop events and leave defaults untouched. Dev warns for dropped events. Native preventDefault guards can

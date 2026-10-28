@@ -141,6 +141,7 @@ for (const version of ['2', '1']) {
     });
     expect(result.stdout).toContain('"hxLocation":true');
     expect(result.stdout).toContain('"pushUrl":true');
+    expect(result.stdout).toContain('"teardown":true');
   }, 65000);
 }
 

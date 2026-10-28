@@ -368,6 +368,13 @@ A route's `onLoad()` is called at DOMContentLoaded, or immediately when the docu
 is no longer loading. It sees the complete DOM and is never awaited: asynchronous
 or never-resolving onLoad work cannot disable handlers or hold readiness. A rejected
 onLoad promise is sent to `reportError` (console.error where unavailable).
+Return a cleanup function, or a promise resolving to one, to release listeners or
+other page resources. Other return values are ignored. The cleanup runs once when
+that marker leaves the document or its route/version changes. Removed markers'
+cleanups run before new markers' onLoad calls from the same swap, including boosts
+and history restoration. If the promise resolves after removal, cleanup runs
+immediately. Cleanup errors use the same reporting path and do not stop other
+cleanups or onLoad calls. Full page unload does not run cleanups.
 Root/layout `onLoad` warns and does not run. Do not assume onLoad precedes htmx's
 own DOMContentLoaded listener or processing of streamed chunks.
 
@@ -648,7 +655,17 @@ unused PostCSS patches, old platform-package exclusions and duplicate build-tool
 dependencies; set client-environment `build.minify` explicitly when server output
 remains unminified.
 
-Route `onLoad` runs after the DOM is ready. Register listeners directly and make
-repeat initialization safe for boosts and Back. Root/layout `onLoad` must move to
-an application-wide script or to the owning page. Do not wait again for an event
-that has already fired, and do not accumulate listeners on each navigation.
+Route `onLoad` runs after the DOM is ready. Register listeners directly and return
+a function that removes them when the route's marker retires on a swap or Back:
+
+```ts
+export const onLoad = () => {
+  const drop = (event: DragEvent) => { event.preventDefault(); };
+  window.addEventListener('drop', drop);
+  return () => window.removeEventListener('drop', drop);
+};
+```
+
+An async `onLoad` can resolve to the cleanup function; readiness never waits for
+it. Root/layout `onLoad` must move to an application-wide script or to the owning
+page. Do not wait again for a DOM readiness event that has already fired.

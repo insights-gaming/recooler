@@ -1,6 +1,6 @@
 {
   "name": "@insights-gaming/recooler",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "File-based routing, JSX pages and htmx actions for Hono on Vite",
   "type": "module",
   "license": "MIT",
