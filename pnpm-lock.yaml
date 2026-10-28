@@ -88,6 +88,12 @@ importers:
       hono:
         specifier: ^4.13.14
         version: 4.13.14
+      hono-412:
+        specifier: npm:hono@4.12.34
+        version: hono@4.12.34
+      hono-5:
+        specifier: npm:hono@5.0.0-rc.1
+        version: hono@5.0.0-rc.1
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
