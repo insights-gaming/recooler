@@ -23,7 +23,11 @@ export default function Page({ count }) {
   const result = transform(input, { id: 'page.tsx', relativePath: 'page.tsx', moduleKind: 'route', mode });
   expect(result.diagnostics).toEqual([]);
   const rawMap = JSON.parse(result.map.toString());
-  expect(rawMap.sourcesContent).toEqual([input]);
+  if (mode === 'client-slice') {
+    expect(rawMap.sourcesContent[0]).not.toContain('outer action');
+    expect(rawMap.sourcesContent[0]).toContain('handler body');
+    expect(rawMap.sourcesContent[0].length).toBe(input.length);
+  } else expect(rawMap.sourcesContent).toEqual([input]);
   const map = new TraceMap(rawMap);
   const check = (generated: string, original: string, originalOffset = 0) => {
     const offset = result.code.indexOf(generated);
@@ -71,4 +75,18 @@ export default function Page({ count }: RouteProps) {
   // import statement; its untouched source literal retains an exact mapping.
   const importOffset = result.code.indexOf('shared }');
   expect(originalPositionFor(map, position(result.code, importOffset))).toMatchObject({ source: 'props.tsx', line: 1, column: 0 });
+});
+
+it('redacts dropped source and comments without changing UTF-16 offsets or lines', () => {
+  const input = `import { browser, SERVER_IMPORT_SECRET } from './shared';
+// ROUTE_COMMENT_SECRET 😀
+export const server = () => 'SQL_SECRET';
+export default () => <form hx-post={() => 'ACTION_SECRET'} hx-on:click={() => browser('visible')}/>;`;
+  const result = transform(input, { id: 'map.tsx', relativePath: 'map.tsx', mode: 'client-slice' });
+  expect(result.diagnostics).toEqual([]);
+  const content = result.map.sourcesContent![0]!;
+  for (const secret of ['SERVER_IMPORT_SECRET', 'ROUTE_COMMENT_SECRET', 'SQL_SECRET', 'ACTION_SECRET']) expect(content).not.toContain(secret);
+  expect(content.length).toBe(input.length);
+  expect(content.split('\n').map(line => line.length)).toEqual(input.split('\n').map(line => line.length));
+  expect(content.indexOf("browser('visible')")).toBe(input.indexOf("browser('visible')"));
 });

@@ -276,7 +276,7 @@ as `/users/:id`, without a mount prefix, not the concrete request pathname.
 
 Legacy roots that inline their second `clientScript?: string` argument must
 explicitly enable `recooler({ htmx: { legacyClientScript: true } })`. That string
-is exactly `import("<entry URL>")`, with HTML-sensitive characters escaped; it is
+is `import("<entry URL>").then(m=>m.init())`, with HTML-sensitive characters escaped; it is
 undefined on handler-free routes. No function-arity detection is attempted. For a
 custom `createApp` entry, pass `clients` and `clientEntry` from
 `virtual:recooler/htmx` to `htmx({ table, clients, clientEntry, namespace, ... })`,
@@ -290,28 +290,35 @@ script in the head). Keep application head scripts in their required order;
 Recooler does not reorder them. Module scripts execute after the full HTML stream
 has parsed, including Suspense's streamed content. The entry also waits for
 `DOMContentLoaded` when imported by the legacy shim. It then loads all reachable
-slices, lets each register its own handlers, replays queued events, and calls only
-the owning route's `onLoad`. Layout/root `onLoad` still warns and does not run.
+slices, lets each register its own handlers, calls the owning route's `onLoad`,
+then replays queued events. Layout/root `onLoad` still warns and does not run.
 `globalThis.__recooler_ready` is the promise for this sequence, useful for tests
 or initialization that must wait for handlers. Loading failures reject it.
 
-Function-valued event attributes now install a tiny queue on first invocation,
-even before the entry itself executes. It retains the original element (`this`),
-event object and captured values, and replays in order after the route's slices
-load. Replay is asynchronous: `preventDefault()`, immediate return values and
-transient event properties such as `currentTarget` cannot be relied on for queued
-events. Disable early interactions when those semantics matter. Already-string
-`hx-on:` attributes are left unchanged. htmx's evaluation of event attributes still
-requires the appropriate `unsafe-eval` CSP allowance, independently of the external
-module-script policy.
+Function-valued event attributes install a compact queue before the entry loads.
+The queue prevents the original event's default immediately. After onLoad,
+handlers replay in order with their element, event data and captured values.
+If the handler does not preventDefault, confirm resumes via issueRequest,
+submit via requestSubmit(submitter), and anchor/button clicks via click().
+Config-request/before-request can restart through htmx.ajax's exposed request
+configuration. Events without a continuation/configuration stay cancelled and
+warn. currentTarget and other dispatch-time state are unavailable on replay.
+One throwing handler is reported without dropping the rest. Already-string
+hx-on attributes and their unsafe-eval CSP requirements remain unchanged.
 
-Client route initialization is **full-page navigation only** in 0.1.0. Same-route
-htmx actions/swaps may use handlers already in that route's static closure, but
-route-changing `hx-boost`/swaps do not select new slices or rerun `onLoad`. Use
-`hx-boost="false"` on navigation links (including under inherited boosting) and a
-normal browser navigation, or issue an htmx `HX-Redirect` response. Merely changing
-a route marker after a swap does not initialize the new route. Modules reachable
-only through server dynamic imports are outside the static route graph.
+The entry exports init(), runs on start, and initializes new content on
+htmx:afterSettle (boost/marker changes) and htmx:historyRestore. Both default
+and custom roots include their route/version marker inside the Content slot,
+so body swaps discover the new route. The legacy import explicitly calls init()
+after cached imports too. Root/layout onLoad is not invoked. Modules reachable
+only through server dynamic imports remain outside the static route graph.
+Custom roots can render props.preloads as modulepreload links to reduce latency.
+
+Client maps default off and minification defaults on; set these explicitly in
+environments.client.build to override. Public slice maps redact removed source
+and comments without changing positions. Unsliced dependencies omit embedded
+source contents. The content-derived version is reproducible, embedded in the
+entry and checked against the page; mismatches reload before dispatch.
 
 Rename `client_banned_imports` to
 `recooler({ htmx: { clientBannedImports: [...] } })`. String patterns remain regular
@@ -321,7 +328,8 @@ handler/`onLoad` reference chain, including literal dynamic imports and global
 chunk's `moduleIds`, including lazy/shared chunks and transitive side-effect
 imports; it also checks package-relative paths after the last `node_modules`
 segment. Both checks fail the build. Include resolved-path patterns for aliases
-that hide a server-only raw specifier. These are explicit application bans;
+that hide a server-only raw specifier. Raw specifiers are also observed through
+transitive client helpers, and browser-external stubs are always banned. These are explicit application bans;
 Recooler does not classify arbitrary dependencies as server-only automatically.
 
 Dev edits invalidate the virtual entry and server graph and send a full reload

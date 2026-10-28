@@ -33,7 +33,7 @@ for (const [i, path] of ['/', '/nested/42?x=1', '/replace'].entries()) {
     expect(res.status).toBe(200);
     const actual = await res.text();
     const routePattern = i === 1 ? '/nested/:id' : path;
-    expect(actual).toBe(expected.replace('<body>', `<body data-recooler-route="${routePattern}">`));
+    expect(actual).toBe(expected.replace('<body>', `<body data-recooler-route="${routePattern}"><meta name="recooler-route" content="${routePattern}"/>`));
   });
 }
 

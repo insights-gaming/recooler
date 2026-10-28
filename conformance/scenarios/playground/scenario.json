@@ -16,7 +16,21 @@
           "<!DOCTYPE html>",
           "<div id=\"app\"><main data-layout=\"root\"><h1>home</h1>"
         ]
-      }
+      },
+      "changes": [
+        {
+          "decision": "D4",
+          "reason": "TS keeps a route/version marker inside swapped Content for boosted client navigation.",
+          "ts": {
+            "status": 200,
+            "includes": [
+              "<!DOCTYPE html>",
+              "<div id=\"app\"><meta name=\"recooler-route\" content=\"/\"",
+              "<main data-layout=\"root\"><h1>home</h1>"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "root head object and layout head function build the title",

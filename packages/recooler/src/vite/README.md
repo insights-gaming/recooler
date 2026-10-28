@@ -168,45 +168,76 @@ Run them with `pnpm --filter recooler exec node test/vite/<script>.mjs`; add
 
 ## Client scripts (Phase 5)
 
-`environments.client` is a client consumer whose input is
-`virtual:recooler/client`. Run `vite build`, or programmatically use
-`createBuilder(config).buildApp()`. The selected server environment discovers the
-same route → slice table that the client consumes; a build assertion rejects a
-mismatch or client-first orchestration. A post plugin hook builds server then
-client for plain Vite; it does not replace any platform's `builder.buildApp`.
-Only Recooler's own plugins opt into shared build state.
+Run `vite build`, or use `createBuilder(config).buildApp()`. Recooler adds
+`virtual:recooler/client` to `environments.client` while preserving user entries
+and an existing default `index.html`. Only Recooler's entry gets the reserved
+`assets/recooler-client.js` filename. Plain Vite builds server then client;
+Cloudflare retains its own builder, asset movement and bindings. Client outDir
+defaults to `dist/client`; read resolved environment outDirs on platform builders.
 
-The stable entry is `assets/recooler-client.js?v=<buildId>` under Vite's base.
-Server output needs no client manifest. Client outDir defaults to `dist/client`;
-platform overrides remain authoritative. Read the resolved environment outDirs,
-particularly with Cloudflare v2's `.cloudflare/output` convention. Cloudflare
-retains its Worker → client builder, manifests, asset movement and asset binding.
+The entry URL is `assets/recooler-client.js?v=<content hash>` under Vite's base.
+The generated entry embeds that version and refuses to dispatch a mismatched
+page, reloading it. Identical graph/source-tree inputs, runtime, configuration and package/lock
+metadata produce the same version, including helpers pruned from server code. Versioned opaque slice filenames avoid stale lazy-chunk collisions.
+Keep old slices available during rolling deployments. Relative Vite bases warn
+and use `/`. Server output needs no client manifest.
 
-Each `?recooler-handlers` variant transforms/slices the original source in one
-MagicString, returns its real map with original sourcesContent, and registers its
-own functions. The entry reads the rendered route pattern, imports only that
-route's reachable slices, and runs only that page's onLoad after registration and
-queue replay. Handler-free pages emit no entry URL; onLoad-only pages do.
+Client source maps default to **off**, and minification to **on**, independently
+of the top-level server build. Override with `environments.client.build.sourcemap`
+and `.minify`. Slices use the exact input seen by the server transform, including
+preceding plugins, and assert matching handler IDs. Their sourcesContent blanks
+dropped ranges and comments while preserving UTF-16 positions and newlines.
+Unsliced dependencies retain mappings without embedded source contents, including
+when they have tree-shaken server exports. Public entry lookup keys are opaque.
+Client chunks are public performance units; bans remain an application boundary.
 
-`htmx.clientBannedImports` patterns see raw specifiers in the scope check and
-resolved module paths in the bundle check. `htmx.legacyClientScript: true` opts
-legacy custom roots into an inline `import("<entry URL>")` string; the default is
-undefined. New roots render `props.scripts` module URLs.
+The entry exports `init()`, initializes on startup and observes
+`htmx:afterSettle` for boosts/changed route markers and `htmx:historyRestore`.
+It imports missing slices, runs the owning route's `onLoad`, then replays early
+events. Content includes a route/version meta marker inside the swapped body for
+both default and custom roots. Preserve the Content slot. Root/layout onLoad
+exports warn and do not run. Repeated init calls for one content marker share
+one initialization; swapped content and history restoration rerun onLoad.
 
-Full-page navigation initializes clients in 0.1.0. Disable hx-boost for links that
-change routes. Same-route swaps can use the existing route's handlers; swapping
-a new route marker does not load a new route. Early function-handler events queue
-with their element, event and capture scope, including events before the module
-entry starts. Queued event return values/preventDefault cannot act synchronously.
-The entry waits for document parsing, so onLoad follows a completed Suspense
-stream; load failures reject `globalThis.__recooler_ready`. See the
-[migration guide](../../../../docs/migration-0.1.md) for timing, CSP and legacy
-root details. Per-route chunks are public performance units, not a secrecy boundary.
+New roots render `props.scripts` as external module scripts and optional
+`props.preloads` as `<link rel="modulepreload" href={url}/>` in their head.
+DefaultRootHOC handles both. A custom `createApp` entry should pass `clientPreloads`
+alongside `clients` and `clientEntry` from `virtual:recooler/htmx` to `htmx()`.
+`htmx.legacyClientScript: true` supplies the one-release inline string
+`import("<entry URL>").then(m=>m.init())`, so htmx re-execution works even when
+imports are cached. Load real htmx before the client entry. The entry waits for
+DOMContentLoaded, including when the legacy script runs during streaming.
 
-Dev changes invalidate the client entry and send a full reload over the real HMR
-channel, alongside the full server reload. `test/vite/client-integration.mjs`
-checks one CLI build, assets, emitted ESM with Happy DOM, queue replay, onLoad,
-shared/admin chunk separation, built/dev source maps and websocket reloads on
-plain Vite, Cloudflare v1 and v2. Run it with
-`node --experimental-vm-modules test/vite/client-integration.mjs [plain|cloudflare|beta]`.
-`client-options.mjs` covers both banned-import checks and the legacy opt-in.
+Early function handlers use a compact queue stub and immediately prevent the
+original event's default. Replay preserves this, event data and captured scope;
+it presents a fresh cancellation state to the handler. If the handler does not
+cancel, confirm continues through `detail.issueRequest()`, submit through
+`form.requestSubmit(submitter)`, and anchor/button clicks through `click()`.
+A handler that invokes issueRequest itself is never resumed a second time.
+Config-request/before-request can restart through `htmx.ajax` using the exposed
+request config. Other cancelable htmx events without request config or a
+continuation remain cancelled and warn; they cannot resume an internal htmx
+stack. Transient properties such as currentTarget are unavailable after the
+original event dispatch. Detached elements are skipped. Each handler/onLoad
+failure is reported independently, so one error does not drop later events.
+`globalThis.__recooler_ready` tracks the latest initialization; import failures
+reject it. Already-string hx-on attributes keep their existing behavior/CSP needs.
+
+Banned imports are checked in retained handler/onLoad references, raw client
+resolution specifiers (including transitive helpers), and emitted resolved
+module IDs with importer chains. Browser-external stubs are always rejected.
+Dev slice requests must belong to discovered clients or source files under
+srcDir with a script extension; arbitrary `/@fs` slice requests cannot bypass
+that boundary. Dev changes refresh the server input before slicing, invalidate
+the virtual entry and send a full reload. A dev Content watchdog warns when a
+root omits the entry or it fails to load; if CSP blocks that inline watchdog,
+the browser's CSP diagnostics apply. Build watch uses one server watcher and
+orders a fresh client build after each server output, avoiding stale route maps.
+
+`test/vite/client-htmx.mjs` loads real htmx 2.x in jsdom over HTTP and executes
+unmodified legacy imports through native ESM. It covers delayed load events,
+confirm, submit, links, replay errors, boosted swaps and cached imports.
+`client-security.mjs` covers maps, user/HTML entries, preloads, transform drift,
+version skew and fs.allow; `client-watch.mjs` covers adding/removing handlers.
+The plain, Cloudflare v1 and v2 integrations scan JS and maps, check original
+positions, execute native ESM with Happy DOM, and verify real HMR websocket reloads.

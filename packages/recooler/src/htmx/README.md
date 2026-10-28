@@ -143,8 +143,8 @@ pass through, including render-time Responses; nullish results produce 204.
 Client slices write their own functions to `globalThis.$handlers` and do not
 import the server runtime. The extension contributes the stable entry URL in
 page.scripts only for routes whose clients table reaches handlers or onLoad.
-The Vite entry loads lazy slices, replays early events and runs the owning page's
-onLoad. Middleware-rendered login forms need an unguarded route; actions are
+The Vite entry loads lazy slices, runs the owning page's onLoad, then replays
+early events. Boosted navigation and history restoration initialize swapped content. Middleware-rendered login forms need an unguarded route; actions are
 never registered before guards.
 
 `recooler/htmx/testing` exports only the test capability helper:
@@ -168,4 +168,4 @@ application endpoint.
 Suspense. The Farm conformance target retains seven intentional TS-only skips. Filesystem watcher
 and Vite dev-server tests require local filesystem watching/loopback permissions.
 
-Phase 5 client delivery, event queuing, onLoad timing, navigation restrictions and both banned-import checks are documented in [the Vite adapter](../vite/README.md#client-scripts-phase-5).
+Phase 5 client delivery, event queuing, onLoad timing, navigation initialization and both banned-import checks are documented in [the Vite adapter](../vite/README.md#client-scripts-phase-5).

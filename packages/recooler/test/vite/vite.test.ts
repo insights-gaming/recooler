@@ -107,3 +107,12 @@ test('client banned-import checks and explicit legacy-root opt-in', async () => 
   });
   expect(result.stdout).toContain('"clientOptions":true');
 }, 65000);
+
+for (const [script, marker] of [['client-htmx.mjs', 'realHtmx'], ['client-security.mjs', 'clientSecurity'], ['client-watch.mjs', 'clientWatch']]) {
+  test(`client regressions: ${marker}`, async () => {
+    const result = await execute(process.execPath, ['--experimental-vm-modules', fileURLToPath(new URL('./' + script, import.meta.url))], {
+      timeout: 60000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NODE_ENV: 'production' },
+    });
+    expect(result.stdout).toContain(`"${marker}":true`);
+  }, 65000);
+}

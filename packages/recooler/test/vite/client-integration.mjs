@@ -71,7 +71,7 @@ export default {
       } catch(error) { next(error); }
     }); } },`}
   ],
-  environments: { ${selected}: { consumer: 'server' }, client: { build: { outDir: 'custom-client' } } },
+  environments: { ${selected}: { consumer: 'server' }, client: { build: { outDir: 'custom-client', sourcemap: true, minify: false } } },
   build: { minify: false, sourcemap: true, assetsInlineLimit: 0, ${cf ? '' : `ssr: 'src/entry.ts', emitAssets: true, outDir: 'custom-server', rolldownOptions: { output: { entryFileNames: 'app.mjs' } },`} },
   server: { host: '127.0.0.1', port: 0 },
 };`);
@@ -85,7 +85,7 @@ export default {
   const serverOut = path.resolve(root, serverInventory.outDir);
   const entry = client.chunks.find(c => c.isEntry);
   assert.equal(entry.fileName, 'assets/recooler-client.js');
-  const allClient = (await Promise.all(client.chunks.map(c => readFile(path.join(clientOut, c.fileName), 'utf8')))).join('\n');
+  const allClient = (await Promise.all(client.chunks.map(c => Promise.all([readFile(path.join(clientOut, c.fileName), 'utf8'), readFile(path.join(clientOut, c.fileName + '.map'), 'utf8').catch(error => { if (error.code === 'ENOENT') return ''; throw error; })]).then(parts => parts.join('\n'))))).join('\n');
   for (const absent of ['SERVER_ONLY_7a9e', 'SERVER_SIDE_EFFECT_7a9e', 'registerActions', 'wrapAction', 'node:async_hooks']) assert(!allClient.includes(absent), absent);
   assert(allClient.includes('PUBLIC_HANDLER')); assert(allClient.includes('ADMIN_HANDLER'));
   const publicChunk = client.chunks.find(c => c.moduleIds.some(id => id.includes('/routes/index.tsx?')));
@@ -168,7 +168,7 @@ export default {
   const original = originalPositionFor(new TraceMap(transformed.map, new URL('/src/components/Shared.tsx?recooler-handlers', devOrigin).href), { line: prefix.split('\n').length, column: prefix.length - prefix.lastIndexOf('\n') - 1 });
   assert.match(original.source, /src\/components\/Shared.tsx$/);
   assert.equal(original.line, 2);
-  assert(transformed.map.sourcesContent.includes(sharedSource.replace('shared()', "shared() + ':edited'")));
+  assert(transformed.map.sourcesContent.some(content => content.includes(":edited") && content.length === sharedSource.replace('shared()', "shared() + ':edited'").length));
   assert((await (await fetch(new URL(devEntry, devOrigin))).text()).includes('recooler-handlers'));
   console.log(JSON.stringify({ kind, cli: true, dom: true, queue: true, onLoad: true, sourceMap: true, noServerCode: true, hmr: true, clientOut, serverOut, chunks: client.chunks.length }));
 } finally {
