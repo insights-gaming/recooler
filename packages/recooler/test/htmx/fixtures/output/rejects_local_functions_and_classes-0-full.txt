@@ -1,0 +1,2 @@
+src/routes/article/[id]/index.tsx: form action src/routes/article/[id]/index.tsx@0 references the local class `Thing`, which cannot be serialized; move it to the module scope
+src/routes/article/[id]/index.tsx: form action src/routes/article/[id]/index.tsx@0 references the local function `fmt`, which cannot be serialized; move it to the module scope

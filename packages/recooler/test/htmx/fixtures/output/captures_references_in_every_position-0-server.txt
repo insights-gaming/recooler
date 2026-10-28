@@ -1,0 +1,22 @@
+import { actionUrl as __recooler_actionUrl, wrapActionWithPayload as __recooler_wrapActionWithPayload, registerActions as __recooler_registerActions } from "recooler/htmx/runtime";
+export default function C(__recooler_props) {
+	let { a, b, c, d, e, f, g, h } = __recooler_props;
+	return <button hx-post={__recooler_actionUrl("src/routes/article/[id]/index.tsx@0", {
+		"a": a,
+		"b": b,
+		"c": c,
+		"d": d,
+		"e": e,
+		"f": f,
+		"g": g,
+		"h": h
+	}, __recooler_props.ctx)} />;
+}
+export const _action$post$0 = /*#__PURE__*/ __recooler_wrapActionWithPayload(({ "a": __recooler_capture, "b": __recooler_capture$1, "c": __recooler_capture$2, "d": __recooler_capture$3, "e": __recooler_capture$4, "f": __recooler_capture$5, "g": __recooler_capture$6, "h": __recooler_capture$7 }) => (async () => {
+	const x = __recooler_capture;
+	if (!__recooler_capture$1) {}
+	await db.del({ c: __recooler_capture$2 });
+	new Date(__recooler_capture$3);
+	return [__recooler_capture$4 ? __recooler_capture$5 : __recooler_capture$6, <i>{__recooler_capture$7}</i>];
+}), "src/routes/article/[id]/index.tsx@0");
+__recooler_registerActions("src/routes/article/[id]/index.tsx", { post: { "src/routes/article/[id]/index.tsx@0": _action$post$0 } });

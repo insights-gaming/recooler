@@ -1,0 +1,245 @@
+[
+  {
+    "name": "omits_ctx_from_props_spread_onto_html_elements",
+    "inputs": [
+      "\n      export default function Wrapper(props: any) {\n        return <><button {...props} /><Comp {...props} /><i {...{ a: 1 }} /></>;\n      }\n      "
+    ]
+  },
+  {
+    "name": "uses_explicit_action_context",
+    "inputs": [
+      "\n        export default function Component(props) {\n          const requestContext = props.context;\n          return <button hx-post={() => null} ctx={requestContext}>Submit</button>;\n        }\n      "
+    ]
+  },
+  {
+    "name": "passes_explicit_action_context_on_to_components",
+    "inputs": [
+      "\n        export default function Component(props) {\n          const rc = props.context;\n          return <>\n            <LikeButton ctx={rc} hx-post={() => null} />\n            <ui.Button ctx={rc} hx-post={() => null} />\n            <svg:a ctx={rc} hx-post={() => null} />\n          </>;\n        }\n      "
+    ]
+  },
+  {
+    "name": "uses_component_context_by_default",
+    "inputs": [
+      "\n        export default function Component(props) {\n          return <button hx-post={() => null}>Submit</button>;\n        }\n      "
+    ]
+  },
+  {
+    "name": "captures_without_rewriting_the_action",
+    "inputs": [
+      "\n        export default function C({ count }) {\n          return <button hx-post={() => <b>{count}</b>} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "captures_survive_hygiene",
+    "inputs": [
+      "\n        export default function C({ count }) {\n          return <button hx-post={(c) => { const count1 = 1; return c.text(String(count + count1)); }} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "captures_references_in_every_position",
+    "inputs": [
+      "\n        export default function C({ a, b, c, d, e, f, g, h }) {\n          return <button hx-post={async () => {\n            const x = a;\n            if (!b) {}\n            await db.del({ c });\n            new Date(d);\n            return [e ? f : g, <i>{h}</i>];\n          }} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "does_not_capture_module_scope_globals_or_inner_bindings",
+    "inputs": [
+      "\n        import { db } from \"./db\";\n        const LIMIT = 10;\n        function fmt(n) { return n; }\n        export default function C({ item, list }) {\n          return <button hx-post={() => {\n            if (list) { const item = 1; console.log(item); }\n            return list.map((item) => fmt(item.id)).slice(0, LIMIT).concat(db);\n          }} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "captures_loop_and_switch_bindings",
+    "inputs": [
+      "\n        export default function C({ items, k }) {\n          const out = [];\n          for (const item of items) {\n            out.push(<button hx-post={() => remove(item.id)} />);\n          }\n          switch (k) {\n            case 1:\n              const y = k + 1;\n              out.push(<button hx-post={() => f(y)} />);\n          }\n          return out;\n        }\n      "
+    ]
+  },
+  {
+    "name": "captured_variables_are_mutable",
+    "inputs": [
+      "\n        export default function C({ count }) {\n          return <button hx-post={() => { count += 1; function helper() {} helper(); return String(count); }} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "rejects_local_functions_and_classes",
+    "inputs": [
+      "\n        export default function C({ n }) {\n          const fmt = (v) => v * 2;\n          class Thing {}\n          return <button hx-post={() => [fmt(n), new Thing()]} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "rejects_this_and_arguments_in_arrow_event_handlers",
+    "inputs": [
+      "\n        export default function C() {\n          return (\n            <div>\n              <button hx-on:click={() => { this.classList.toggle(\"on\"); }} />\n              <button hx-on-click={(e) => [1].map(() => console.log(arguments.length, e))} />\n              <button hx-on:load={(e = this) => e} />\n              <button {...{ \"hx-on:click\": async () => this.remove() }} />\n              <button hx-on:click={() => class { [this.id] = 1; static [arguments[0]]() {} }} />\n              <button hx-on:click={() => ({ get [this.id]() { return 1; } })} />\n              <button hx-on:click={() => ({ set [arguments[0]](v) {} })} />\n            </div>\n          );\n        }\n      ",
+      "\n        export default function C() {\n          return (\n            <div>\n              <button hx-on:click={function () { this.classList.toggle(arguments[0].type); }} />\n              <button hx-on:click={() => [1].forEach(function () { console.log(this, arguments); })} />\n              <button hx-on:click={() => ({ m() { return this; }, get g() { return this; } })} />\n              <button hx-on:click={() => class { f = this; m() { return arguments; } }} />\n              <button hx-on:click={(e) => e.currentTarget.arguments} />\n            </div>\n          );\n        }\n      "
+    ]
+  },
+  {
+    "name": "transforms_data_prefixed_attributes",
+    "inputs": [
+      "\n        export default function C({ msg }) {\n          return (\n            <form data-hx-post={() => msg} ctx={c}>\n              <button data-hx-on:click={() => alert(msg)} data-hx-on-mouseover={() => 1} />\n              <i {...{ \"data-hx-delete\": () => 2, \"data-hx-on:load\": () => 3 }} />\n            </form>\n          );\n        }\n      ",
+      "<a data-data-hx-get={() => 1} data-on:click={() => 2} />"
+    ]
+  },
+  {
+    "name": "captures_event_handler_variables",
+    "inputs": [
+      "\n        export default function C({ msg }) {\n          return <button hx-on:click={() => alert(msg)} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "leaves_handlers_without_captures_unchanged",
+    "inputs": [
+      "\n        export default function C() {\n          return <button hx-on:click={() => alert(1)} hx-post={(c) => c.text(\"hi\")} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "transforms_nested_actions_using_outer_action_context",
+    "inputs": [
+      "\n        export default function C(props) {\n          const a = props.a;\n          return <button hx-post={() => <i hx-post={() => f(a)} />} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "nested_actions_do_not_use_outer_explicit_context",
+    "inputs": [
+      "\n        export default function C(props) {\n          const rc = props.ctx;\n          return <form ctx={rc} hx-post={async (ctx) => <button hx-post={() => 1} />} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "encodes_route_params_in_action_urls",
+    "inputs": [
+      "\n      export default function C(props) {\n        return <button hx-post={() => 1} />;\n      }\n    "
+    ]
+  },
+  {
+    "name": "reads_route_params_with_any_name",
+    "inputs": [
+      "\n        export default function C(props) {\n          return <button hx-post={() => 1} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "uses_explicit_action_context_from_object_props",
+    "inputs": [
+      "export default function C(props) { const ctx = props.rc; return <button {...{ ctx, \"hx-post\": () => 1 }} />; }",
+      "export default function C(props) { const ctx = props.rc; return <button {...{ \"hx-post\": () => 1, ctx: ctx }} />; }"
+    ]
+  },
+  {
+    "name": "keeps_explicit_action_context_in_object_props_of_components",
+    "inputs": [
+      "\n        export default function C(props) {\n          const rc = props.rc;\n          return (\n            <>\n              <Btn {...{ \"hx-post\": () => 1, ctx: rc }} />\n              <Btn {...{ ctx, \"hx-post\": () => 2 }} />\n              <a {...{ ctx: rc, \"hx-post\": () => 3 }} />\n              <Btn {...props} {...{ x: { ctx: rc, \"hx-post\": () => 4 } }} />\n            </>\n          );\n        }\n      "
+    ]
+  },
+  {
+    "name": "rewrites_destructured_props_for_context",
+    "inputs": [
+      "\n        export default function C({ id }: RouteProps) {\n          return <button hx-post={() => id} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "reads_context_from_rest_props_param",
+    "inputs": [
+      "\n        export default function C(...args) {\n          return <button hx-post={() => 1} />;\n        }\n      ",
+      "\n        export default (...[{ id }]: [RouteProps]) => <button hx-post={() => id} />;\n      "
+    ]
+  },
+  {
+    "name": "nested_actions_use_their_own_frame_or_explicit_context",
+    "inputs": [
+      "\n        export default function C(props) {\n          return <>\n            <a ctx={props.ctx} hx-post={() => <b hx-post={() => <i hx-post={() => 1} />} />} />\n            <p hx-post={(c1) => <u ctx={c1} hx-post={(c2) => <s hx-post={() => 2} />} />} />\n          </>;\n        }\n      "
+    ]
+  },
+  {
+    "name": "reads_route_params_with_symbols_and_unicode_in_names",
+    "inputs": [
+      "\n        export default function C(props) {\n          return <button hx-post={() => 1} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "skips_typescript_this_param_for_context",
+    "inputs": [
+      "\n        export default function C(this: unknown, { id }: RouteProps) {\n          return <button hx-post={function (this: unknown) {\n            return <button hx-post={() => id} />;\n          }} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "reports_missing_context_instead_of_panicking",
+    "inputs": [
+      "\n        export default function C() {\n          return <button hx-post={() => 1} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "slices_handler_helpers_and_drops_server_code",
+    "inputs": [
+      "\n        import { query as q } from \"faunadb\";\n        import { type BountyMultipliers, faunaClient } from \"@app/backend/fql\";\n        import { runAdminAction } from \"../lib/admin-action\";\n        import Button from \"./Button\";\n        import \"./styles.css\";\n\n        export interface Props { multipliers?: BountyMultipliers }\n\n        const defaultMultipliers: BountyMultipliers = { tier: [1] };\n\n        function formatNumber(n: number): string {\n          return n.toFixed(2);\n        }\n\n        function multipliersFromFormPayload(payload: Record<string, any>): BountyMultipliers {\n          return payload as unknown as BountyMultipliers;\n        }\n\n        function setElementFormattedNumber(id: string, value: number) {\n          (document.getElementById(id) as HTMLElement).innerText = formatNumber(value);\n        }\n\n        export const updateMultipliersTable = () => {\n          const multipliers = multipliersFromFormPayload({});\n          setElementFormattedNumber(\"x\", multipliers.tier[0]);\n        };\n\n        console.log(\"side effect\");\n\n        export async function ManageMultipliersButton({ multipliers }: Props) {\n          multipliers ??= (await faunaClient.query(q.Get(\"x\"))) ?? defaultMultipliers;\n          return (\n            <Button\n              hx-on-click={function (this: HTMLButtonElement) {\n                ((window as any).updateMultipliersTable = updateMultipliersTable)();\n              }}\n              hx-post={async (ctx) => runAdminAction(ctx, multipliers)}\n            />\n          );\n        }\n      "
+    ]
+  },
+  {
+    "name": "slices_handlers_with_captured_scope",
+    "inputs": [
+      "\n        import { fmt } from \"./fmt\";\n        import { db } from \"./db\";\n        export default async function C({ msg }) {\n          await db.get();\n          return <button hx-on:click={() => alert(fmt(msg))} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "slices_out_type_only_imports",
+    "inputs": [
+      "\n        import type { A } from \"./a\";\n        import { type B, c } from \"./b\";\n        import { D } from \"./d\";\n        export default function C() {\n          return <button hx-on:click={(e: A) => { const x: B = c; return e as unknown as D; }} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "slices_destructured_var_declarators",
+    "inputs": [
+      "\n        import { config } from \"./config\";\n        import { server } from \"./server\";\n        const { a, b: [c] } = config, unused = server();\n        let other = 1;\n        export default function C() {\n          return <button hx-on:click={() => c} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "slices_partially_used_import_declarations",
+    "inputs": [
+      "\n        import { a, b, c as d } from \"./m\";\n        import def, { e } from \"./n\";\n        import * as ns from \"./o\";\n        import f, * as g from \"./p\";\n        export default function C() {\n          return <button hx-on:click={() => [a, d, ns.x, f, b2]} hx-on:keyup={() => def} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "reports_banned_imports_with_reference_chain",
+    "inputs": [
+      "\n      import { faunaClient } from \"../lib/fql\";\n      import { query as q } from \"faunadb\";\n      function query() {\n        return faunaClient.query();\n      }\n      export const updateTable = () => query();\n      export default async function C() {\n        await faunaClient.query(q.Get(\"x\"));\n        return <><button hx-on:click={() => 1} /><button hx-on:click={() => updateTable()} /></>;\n      }\n    "
+    ]
+  },
+  {
+    "name": "slices_on_load_without_event_handlers",
+    "inputs": [
+      "\n      import { db } from \"./db\";\n      import { fmt } from \"./fmt\";\n      function helper() {\n        return fmt(1);\n      }\n      export const onLoad = () => {\n        helper();\n      };\n      export default async function Page() {\n        await db.get();\n        return <div />;\n      }\n    "
+    ]
+  },
+  {
+    "name": "slices_on_load_and_handlers_sharing_a_helper",
+    "inputs": [
+      "\n        import { db } from \"./db\";\n        function shared(n) {\n          return n * 2;\n        }\n        export async function onLoad() {\n          shared(1);\n        }\n        export default async function Page() {\n          await db.get();\n          return <button hx-on:click={() => shared(2)} />;\n        }\n      "
+    ]
+  },
+  {
+    "name": "slices_on_load_export_forms",
+    "inputs": [
+      "\n        import { run } from \"./run\";\n        function load() {\n          run();\n        }\n        export { load as onLoad, other };\n        const other = 1;\n      ",
+      "export { onLoad, other } from \"./client\";",
+      "export const a = 1, b = 2, onLoad = () => a;",
+      "export declare const onLoad: () => void;"
+    ]
+  },
+  {
+    "name": "reports_banned_imports_reached_from_on_load",
+    "inputs": [
+      "\n        import { x } from \"../lib/fql\";\n        function helper() {\n          return x.query();\n        }\n        export function onLoad() {\n          helper();\n        }\n      ",
+      "export { onLoad } from \"../lib/fql\";"
+    ]
+  },
+  {
+    "name": "reports_banned_dynamic_imports_and_requires",
+    "inputs": [
+      "\n      async function load() {\n        const { query } = await import(\"../lib/fql\");\n        return query();\n      }\n      const legacy = () => require(`faunadb`);\n      export default function C({ name }) {\n        import(\"../lib/server-only\");\n        return <>\n          <button hx-on:click={() => import(\"faunadb\")} />\n          <button hx-on:click={() => load()} />\n          <button hx-on:click={() => legacy()} />\n          <button hx-on:click={() => import(name)} />\n        </>;\n      }\n    ",
+      "\n        export async function onLoad() {\n          await import(\"../lib/fql\");\n        }\n      "
+    ]
+  },
+  {
+    "name": "ignores_dynamic_imports_without_a_static_specifier_or_outside_the_slice",
+    "inputs": [
+      "\n      const lazy = (name) => import(`../lib/${name}`);\n      const resolve = () => require.resolve(\"faunadb\");\n      function unused() { return import(\"faunadb\"); }\n      const api = { load() { return import(`faunadb`); } };\n      export default function C() {\n        return <>\n          <button hx-on:click={() => lazy(\"fql\")} />\n          <button hx-on:click={() => resolve()} />\n          <button hx-on:click={() => api.load()} />\n        </>;\n      }\n    "
+    ]
+  }
+]

@@ -25,6 +25,14 @@
       "types": "./dist/htmx/index.d.ts",
       "default": "./dist/htmx/index.js"
     },
+    "./htmx/transform": {
+      "types": "./dist/htmx/transform/index.d.ts",
+      "default": "./dist/htmx/transform/index.js"
+    },
+    "./htmx/runtime": {
+      "types": "./dist/htmx/runtime.d.ts",
+      "default": "./dist/htmx/runtime.js"
+    },
     "./vite": {
       "types": "./dist/vite/index.d.ts",
       "default": "./dist/vite/index.js"

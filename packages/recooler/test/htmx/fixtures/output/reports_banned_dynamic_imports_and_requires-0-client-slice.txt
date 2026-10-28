@@ -1,0 +1,3 @@
+event handler src/routes/article/[id]/index.tsx@0 imports banned module "faunadb" via _handler$0
+event handler src/routes/article/[id]/index.tsx@1 imports banned module "../lib/fql" via _handler$1 → load
+event handler src/routes/article/[id]/index.tsx@2 imports banned module "faunadb" via _handler$2 → legacy

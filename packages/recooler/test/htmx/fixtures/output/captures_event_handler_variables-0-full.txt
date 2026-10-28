@@ -1,0 +1,5 @@
+import { handlerScope as __recooler_handlerScope } from "recooler/htmx/runtime";
+export default function C({ msg }) {
+	return <button hx-on:click={`$handlers["src/routes/article/[id]/index.tsx@0"](${__recooler_handlerScope({ "msg": msg })}).call(this, event)`} />;
+}
+export const _handler$0 = ({ "msg": __recooler_capture }) => (() => alert(__recooler_capture));
