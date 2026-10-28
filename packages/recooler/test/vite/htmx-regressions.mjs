@@ -137,6 +137,9 @@ try {
     second = otherEnvironment;
     const other = (await otherEnvironment.environments.other.runner.import('/src/entry.ts')).default;
     const otherGraph = await (await other.fetch(new Request('http://test/table'), env)).json();
+    const sameServerSsr = (await otherEnvironment.environments.ssr.runner.import('/src/entry.ts')).default;
+    const sameServerGraph = await (await sameServerSsr.fetch(new Request('http://test/table'), env)).json();
+    assert.notEqual(otherGraph.namespace, sameServerGraph.namespace, 'server environments on one dev server must be isolated');
     assert.notEqual(otherGraph.namespace, firstNamespace);
     assert(otherGraph.namespace.endsWith(':other'));
   }

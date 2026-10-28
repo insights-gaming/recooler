@@ -141,6 +141,7 @@ try {
     const original = originalPositionFor(map, { line: Number(line), column: Number(column) - 1 });
     assert.match(original.source, /src\/routes\/index\.tsx$/);
     assert.equal(original.line, 10);
+    assert.equal(original.column, pageSource.split('\n')[9].indexOf('new Error'));
     assert.equal(map.sourcesContent[map.sources.indexOf(original.source)], pageSource);
   }
   await builtPreview?.close(); builtPreview = undefined;

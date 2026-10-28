@@ -85,7 +85,8 @@ declare module 'recooler/jsx' {
 ## Server htmx actions (Phase 4b)
 
 `recooler()` transforms `hx-*` source attributes in server mode before the JSX
-pragmas are added. It automatically installs the htmx extension when any loaded
+pragmas are added. Dev always installs the htmx extension so adding the first
+action through an import works immediately. Builds install it when a loaded
 source module contains `hx-`. Set `htmx: {}` to enable it explicitly or
 `htmx: false` to disable the transform and automatic extension. Handler strings
 are emitted, but client chunks, `onLoad` delivery and `page.scripts` are Phase 5.
@@ -106,6 +107,8 @@ back to `process.env[binding]` on Node. Configure a Worker secret (a `.dev.vars`
 value locally); Cloudflare v2 also requires declaring the binding as a secret in
 `worker.env`. Supply a nonempty value before the first request to an action-bearing
 route. The key is never read during compilation or inlined into the JS bundle.
+Cloudflare copies `.dev.vars` into `dist/<worker>/` for local build preview; that
+file contains secrets, so keep build output private and out of source control.
 Rotation follows the runtime's env-identity cache; use a fresh env object or app.
 The plugin intentionally accepts a binding name rather than a literal secret.
 
@@ -119,9 +122,10 @@ import { htmx } from 'recooler/htmx';
 // })] });
 ```
 
-Always pass that namespace: it is a stable hash of the absolute srcDir and matches
-all generated registrations, isolating projects with identical relative module
-IDs. Module/action IDs are **srcDir-relative**, with POSIX separators (including
+Always pass that namespace: it contains a stable hash of the absolute srcDir, the
+environment name, and a per-server nonce in dev. It matches all registrations and
+isolates projects, server environments, and concurrent dev servers with identical
+relative module IDs. Module/action IDs are **srcDir-relative**, with POSIX separators (including
 `../` for outside-source modules), exactly matching 0.0.27. Only Vite transport
 `?v=`/`?t=` queries are removed; meaningful variants remain distinct.
 
@@ -135,17 +139,22 @@ explicit unsafe mode. Bundler-independent consumers without this plugin must
 provide their own production policy.
 
 The D5 table follows surviving static imports/re-exports/side effects from each
-page route, its layouts and the root. It emits only action-bearing module IDs.
+page route, its router-resolved layouts (including canonical alias directories)
+and the root. It emits only action-bearing module IDs.
 Dynamic imports are not action roots. Barrels intentionally over-approximate at
 module precision; D6 signatures prevent foreign-route/path authorization. Routes
-without a page never receive table entries. Build adjacency is cached once per
-`renderChunk` pass; table replacement returns a source map. Dev uses the selected
+without a page never receive table entries. Both build and dev propagate action
+identities through reverse static edges, discovering shared closures once. Table
+replacement returns `map: null` when later mapped code does not move; combined
+lines use a boundary source map. Dev uses the selected
 server environment's lowered `transformResult.deps`, parallel discovery with cached
 adjacency, reverse-edge action propagation, stable graph epochs and deduped
 concurrent computations. Unchanged pure htmx transforms are cached across full
-reloads; source changes still re-evaluate every registration. Every source
-transform registers, including `{}` when actions are absent. Changes use
-`invalidateAll` and an SSR full reload. Route generation runs before platform
+reloads; source changes still re-evaluate every registration. Dev registration
+starts only after that environment loads `virtual:recooler/htmx`. Reset hooks cover
+`srcDir`, declared action packages, and previously transformed action modules,
+including `{}` when actions are absent. Idle and auxiliary environments are left
+alone. Changes invalidate only the virtual table and use a full SSR runner reload. Route generation runs before platform
 startup hooks, so eager workerd imports see the initial graph.
 
 Action packages must remain source inputs. Packages declaring `recooler` or
@@ -160,8 +169,16 @@ source transforms cannot discover a package they never receive. Custom Rolldown
 responsibility. `htmx.clientBannedImports` forwards raw-specifier checks to the
 transform; the client bundle graph check remains Phase 5.
 
+Each registration includes the defining module’s SHA-256 content hash through
+the codegen contract. V2 signed URLs bind that hash, namespace and mount base;
+editing a module invalidates old positional action IDs from that module.
+Function-valued action and `hx-on*` attributes reaching the JSX runtime throw a
+“module was not transformed” diagnostic instead of rendering server source.
+
 Verification fixtures: `test/vite/htmx-integration.mjs` (plain, Cloudflare v1,
-v2 beta), `htmx-options.mjs` (production guard and located diagnostics), and
+v2 beta), `htmx-options.mjs` (production guard and located diagnostics),
+`htmx-regressions.mjs` (alias layouts, table parity, map paths, edit matrix, shifted
+IDs and server/environment isolation; add `--cloudflare` for workerd), and
 `htmx-bench.mjs` (interleaved full-plugin/no-htmx build and edit-response gates).
 Run them with `pnpm --filter recooler exec node test/vite/<script>.mjs`; add
 `--cloudflare` to the benchmark for the 400/1,000-route workerd dev gate.

@@ -58,7 +58,11 @@ request matrix, normalization and comparison records. Adapters expose:
   catalog's Hono template. The hook maps that template to any runtime route ID.
   The 0.0.27 hook constructs the existing unsigned `?action=<id>` URL. A 0.1
   adapter must sign at dispatch, using the htmx phase's required test-only export:
-  `signActionUrl({ routeId, pathname, method, actionId, scope }, secret)`.
+  `signActionUrl({ namespace, base, moduleHash, routeId, pathname, method, actionId, scope }, secret)`.
+  The adapter supplies the receiving app/environment registry namespace, normalized
+  mount base and current defining-module content hash from registration metadata.
+  The v2 MAC binds all three as well as the route, pathname, method, action and
+  exact scope JSON. The returned URL already includes `base`; do not add it twice.
   The helper returns a URL string (or Promise thereof). The test secret belongs
   in private adapter options; do not bake signatures into baseline cases.
   Missing hook support fails replay. Explicit cases may provide captured scopes;

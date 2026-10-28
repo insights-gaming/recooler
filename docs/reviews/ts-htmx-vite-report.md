@@ -1,5 +1,9 @@
 # Phase 4b: server htmx in recooler()
 
+The [Phase 4b review response](ts-htmx-vite-review-response.md) supersedes this
+initial report’s dev invalidation policy, namespace/signing contract, and benchmark
+control. This report retains the original implementation measurements.
+
 Implementation branch: `ssttevee/ts-htmx-vite`, based on `ac17235`.
 Worktree: `/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-b14570d3`.
 No Rust sources changed; no consumer sources copied; no push.
