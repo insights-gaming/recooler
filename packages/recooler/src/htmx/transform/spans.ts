@@ -27,7 +27,7 @@ export class SpanIndex<T extends Span> {
   }
   owner(span: Span): T | undefined {
     const end = lowerBound(this.items, span.start + 1, item => item.start);
-    let item = this.items[end - 1];
+    let item: T | undefined = this.items[end - 1];
     while (item && !contains(item, span)) item = this.parents.get(item);
     return item;
   }

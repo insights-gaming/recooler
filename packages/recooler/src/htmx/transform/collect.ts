@@ -112,8 +112,10 @@ function lexicalBindings(fn: FunctionNode, analysis: Analysis): ("this" | "argum
       return;
     }
     if (node.type === "ThisExpression") thisUsed = true;
-    if (node.type === "Identifier" && node.name === "arguments"
-      && (() => { const ref = analysis.referenceAt.get(node.start); return ref && analysis.isValueReference(ref); })()) argumentsUsed = true;
+    if (node.type === "Identifier" && node.name === "arguments") {
+      const ref = analysis.referenceAt.get(node.start);
+      if (ref && analysis.isValueReference(ref)) argumentsUsed = true;
+    }
     for (const child of children(node)) visit(child);
   }
   visit(fn);

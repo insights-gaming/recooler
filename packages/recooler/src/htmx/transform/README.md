@@ -31,7 +31,8 @@ Each entry has `id`, `exportName`, sorted original capture names, and original
 counters. ESTree visitor order differs from SWC in two cases: class `extends`
 actions precede body actions here (Rust visits the body first), and `do…while`
 body actions precede test actions here (the oracle visits the test first). These
-orders are intentional; no compatibility special cases are applied. Export names retain decimal counters (`_action$post$36`, `_handler$36`).
+orders are intentional; no compatibility special cases are applied. Export names
+retain decimal counters (`_action$post$36`, `_handler$36`).
 Callers supply the same project-relative path in every variant. No route pathname
 is needed, and the transform does not normalize or URL-encode this identity.
 
@@ -79,7 +80,8 @@ The separately exported `moduleIdForms`, `isBannedModule` and `bannedClientModul
 provide the resolved client-graph check for the bundler adapter. Match resolved
 paths there, ignoring queries and also checking the path after the last
 `node_modules` segment. Only complete path segments match: `my_node_modules`
-is deliberately treated as an ordinary directory, unlike Rust's substring match. `bannedClientModules` accepts an adjacency map in import
+is deliberately treated as an ordinary directory, unlike Rust's substring match.
+`bannedClientModules` accepts an adjacency map in import
 order and reports shortest module chains, including disconnected banned modules.
 The adapter still has to supply the actual bundle graph and reject the results.
 

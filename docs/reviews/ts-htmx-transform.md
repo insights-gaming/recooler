@@ -1,5 +1,8 @@
 # TypeScript htmx transform implementation handoff
 
+Review follow-up: [findings, consumer corpus and scaling verification](ts-htmx-transform-review-followup.md)
+supersedes the behavior and verification details in this initial handoff.
+
 Date: 2026-10-27. Base: `cf56726`, `ssttevee/typescript-rewrite-0-1-0`.
 Implementation branch: `ssttevee/ts-htmx-transform`.
 Worktree: `/Users/steve/.t3/worktrees/farm-plugin-recooler/t3-6767a612`.

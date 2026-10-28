@@ -160,3 +160,15 @@ it('consumes nested object ctx while preserving direct component spread props', 
   expect(value.props.x.ctx).toBeUndefined();
   expect(runtime.calls.map((c: { ctx: unknown }) => c.ctx)).toEqual([rc, rc]);
 });
+
+it('executes a hoisted action from a pruned handler-only component with its import intact', async () => {
+  const dbUrl = url('export const saved = []; export const db = { save: async value => saved.push(value) };');
+  const { module, result } = await execute(`import { db, saved } from ${JSON.stringify(dbUrl)};
+    export { saved };
+    function Row(props) { return <form hx-post={async () => { await db.save(props.id); }} />; }
+    export default function Page() { return <i hx-on:click={function () { return <Row id={42} />; }} />; }
+  `, { mode: 'server' });
+  expect(result.code).not.toContain('function Row');
+  await module['_action$post$0']({ scope: { props: { id: 42 } } });
+  expect(module.saved).toEqual([42]);
+});
