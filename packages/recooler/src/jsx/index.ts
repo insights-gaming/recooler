@@ -147,15 +147,16 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         throw new RouteValidationError([`Invalid root in ${source}: default export is not a function`]);
       }
       // Custom roots may render their own body without using renderHeadElements. Put a
-      // discoverable meta in the content slot, which works for those roots as well.
+      // discoverable body marker in the content slot, which works for those roots as well.
       {
         const Page = Content;
         Content = (props: RouteProps) => createElement(Fragment, {},
-          createElement('meta', { name: 'recooler-route', content: props.route,
+          createElement('span', { hidden: true, 'data-recooler-marker': 'true', 'data-recooler-route': props.route,
             'data-recooler-version': props.scripts.filter(src => new URL(src, props.url).pathname.endsWith('/assets/recooler-client.js'))
               .map(src => new URL(src, props.url).searchParams.get('v')).find(Boolean) }),
           typeof __RECOOLER_PRODUCTION__ !== 'undefined' && !__RECOOLER_PRODUCTION__ && props.scripts.some(src => src.includes('virtual:recooler/client'))
             && createElement('script', {}, dangerouslyPreventEscaping(`setTimeout(()=>{if(!globalThis.__recooler_entry_loaded)console.warn('recooler: client entry did not load; render props.scripts in your root and check CSP')},5000)`)),
+          ...props.scripts.map(src => createElement('script', { type: 'module', src })),
           createElement(Page, props));
       }
       // Named contributions are available to adapters for collision policies. JSX

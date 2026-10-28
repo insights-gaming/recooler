@@ -96,6 +96,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
 
   if (mode === "client-slice") {
     redactions.push(...analysis.comments);
+    for (const comment of analysis.comments) drop(comment.start, comment.end);
     for (const item of analysis.program.body) {
       if (item.type === "ExportAllDeclaration" && slice!.onLoadItems.has(item)) continue;
       if (item.type === "ImportDeclaration") {
@@ -271,7 +272,7 @@ export function transform(code: string, options: TransformOptions): TransformRes
         if (options.queueHandlers) {
           // Self-installing: an event can arrive before even the module entry
           // executes (notably while a Suspense response is still streaming).
-          const dispatch = `(globalThis.$rc??=(...a)=>{a[3].preventDefault();(globalThis.$rq??=[]).push(a)})`;
+          const dispatch = `globalThis.$rc?.`;
           const prefix = `${dispatch}(${JSON.stringify(c.id)},`;
           replacement = c.variables.length
             ? `\`${escapeTemplate(prefix)}\${${helper("handlerScope")}(${scopeAtSite(c)})},this,event)\``

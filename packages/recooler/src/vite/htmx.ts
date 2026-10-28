@@ -15,7 +15,7 @@ import type { ActionTable } from '../htmx/index.js';
 import type { TransformResult } from '../htmx/transform/index.js';
 import type { RecoolerOptions } from './index.js';
 import { routePathWithoutGroups, routeSegment } from '../router/resolve.js';
-import { clientEntry, clientId, internalClient, clientFile, sliceQuery, type ClientRoute } from './client.js';
+import { clientEntry, clientId, internalClient, clientFile, routeClientId, sliceQuery, type ClientRoute } from './client.js';
 
 export const tableId = 'virtual:recooler/htmx';
 const internalTable = '\0' + tableId;
@@ -51,7 +51,7 @@ export function canonicalId(id: string): string {
   return normalizePath(id.slice(0, at)) + (parts.length ? '?' + parts.join('&') : '');
 }
 
-interface TableData { table: ActionTable; clients: ActionTable; enabled: boolean; preloads?: Record<string, string[]> }
+interface TableData { table: ActionTable; clients: ActionTable; enabled: boolean; preloads?: Record<string, string[]>; routeModules?: Record<string, string> }
 
 interface State {
   tableLoaded: boolean;
@@ -211,6 +211,9 @@ export function htmxPlugin(options: RecoolerOptions) {
 
   const sliceIds = () => [...new Set(Object.values(builtData?.clients ?? {}).flat())].sort();
   const sliceFile = (id: string) => `assets/recooler-slice-${buildId}-${sliceIds().indexOf(id)}.js`;
+  const routeKey = (file: string) => createHash('sha256').update(file).digest('hex').slice(0, 20);
+  const routeModules = (data: TableData) => Object.fromEntries(Object.entries(data.clients).filter(([, ids]) => ids.length).map(([route]) => [route,
+    serving ? `${base}@id/${routeClientId}${routeKey(route)}` : `${base}assets/recooler-route-${routeKey(route)}.js?v=${buildId}`]));
   const preloads = (data: TableData) => Object.fromEntries(Object.entries(data.clients).map(([route, ids]) => [route,
     ids.map(id => serving ? `${base}@fs${normalizePath(path.resolve(roots.srcDir, id))}?${sliceQuery}` : base + sliceFile(id))]));
 
@@ -218,6 +221,7 @@ export function htmxPlugin(options: RecoolerOptions) {
     name: 'recooler:htmx',
     enforce: 'pre',
     config(_config, env) {
+      if (_config.base !== undefined && !_config.base.startsWith('/')) throw new Error('recooler: relative Vite base is unsupported; configure an absolute path prefix');
       // Applies to custom createApp entries too; no runtime evaluation of a
       // Worker bundle in Node is needed to enforce the production guard.
       return {
@@ -253,8 +257,7 @@ export function htmxPlugin(options: RecoolerOptions) {
       states.clear();
       builtData = undefined; clientData = undefined;
       buildId = versionToken;
-      if (config.base === './' || config.base === '') config.logger.warn('recooler: relative Vite base is unsupported; client URLs use /');
-      base = config.base === './' || config.base === '' ? '/' : config.base;
+      base = config.base;
       entryUrl = config.command === 'serve' ? `${base}@id/${clientId}` : `${base}${clientFile}?v=${buildId}`;
       roots = locations({ ...options.routes, cwd: options.routes?.cwd ?? config.root });
       serving = config.command === 'serve';
@@ -297,7 +300,15 @@ export function htmxPlugin(options: RecoolerOptions) {
         rendered.delete(this.environment.name);
         this.addWatchFile(roots.routesDir);
       }
-      if (this.environment.name === 'client') sliceContents.clear();
+      if (this.environment.name === 'client') {
+        sliceContents.clear();
+        for (const id of sliceIds()) this.emitFile({ type: 'chunk',
+          id: normalizePath(path.resolve(roots.srcDir, id)) + (id.includes('?') ? '&' : '?') + sliceQuery, fileName: sliceFile(id) });
+        for (const [file, ids] of Object.entries(builtData?.clients ?? {})) if (ids.length) {
+          const key = routeKey(file);
+          this.emitFile({ type: 'chunk', id: routeClientId + key, fileName: `assets/recooler-route-${key}.js` });
+        }
+      }
     },
     async writeBundle() {
       if (!selected(this.environment) || !clientBuild) return;
@@ -316,7 +327,7 @@ export function htmxPlugin(options: RecoolerOptions) {
       }
     },
     async hotUpdate(context) {
-      if (!selected(this.environment) || options.htmx === false) return;
+      if (!selected(this.environment) || options.htmx === false || !context.modules.length) return;
       // Generation errors have their own overlay/invalidation path. Eagerly
       // importing an invalid manifest only repeats the same diagnostic.
       if (generationFailed) return [];
@@ -327,10 +338,14 @@ export function htmxPlugin(options: RecoolerOptions) {
       // importers, retaining unchanged transforms while reloading the runner.
       const table = this.environment.moduleGraph.getModuleById(internalTable);
       if (table) this.environment.moduleGraph.invalidateModule(table);
-      const client = context.server.environments.client;
-      client?.moduleGraph.invalidateAll();
-      client?.hot.send({ type: 'full-reload', path: '*' });
-      this.environment.hot.send({ type: 'full-reload', path: '*' });
+      const before = JSON.stringify(state.cached?.clients);
+      const after = JSON.stringify((await devTable(this.environment as DevEnvironment)).clients);
+      if (before !== after) {
+        const client = context.server.environments.client;
+        client?.moduleGraph.invalidateAll();
+        client?.hot.send({ type: 'full-reload', path: '*' });
+        this.environment.hot.send({ type: 'full-reload', path: '*' });
+      }
       return [];
     },
     async resolveId(id, importer) {
@@ -344,6 +359,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         this.error(`recooler: banned imports in client chunk (raw specifier): ${chain.join(' → ')}`);
       }
       if (id === clientId) return internalClient;
+      if (id.startsWith(routeClientId)) return '\0' + id;
       const query = id.indexOf('?');
       if (query >= 0 && id.slice(query + 1).split('&').includes(sliceQuery)) {
         if (this.environment.name !== 'client') this.error('recooler: handler slices require the client environment');
@@ -362,6 +378,18 @@ export function htmxPlugin(options: RecoolerOptions) {
       return internalTable;
     },
     async load(id) {
+      if (id.startsWith('\0' + routeClientId)) {
+        if (this.environment.name !== 'client') this.error('recooler: route modules require the client environment');
+        const environment = serving ? Object.values(devServer?.environments ?? {}).find(selected) : undefined;
+        const data = environment ? await devTable(environment) : builtData;
+        const file = Object.keys(data?.clients ?? {}).find(file => routeKey(file) === id.slice(routeClientId.length + 1));
+        if (!file) this.error('recooler: unknown client route');
+        const ids = [...new Set(Object.values(data!.clients).flat())].sort();
+        const modules = data!.clients[file]!;
+        return { code: `import { register } from ${JSON.stringify(clientId)};\nexport { init } from ${JSON.stringify(clientId)};\n`
+          + modules.map((module, i) => `import * as m${i} from ${JSON.stringify(normalizePath(path.resolve(roots.srcDir, module)) + '?' + sliceQuery)};`).join('\n')
+          + `\nregister([${modules.map((module, i) => `[${JSON.stringify(String(ids.indexOf(module)))},m${i}]`).join(',')}]);`, map: null };
+      }
       if (id === internalClient) {
         if (this.environment.name !== 'client') this.error('recooler: client entry requires the client environment');
         const environment = serving ? Object.values(devServer?.environments ?? {}).find(selected) : undefined;
@@ -377,7 +405,7 @@ export function htmxPlugin(options: RecoolerOptions) {
           routes[pattern] = { slices: [...modules], ...(onLoad ? { onLoad: relative(file) } : {}) };
         }
         for (const file of files) this.addWatchFile(file);
-        return { code: clientEntry(routes, id => normalizePath(path.resolve(roots.srcDir, id)), serving ? '' : buildId, serving), map: null };
+        return { code: clientEntry(routes, id => normalizePath(path.resolve(roots.srcDir, id)), serving ? '' : buildId, serving, id => serving ? `${base}@fs${normalizePath(path.resolve(roots.srcDir, id))}?${sliceQuery}` : base + sliceFile(id)), map: null };
       }
       if (id.split('?')[1]?.split('&').includes(sliceQuery)) {
         const original = id.replace(new RegExp('([?&])' + sliceQuery + '(?=&|$)'), '').replace('?&', '?');
@@ -412,8 +440,8 @@ export function htmxPlugin(options: RecoolerOptions) {
       stateFor(this.environment.name).tableLoaded = true;
       const namespace = namespaceFor(this.environment.name);
       const current = serving ? await devTable(this.environment as DevEnvironment) : undefined;
-      const data = current ? JSON.stringify({ ...current, preloads: preloads(current) }) : token;
-      return { code: `const data = JSON.parse(${JSON.stringify(data)});\nexport const table = data.table;\nexport const clients = data.clients;\nexport const clientPreloads = data.preloads ?? {};\nexport const clientEntry = ${JSON.stringify(entryUrl)};\nexport const enabled = data.enabled;\nexport const namespace = ${JSON.stringify(namespace)};\n`, map: null };
+      const data = current ? JSON.stringify({ ...current, preloads: preloads(current), routeModules: routeModules(current) }) : token;
+      return { code: `const data = JSON.parse(${JSON.stringify(data)});\nexport const table = data.table;\nexport const clients = data.clients;\nexport const clientPreloads = data.preloads ?? {};\nexport const clientModules = data.routeModules ?? {};\nexport const clientEntry = ${JSON.stringify(entryUrl)};\nexport const enabled = data.enabled;\nexport const namespace = ${JSON.stringify(namespace)};\n`, map: null };
     },
     transform: {
       filter: { id: sourcePattern, code: /hx-|onLoad/ },
@@ -518,6 +546,7 @@ export function htmxPlugin(options: RecoolerOptions) {
         buildId = hash.digest('hex').slice(0, 20);
         builtData = { table, clients, enabled };
         builtData.preloads = preloads(builtData);
+        builtData.routeModules = routeModules(builtData);
         state.cached = { ...builtData, epoch: state.epoch };
         return builtData;
       })());

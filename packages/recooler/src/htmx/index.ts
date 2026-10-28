@@ -16,6 +16,8 @@ export interface HtmxOptions<E extends Env = Env> {
   clients?: ActionTable;
   /** Stable external module URL, including build cache-busting query. */
   clientEntry?: string;
+  /** Deterministically named static route modules, supplied by Vite. */
+  clientModules?: Readonly<Record<string, string>>;
   /** Current route modulepreloads, supplied by Vite. */
   clientPreloads?: Readonly<Record<string, readonly string[]>>;
   /** Explicit opt-in for roots that inline their second argument as JavaScript. */
@@ -130,7 +132,7 @@ export function htmx<E extends Env = Env>(options: HtmxOptions<E>): HtmxExtensio
       const hasClient = hasPage && !!options.clients?.[route.file]?.length && !!options.clientEntry;
       return {
         methods: [...methods],
-        middleware: [binding, dispatch], reserved: reserves, page: { scripts: hasClient ? [options.clientEntry!] : [],
+        middleware: [binding, dispatch], reserved: reserves, page: { scripts: hasClient ? [options.clientEntry!, ...(options.clientModules?.[route.file] ? [options.clientModules[route.file]!] : [])] : [],
           preloads: hasClient ? [...(options.clientPreloads?.[route.file] ?? [])] : [],
           ...(hasClient && options.legacyClientScript ? { clientScript: `import(${JSON.stringify(options.clientEntry).replaceAll('<', '\\u003c')}).then(m=>m.init())` } : {}) },
       };

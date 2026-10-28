@@ -1,6 +1,7 @@
 /** Generated entry; slice maps disclose only surviving client source. */
 export const clientId = 'virtual:recooler/client';
 export const internalClient = '\0' + clientId;
+export const routeClientId = 'virtual:recooler/route/';
 export const sliceQuery = 'recooler-handlers';
 export const clientFile = 'assets/recooler-client.js';
 
@@ -10,129 +11,150 @@ export interface ClientRoute {
   onLoad?: string;
 }
 
-export function clientEntry(routes: Record<string, ClientRoute>, resolveSlice: (id: string) => string, version = '', dev = false): string {
+export function clientEntry(routes: Record<string, ClientRoute>, resolveSlice: (id: string) => string, version = '', dev = false,
+  retryURL: (id: string) => string = resolveSlice): string {
   const ids = [...new Set(Object.values(routes).flatMap(route => route.slices))].sort();
-  // Neither the entry's lookup keys nor its route table disclose source paths.
   const opaque = (id: string) => String(ids.indexOf(id));
   const pages = Object.fromEntries(Object.entries(routes).map(([route, page]) => [route, {
     slices: page.slices.map(opaque), ...(page.onLoad ? { onLoad: opaque(page.onLoad) } : {}),
   }]));
   return `
+const runtime = globalThis.__recooler_client ??= (() => {
 const slices = {
 ${ids.map(id => `${JSON.stringify(opaque(id))}: () => import(${JSON.stringify(resolveSlice(id) + (id.includes('?') ? '&' : '?') + sliceQuery)})`).join(',\n')}
 };
+const urls = ${JSON.stringify(Object.fromEntries(ids.map(id => [opaque(id), retryURL(id)])))};
 const routes = ${JSON.stringify(pages)};
 const version = ${JSON.stringify(version)};
 const handlers = globalThis.$handlers ??= Object.create(null);
-const modules = new Map();
-const report = error => typeof globalThis.reportError === 'function' ? globalThis.reportError(error) : console.error(error);
-let active, activeRoute, activeVersion, pending, loading = true, resuming;
-const marker = () => document.querySelector('body meta[name="recooler-route"]') ?? document.querySelector('meta[name="recooler-route"]') ?? document.body;
-const routeOf = node => node?.content ?? node?.dataset.recoolerRoute;
-const changed = () => {
-  const node = marker();
-  return node !== active || routeOf(node) !== activeRoute || node?.dataset.recoolerVersion !== activeVersion;
-};
-function checkVersion(node) {
-  const expected = node?.dataset.recoolerVersion;
-  if (expected && version && expected !== version) {
-    location.reload();
-    throw new Error('recooler: page/client version mismatch; reloading');
-  }
-}
-const queue = (...args) => {
-  args[3].preventDefault();
-  (globalThis.$rq ??= []).push(args);
-};
-globalThis.$rc = (id, scope, element, event) => {
-  if (resuming?.elements.has(element) && resuming.type === event.type) return;
-  if (loading || changed()) { queue(id, scope, element, event); return; }
-  checkVersion(active);
-  const fn = handlers[id];
-  if (!fn) throw new Error('recooler: handler is not loaded for this route: ' + id);
-  return (scope === null ? fn : fn(scope)).call(element, event);
-};
-async function replay(records) {
-  const [, , element, event] = records[0];
-  if (!element.isConnected) return;
-  let cancelled = false, issued = false;
-  // Queueing cancelled the original event. Present the handler with its own
-  // cancellation state, retaining target, detail, this and native event methods.
-  const detail = event.detail && typeof event.detail === 'object' ? new Proxy(event.detail, {
-    get(target, key) {
-      if (key === 'issueRequest' && typeof target[key] === 'function') return (...args) => { issued = true; return target[key](...args); };
-      return Reflect.get(target, key);
-    }
-  }) : event.detail;
-  const replayed = new Proxy(event, { get(target, key) {
-    if (key === 'defaultPrevented') return cancelled;
-    if (key === 'preventDefault') return () => { cancelled = true; target.preventDefault(); };
-    if (key === 'detail') return detail;
-    const value = Reflect.get(target, key, target);
-    return typeof value === 'function' ? value.bind(target) : value;
-  } });
-  for (const [id, scope, target] of records) {
-    if (!target.isConnected) continue;
-    try { await globalThis.$rc(id, scope, target, replayed); }
-    catch (error) { cancelled = true; report(error); }
-  }
-  if (!event.cancelable || cancelled || issued || !element.isConnected) return;
-  const source = event.type === 'submit' ? event.target?.closest?.('form')
-    : event.type === 'click' ? event.target?.closest?.('a,button,input[type="submit"],input[type="button"]')
-    : detail?.elt ?? element;
-  resuming = { elements: new Set(records.map(args => args[2])), type: event.type };
+const modules = new Map(), jobs = new WeakMap(), completed = new WeakMap();
+const report = error => console.error(error);
+const markers = () => [...document.querySelectorAll('[data-recooler-marker]')];
+const signature = node => node.dataset.recoolerRoute + '@' + node.dataset.recoolerVersion;
+function reloadOnce(key, message) {
   try {
-    if (event.type === 'htmx:confirm' && typeof detail?.issueRequest === 'function') detail.issueRequest();
-    else if (event.type === 'submit' && typeof source?.requestSubmit === 'function') source.requestSubmit(event.submitter ?? undefined);
-    else if (event.type === 'click' && source) source.click();
-    else if (event.type.startsWith('htmx:')) {
-      const config = detail?.requestConfig ?? detail;
-      if (config?.verb && config?.path && globalThis.htmx?.ajax) {
-        globalThis.htmx.ajax(config.verb, config.path, { source, target: config.target,
-          headers: config.headers, values: config.parameters, event: config.triggeringEvent });
-      } else console.warn('recooler: queued ' + event.type + ' was cancelled; htmx exposes no request continuation');
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      location.reload();
+      return;
     }
-  } finally { resuming = undefined; }
+  } catch {}
+  console.error(message);
 }
-async function initialize() {
-  if (document.readyState === 'loading') await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
-  const node = marker();
-  if (!changed()) return pending;
-  checkVersion(node);
-  active = node;
-  const route = activeRoute = routeOf(node);
-  const pageVersion = activeVersion = node?.dataset.recoolerVersion;
-  const current = () => marker() === node && routeOf(node) === route && node?.dataset.recoolerVersion === pageVersion;
-  loading = true;
-  const page = Object.hasOwn(routes, route) ? routes[route] : undefined;
-  pending = (async () => {
-    await Promise.all((page?.slices ?? []).map(async id => {
-      if (!modules.has(id)) modules.set(id, slices[id]());
-      await modules.get(id);
-    }));
-    // A later swap can finish before an earlier dynamic import.
-    if (!current()) return;
-    const onLoad = page?.onLoad && (await modules.get(page.onLoad))?.onLoad;
-    if (typeof onLoad === 'function') { try { await onLoad(); } catch (error) { report(error); } }
-    if (!current()) return;
-    loading = false;
-    const queued = globalThis.$rq ?? [];
-    globalThis.$rq = [];
-    const events = new Map();
-    for (const args of queued) {
-      if (!events.has(args[3])) events.set(args[3], []);
-      events.get(args[3]).push(args);
+function checkVersion(node) {
+  const expected = node.dataset.recoolerVersion;
+  if (expected && version && expected !== version) {
+    reloadOnce('recooler:version:' + expected + ':' + version, 'recooler: page/client version mismatch persists; refresh after the deployment completes');
+    return false;
+  }
+  return true;
+}
+async function load(id) {
+  if (!modules.has(id)) {
+    const promise = (async () => {
+      try { return await slices[id](); }
+      catch {
+        // Native import caches failures by URL. Give the retry a fresh identity.
+        const url = urls[id];
+        return import(/* @vite-ignore */ url + (url.includes('?') ? '&' : '?') + 'rc_retry=' + Date.now());
+      }
+    })();
+    modules.set(id, promise);
+    promise.catch(() => { if (modules.get(id) === promise) modules.delete(id); });
+  }
+  return modules.get(id);
+}
+function invoke(id, scope, element, event) {
+  const fn = handlers[id];
+  if (fn) return (scope === null ? fn : fn(scope)).call(element, event);
+}
+async function initializeNode(node) {
+  const key = signature(node);
+  if (completed.get(node) === key) return;
+  const existing = jobs.get(node);
+  if (existing?.key === key) return existing.promise;
+  if (!checkVersion(node)) return;
+  const page = routes[node.dataset.recoolerRoute];
+  const run = async () => {
+    // Static route modules register namespaces synchronously before DCL.
+    // Only swaps or failed initial module loads take the asynchronous path.
+    const missing = (page?.slices ?? []).filter(id => !modules.has(id));
+    if (missing.length) await Promise.all(missing.map(load));
+    const values = (page?.slices ?? []).map(id => modules.get(id));
+    if (values.some(value => value instanceof Promise)) await Promise.all(values);
+    if (!node.isConnected || signature(node) !== key) return;
+    completed.set(node, key);
+    const value = page?.onLoad && modules.get(page.onLoad);
+    const module = value instanceof Promise ? await value : value;
+    if (typeof module?.onLoad === 'function') {
+      try { await module.onLoad(); } catch (error) { report(error); }
     }
-    for (const records of events.values()) { try { await replay(records); } catch (error) { report(error); } }
-  })();
-  return pending;
+  };
+  const promise = run().catch(error => {
+    reloadOnce('recooler:import:' + (version || 'dev') + ':' + node.dataset.recoolerRoute,
+      'recooler: client module failed after retry; ' + error);
+    report(error);
+  }).finally(() => { if (jobs.get(node)?.promise === promise) jobs.delete(node); });
+  jobs.set(node, { key, promise });
+  return promise;
 }
-export function init() { return globalThis.__recooler_ready = initialize(); }
-document.addEventListener('htmx:afterSettle', () => {
-  if (changed()) init().catch(report);
-});
-document.addEventListener('htmx:historyRestore', () => { init().catch(report); });
+function init() {
+  const ready = Promise.all(markers().map(initializeNode));
+  // Observe every public readiness promise even when the caller ignores it.
+  ready.catch(report);
+  return globalThis.__recooler_ready = ready;
+}
+function register(entries) {
+  for (const [id, module] of entries) modules.set(id, module);
+  init();
+}
+const waiting = new WeakMap();
+globalThis.$rc = (id, scope, element, event) => {
+  if (handlers[id] && markers().every(node => completed.get(node) === signature(node))) {
+    return invoke(id, scope, element, event);
+  }
+  // Confirm is the only public htmx continuation. All other handlers run late:
+  // never prevent a native default or restart an htmx request.
+  let batch = waiting.get(event);
+  if (!batch) {
+    const confirm = event.type === 'htmx:confirm' && typeof event.detail?.issueRequest === 'function';
+    if (confirm) event.preventDefault();
+    batch = { records: [], confirm };
+    waiting.set(event, batch);
+    queueMicrotask(async () => {
+      try {
+        await init();
+        let cancelled = false, issued = false;
+        const detail = confirm ? new Proxy(event.detail, { get(target, key) {
+          if (key === 'issueRequest') return (...args) => { issued = true; return target.issueRequest(...args); };
+          return Reflect.get(target, key);
+        } }) : event.detail;
+        const late = new Proxy(event, { get(target, key) {
+          if (key === 'preventDefault') return () => { cancelled = true; };
+          if (key === 'defaultPrevented' && confirm) return cancelled;
+          if (key === 'detail') return detail;
+          const value = Reflect.get(target, key, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        } });
+        for (const [id, scope, target] of batch.records) {
+          if (!target.isConnected) continue;
+          if (!handlers[id]) { cancelled = true; continue; }
+          try { await invoke(id, scope, target, late); } catch (error) { cancelled = true; report(error); }
+        }
+        if (confirm && !cancelled && !issued && event.detail.elt?.isConnected !== false) event.detail.issueRequest(true);
+      } catch (error) { report(error); }
+    });
+  }
+  batch.records.push([id, scope, element]);
+};
+for (const name of ['htmx:afterSwap', 'htmx:afterSettle', 'htmx:historyRestore']) document.addEventListener(name, init);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+else queueMicrotask(init);
 ${dev ? `globalThis.__recooler_entry_loaded = true;` : ''}
-export const ready = init();
+return { init, register };
+})();
+export const init = runtime.init;
+export const register = runtime.register;
+export const ready = globalThis.__recooler_ready ?? Promise.resolve();
 `;
 }
