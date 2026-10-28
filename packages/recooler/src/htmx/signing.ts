@@ -10,12 +10,21 @@ export interface ActionAddress {
   scope?: Record<string, unknown>;
 }
 
-export function actionSignature(address: Omit<ActionAddress, 'scope'>, json: string, secret: string): string {
-  // A versioned tuple avoids delimiter ambiguity in user-controlled strings.
-  const message = JSON.stringify(['recooler.action.v1', address.routeId, address.pathname,
-    address.method.toUpperCase(), address.actionId, json]);
+export type ActionSigner = (address: Omit<ActionAddress, 'scope'>, json: string) => string | undefined;
+
+export function createActionSigner(secret: string): ActionSigner {
   const encode = new TextEncoder();
-  return base64url(hmacSha256(encode.encode(secret), encode.encode(message)));
+  const key = encode.encode(secret);
+  return (address, json) => {
+    // A versioned tuple avoids delimiter ambiguity in user-controlled strings.
+    const message = JSON.stringify(['recooler.action.v1', address.routeId, address.pathname,
+      address.method.toUpperCase(), address.actionId, json]);
+    return base64url(hmacSha256(key, encode.encode(message)));
+  };
+}
+
+export function actionSignature(address: Omit<ActionAddress, 'scope'>, json: string, secret: string): string {
+  return createActionSigner(secret)(address, json)!;
 }
 
 export function actionPath(pathname: string, base = ''): string {
@@ -25,9 +34,11 @@ export function actionPath(pathname: string, base = ''): string {
   return /^\/[\\/]/.test(path) ? '/.' + path : path;
 }
 
-export function signedUrl(address: ActionAddress, secret: string | false, base = ''): string {
+export function signedUrl(address: ActionAddress, secret: string | false | ActionSigner, base = ''): string {
   const json = serializeScope(address.scope ?? {});
+  const signature = typeof secret === 'function' ? secret(address, json)
+    : secret === false ? undefined : actionSignature(address, json, secret);
   return `${actionPath(address.pathname, base)}?action=${encodeURIComponent(address.actionId)}`
     + `&scope=${encodeURIComponent(json)}`
-    + (secret === false ? '' : `&sig=${actionSignature(address, json, secret)}`);
+    + (signature === undefined ? '' : `&sig=${signature}`);
 }

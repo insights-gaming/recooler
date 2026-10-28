@@ -180,8 +180,9 @@ External module scripts execute after the entire Suspense stream finishes. Phase
 Configure `htmx({ table, secret })` from `recooler/htmx` as a `createApp` extension
 alongside `jsxPages()`. The reachability table maps manifest `route.file` IDs to
 registered action-bearing module IDs, including roots, layouts and shared static
-imports. A synchronous getter supports development. The Vite integration will
-provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
+imports. The table is static; D5 development uses `invalidateAll` and a full SSR
+reload to re-evaluate the virtual table and recreate `createApp`. Getter mode is
+unsupported. The Vite integration will provide this table later; see the [runtime interface](../packages/recooler/src/htmx/README.md).
 
 **D6: all action URLs are now signed**, including actions without captures. The
 signature covers the receiving route file, exact pathname, HTTP method, action
@@ -190,19 +191,26 @@ URLs: invalidate those pages and have users refresh them before submitting.
 Unknown, unsigned, tampered and replayed-to-another-path URLs fall through after
 route middleware and normally return 404 without running an action. A guard's
 401 still comes first. Supply a runtime secret string or `secret: env =>
-env.ACTION_SECRET`; it is resolved once per extension instance and cached, never
-inlined by the transform. Missing/empty secrets fail startup or the first request
-with actions. `secret: false` warns and permits unsigned local development URLs;
-it disables D6 replay protection while retaining CSRF and reachability checks.
+env.ACTION_SECRET`; env functions are cached per env object identity in a WeakMap
+(with one fallback slot for non-object envs), never inlined by the transform.
+Use a new env object or recreate the app to rotate a key within the same env. Missing/empty secrets fail startup or the first request
+with actions. `secret: false` now throws; use `secret: { unsafeUnsigned: true }` only for local
+development. This disables D6 replay protection (including unused barrel actions)
+while retaining CSRF and reachability checks. The Phase 4b Vite plugin must reject
+this mode in production using the exported `unsafeUnsignedMarker` on the extension.
+The plugin must also provide a stable per-project namespace to both
+`registerActions(moduleId, methods, namespace)` and `htmx({ namespace, ... })`; the
+default namespace remains shared for compatibility with current transform output.
 
 **D7: action requests require `HX-Request: true`**, including mutating GET actions.
 They also require acceptable Fetch Metadata or Origin. Manual requests should
 send `HX-Request: true`, `Origin` equal to the destination origin, and
-`Sec-Fetch-Site: same-origin`. Hono CSRF semantics allow either same-origin Fetch
-Metadata or an allowed Origin; `same-site` alone is insufficient. Configure
+`Sec-Fetch-Site: same-origin`. An allowed Origin is accepted only when
+`Sec-Fetch-Site` is absent; `same-site` alone is insufficient. Configure
 `trustedOrigins` for additional exact origins or an origin predicate. Missing or
 invalid provenance and missing HX headers return 403 before action execution.
-These checks also apply to JSON and other non-form content types.
+These checks also apply to bodyless, JSON and other non-form requests. Rejections
+return 403 directly without entering the application's `onError`.
 
 **D3: actions post to the rendering route.** A component imported from an admin
 route and rendered on a public page now submits to the public page's middleware
@@ -210,7 +218,9 @@ chain. In 0.0.27 it submitted to the defining route module. Keep authorization i
 the rendering route or action when sharing such components. Only page routes
 register actions; handler-only routes keep ordinary `action` query parameters.
 Forms returned by guard middleware must live on an unguarded route because the
-guard always runs before action dispatch.
+guard always runs before action dispatch. Actions run after directory/group
+middleware but before `onRequest`, as in 0.0.27: authorization in `onRequest`
+does not protect actions. Move such checks into directory or group middleware.
 
 Use `htmx({ base: '/app', ... })` when `app.mount()` or a prefix-stripping proxy
 hides that external prefix. Mount actions without the appropriate base are

@@ -3,7 +3,7 @@ import { Hono, type Context, type Handler } from 'hono';
 import { mount as mount5 } from 'hono-5/mount';
 import { createApp } from '../../src/router/index.js';
 import { createElement as h, jsxPages } from '../../src/jsx/index.js';
-import { htmx, type ActionTable } from '../../src/htmx/index.js';
+import { htmx, unsafeUnsignedMarker } from '../../src/htmx/index.js';
 import { actionUrl, registerActions } from '../../src/htmx/runtime.js';
 import { actionApp, app, errors, extract, headers, manifest, Page, register, render, secret, submit, url } from './helpers.js';
 const text = (value: string): Handler => c => c.text(value);
@@ -131,11 +131,12 @@ it.each(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])('enforces CSRF for %s, includ
   expect(calls).toBe(3);
 });
 
-it('accepts trusted origins using Hono OR semantics without bypassing HX-Request', async () => {
+it('accepts trusted origins only when Fetch Metadata is absent without bypassing HX-Request', async () => {
   register('trusted', { get: { a: () => 'trusted' } });
   for (const trustedOrigins of [['https://friend.example'], async (origin: string, c: Context) => origin === 'https://friend.example' && c.req.method === 'GET']) {
     const a = app(manifest({ 'index.tsx': { default: Page } }), { 'routes/index.tsx': ['trusted'] }, { trustedOrigins });
-    expect((await a.request(url('/', 'a', 'GET'), { headers: { 'HX-Request': 'true', Origin: 'https://friend.example', 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(200);
+    expect((await a.request(url('/', 'a', 'GET'), { headers: { 'HX-Request': 'true', Origin: 'https://friend.example' } })).status).toBe(200);
+    expect((await a.request(url('/', 'a', 'GET'), { headers: { 'HX-Request': 'true', Origin: 'https://friend.example', 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(403);
     expect((await a.request(url('/', 'a', 'GET'), { headers: { Origin: 'https://friend.example' } })).status).toBe(403);
   }
 });
@@ -163,7 +164,7 @@ it('keeps root catch-all //evil action URLs on the rendering origin', async () =
   expect(await (await submit(a, new URL(target, 'http://localhost').href)).text()).toBe('safe');
 });
 
-it('requires secrets only for reachable page actions and caches env resolution once', async () => {
+it('requires secrets only for reachable page actions and caches secret resolution per env identity', async () => {
   register('secret', { post: { a: () => 'action' } });
   const input = manifest({ 'index.tsx': { default: () => h('form', { 'hx-post': actionUrl('a', {}) }) } });
   const table = { 'routes/index.tsx': ['secret'] };
@@ -173,26 +174,45 @@ it('requires secrets only for reachable page actions and caches env resolution o
   expect(() => app(manifest({ 'index.ts': { onPost: text('api') } }), table, { secret: undefined })).not.toThrow();
   const resolve = vi.fn((env: { KEY: string }) => env.KEY);
   const a = createApp<{ Bindings: { KEY: string } }>(input, { pages: jsxPages(), extensions: [htmx<{ Bindings: { KEY: string } }>({ table, secret: resolve })] });
-  const first = extract(await (await a.request('/', {}, { KEY: secret })).text());
+  const envA = { KEY: secret };
+  const envB = { KEY: 'tenant-b-secret' };
+  const first = extract(await (await a.request('/', {}, envA)).text());
   expect(first).toBe(url('/', 'a'));
-  expect(extract(await (await a.request('/', {}, { KEY: 'rotated' })).text())).toBe(first);
-  expect(resolve).toHaveBeenCalledTimes(1);
+  expect(extract(await (await a.request('/', {}, envA)).text())).toBe(first);
+  const second = extract(await (await a.request('/', {}, envB)).text());
+  expect(second).not.toBe(first);
+  expect((await a.request(first, { method: 'POST', headers }, envB)).status).toBe(404);
+  expect((await a.request(first, { method: 'POST', headers }, envA)).status).toBe(200);
+  expect((await a.request(second, { method: 'POST', headers }, envB)).status).toBe(200);
+  expect(resolve).toHaveBeenCalledTimes(2);
   const bad = errors(app(input, table, { secret: () => '' }));
   expect((await bad.request('/')).status).toBe(500);
 });
 
-it('supports getter tables and module replacement/clearing across dev edits', async () => {
-  let table: ActionTable = {};
-  const a = app(manifest({ 'index.tsx': { default: Page, onPost: text('normal') } }), () => table);
+it('recreates static tables and method registrations on full SSR reload', async () => {
+  const input = manifest({ 'index.tsx': { default: Page, onPost: text('normal') } });
   register('dev', { post: { a: () => 'old' } });
-  expect(await (await submit(a, url('/', 'a'))).text()).toBe('normal');
-  table = { 'routes/index.tsx': ['dev'] };
+  expect(await (await submit(app(input, {}), url('/', 'a'))).text()).toBe('normal');
+  const table = { 'routes/index.tsx': ['dev'] };
+  const a = app(input, table);
   expect(await (await submit(a, url('/', 'a'))).text()).toBe('old');
   register('dev', { post: { a: () => 'new' }, put: { b: () => 'added method' } });
   expect(await (await submit(a, url('/', 'a'))).text()).toBe('new');
-  expect(await (await submit(a, url('/', 'b', 'PUT'), 'PUT')).text()).toBe('added method');
+  expect((await submit(a, url('/', 'b', 'PUT'), 'PUT')).status).toBe(404);
+  expect(await (await submit(app(input, table), url('/', 'b', 'PUT'), 'PUT')).text()).toBe('added method');
   register('dev', {});
-  expect(await (await submit(a, url('/', 'a'))).text()).toBe('normal');
+  expect(await (await submit(app(input, table), url('/', 'a'))).text()).toBe('normal');
+  // @ts-expect-error Getter mode was removed; full SSR reloads recreate createApp.
+  expect(() => htmx({ table: () => table, secret })).toThrow('static ActionTable');
+});
+
+it.each(['POST', 'DELETE'])('does not add %s to guarded pages without actions', async method => {
+  const a = app(manifest({
+    '(auth)/middleware.ts': { default: (c: Context) => c.text('guard', 401) },
+    '(auth)/settings/index.tsx': { default: Page },
+    '(public)/[[rest]]/index.ts': { onPost: text('public'), onDelete: text('public') },
+  }), {});
+  expect(await (await a.request('/settings', { method })).text()).toBe('public');
 });
 
 it('persists registrations across runtime module reloads', async () => {
@@ -204,20 +224,21 @@ it('persists registrations across runtime module reloads', async () => {
   expect(reloaded.actionRegistry.get('persistent')).toEqual({});
 });
 
-it('makes secret:false explicitly unsigned while retaining CSRF and reachability', async () => {
-  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  try {
-    register('unsigned', { post: { a: () => 'dev' } });
-    const a = app(manifest({ 'index.tsx': { default: () => h('form', { 'hx-post': actionUrl('a', {}) }) } }), { 'routes/index.tsx': ['unsigned'] }, { secret: false });
-    const target = extract(await render(a));
-    expect(target).not.toContain('sig=');
-    expect(await (await submit(a, target)).text()).toBe('dev');
-    expect((await a.request(target, { method: 'POST' })).status).toBe(403);
-    expect((await submit(a, '/?action=foreign')).status).toBe(404);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('replay protection'));
-  } finally { warn.mockRestore(); }
+it('makes unsafeUnsigned explicit while retaining CSRF and reachability', async () => {
+  register('unsigned', { post: { a: () => 'dev' } });
+  const a = app(manifest({ 'index.tsx': { default: () => h('form', { 'hx-post': actionUrl('a', {}) }) } }),
+    { 'routes/index.tsx': ['unsigned'] }, { secret: { unsafeUnsigned: true } });
+  const target = extract(await render(a));
+  expect(target).not.toContain('sig=');
+  expect(await (await submit(a, target)).text()).toBe('dev');
+  expect((await a.request(target, { method: 'POST' })).status).toBe(403);
+  expect((await submit(a, '/?action=foreign')).status).toBe(404);
+  expect(htmx({ table: {}, secret: { unsafeUnsigned: true } })[unsafeUnsignedMarker]).toBe(true);
+  expect(htmx({ table: {}, secret })[unsafeUnsignedMarker]).toBe(false);
+  // @ts-expect-error false was removed in favor of an explicit unsafe option.
+  expect(() => htmx({ table: {}, secret: false })).toThrow('replaced by secret: { unsafeUnsigned: true }');
 });
 
-it.each(['https://evil.example', '//evil', '/\\evil', '/a?b', '/a#b', '/a/../b'])('rejects invalid base %s', base => {
+it.each(['https://evil.example', '//evil', '/\\evil', '/a?b', '/a#b', '/a/../b', '/\t/evil.example', '/\r/evil.example', '/\n/evil.example', '/%2e%2e', '/a b', '/a\u0000', '/a\u007f'])('rejects invalid base %s', base => {
   expect(() => htmx({ table: {}, secret, base })).toThrow('local path prefix');
 });

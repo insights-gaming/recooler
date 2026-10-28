@@ -24,7 +24,7 @@ export default createApp<{ Bindings: { ACTION_SECRET: string } }>(manifest, {
 
 `ActionTable` is `Readonly<Record<string, readonly string[]>>`. Keys are exact
 manifest `route.file` identities. Values are the action-bearing module IDs from
-`registerActions(moduleId, methods)`, including the route's root, layouts and
+`registerActions(moduleId, methods, namespace?)`, including the route's root, layouts and
 surviving static dependencies. IDs must match the transform's supplied
 `relativePath`; there is no implicit prefix normalization. Missing keys mean no
 actions. Only routes with their own function `default` export register actions;
@@ -36,15 +36,18 @@ graph edges. Dynamic `import()` is not followed in v1. Barrels over-approximate
 reachability; signing prevents a foreign URL from authorizing an unused action.
 The table is trusted server configuration, never request input.
 
-For development use `table: () => currentTable`. The synchronous getter is read
-when registering and at each request's binding; the module list is copied and
-frozen for that request. Getter mode registers the five supported action methods
-on page routes so a reload can introduce a method. Static-table mode registers
-only currently reachable action methods; reconstruct the app if those methods
-change. A dev plugin must coordinate table refresh and SSR reloads. The persistent
-`Symbol.for` registry survives runtime-module reloads; each module replaces its
-registration atomically, and `registerActions(id, {})` removes all of its actions.
-Do not clear cached modules' registrations in dispose hooks.
+The table is static. Only reachable action methods are registered at app creation.
+In development, D5 uses a full SSR reload with `invalidateAll`, re-evaluating the
+virtual table module and `createApp` after edits. Getter tables are unsupported.
+The persistent `Symbol.for` registry survives runtime-module reloads; each module
+replaces its registration atomically, and `registerActions(id, {}, namespace)`
+removes its actions. Do not clear cached modules' registrations in dispose hooks.
+
+`registerActions(moduleId, methods, namespace?)` and `htmx({ namespace, ... })`
+must use the same namespace. Phase 4b's Vite plugin **must emit a stable per-project
+namespace** into both registrations and extension configuration to isolate apps
+with identical relative module IDs. Omitting it retains the default namespace for
+the transform's current emission; apps sharing that default also share registrations.
 
 ## Dispatch and security
 
@@ -58,9 +61,10 @@ The Worker needs AsyncLocalStorage support (`nodejs_als` or `nodejs_compat`).
 
 Only `?action=` on a method with reachable actions is reserved. Ordinary requests
 continue through `onRequest`, method handlers and pages. Action requests require
-`HX-Request: true`, then Hono CSRF's origin/Fetch Metadata policy, applied even to
-GET and non-form content types. Either `Sec-Fetch-Site: same-origin` or an allowed
-`Origin` suffices, matching `hono/csrf`. Same-site alone does not suffice. The
+`HX-Request: true` and `Sec-Fetch-Site: same-origin`, or an allowed `Origin`
+when `Sec-Fetch-Site` is absent. This inline check applies even to GET, bodyless
+and non-form requests and returns 403 directly, without invoking `onError`.
+Same-site alone does not suffice. The
 request URL's origin is always allowed; `trustedOrigins` adds exact origins via
 an array or `(origin, context) => boolean | Promise<boolean>`.
 
@@ -77,16 +81,24 @@ may return 401. `HEAD` does not run GET actions: the signature uses the actual
 method, and only the five transform action methods are reserved.
 
 `secret` accepts a nonempty string or a synchronous function of the request env.
-An env function is resolved once per extension instance on the first request with
-actions, then cached, so key rotation requires a new app/instance. A missing or
-empty secret fails startup when reachable actions are already registered, or the
-first request when actions arrive through the getter later. The secret stays in
-server runtime configuration; no transform inlines it.
+An env function is resolved once per env object identity and cached in a WeakMap,
+with one fallback slot for non-object envs. Rotation within the same env object
+requires a new app/instance or a new env object. Missing/empty secrets fail app
+creation for statically configured keys or the first request for env functions.
+Keys and HMAC pads stay in signing closures; `c.var` contains only the signing
+function and route metadata, so serializing it does not reveal the key.
 
-`secret: false` explicitly disables signing and verification and emits a warning.
+`secret: false` throws a migration error. The replacement,
+`secret: { unsafeUnsigned: true }`, explicitly disables signing and verification.
 URLs are unsigned; CSRF and module reachability still apply, but **D6 route/path
-replay protection is disabled**. Use it only for local development. It is not a
-production compatibility mode.
+replay protection is disabled**, including protection against unused barrel actions.
+Use it only for local development. The exported `unsafeUnsignedMarker` symbol is
+true on the returned extension in this mode. Phase 4b's Vite plugin **must fail
+production builds** when it detects this marker or the equivalent option.
+
+Actions run after directory/group middleware but **before `onRequest`**, as in
+0.0.27. Authorization in `onRequest` does not protect actions; use directory or
+group middleware instead.
 
 `base: '/app'` adds an external prefix hidden by `app.mount()` or a prefix-stripping
 proxy. `route()` and `basePath()` expose the prefix in the pathname already, so
@@ -133,6 +145,5 @@ application endpoint.
 `pnpm --filter recooler build` cover this package. Runtime tests run on Hono
 4.12.34, 4.13.14 and 5.0.0-rc.1, including 88 HMAC vectors per version against
 `node:crypto`, real transformed modules evaluated through data URLs, and streamed
-Suspense. The package currently passes 1,270 tests. The unchanged Farm conformance
-target passes 533 tests with seven intentional TS-only skips. Filesystem watcher
+Suspense. The Farm conformance target retains seven intentional TS-only skips. Filesystem watcher
 and Vite dev-server tests require local filesystem watching/loopback permissions.

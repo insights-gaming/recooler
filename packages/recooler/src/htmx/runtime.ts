@@ -1,18 +1,26 @@
 import type { Context } from 'hono';
 import { getContext } from 'hono/context-storage';
 import { serializeScope } from './scope.js';
-import { signedUrl } from './signing.js';
+import { signedUrl, type ActionSigner } from './signing.js';
 
 export type Action = (context: Context) => unknown;
 export type ActionMethods = Record<string, Record<string, Action>>;
 
 // Symbol.for survives server-runtime reloads while cached modules retain registrations.
-const registryKey = Symbol.for('recooler.htmx.actions.v1');
-const persistent = globalThis as typeof globalThis & { [registryKey]?: Map<string, ActionMethods> };
-export const actionRegistry = persistent[registryKey] ??= new Map<string, ActionMethods>();
+// Phase 4b must emit a stable per-project namespace in both registration and htmx().
+const registryKey = Symbol.for('recooler.htmx.actions.v2');
+const persistent = globalThis as typeof globalThis & { [registryKey]?: Map<string, Map<string, ActionMethods>> };
+const registries = persistent[registryKey] ??= new Map<string, Map<string, ActionMethods>>();
+export function getActionRegistry(namespace = ''): Map<string, ActionMethods> {
+  let registry = registries.get(namespace);
+  if (!registry) registries.set(namespace, registry = new Map());
+  return registry;
+}
+/** Default namespace retained for the transform's current two-argument emission. */
+export const actionRegistry = getActionRegistry();
 
 /** Replace one module atomically. An empty registration clears removed actions in dev. */
-export function registerActions(moduleId: string, actions: ActionMethods): void {
+export function registerActions(moduleId: string, actions: ActionMethods, namespace = ''): void {
   const methods: ActionMethods = Object.create(null);
   for (const [method, entries] of Object.entries(actions)) {
     const normalized = method.toUpperCase();
@@ -25,7 +33,7 @@ export function registerActions(moduleId: string, actions: ActionMethods): void 
       table[id] = action;
     }
   }
-  actionRegistry.set(moduleId, methods);
+  getActionRegistry(namespace).set(moduleId, methods);
 }
 
 export interface ActionBinding {
@@ -33,7 +41,8 @@ export interface ActionBinding {
   readonly pathname: string;
   readonly base: string;
   readonly modules: readonly string[];
-  readonly secret: string | false;
+  readonly sign: ActionSigner;
+  readonly namespace?: string;
 }
 export const bindingKey = 'recooler.htmx.binding.v1';
 
@@ -44,9 +53,9 @@ export function getActionBinding(context: Context): ActionBinding {
   return binding;
 }
 
-export function findAction(modules: readonly string[], method: string, id: string): Action | undefined {
+export function findAction(modules: readonly string[], method: string, id: string, namespace?: string): Action | undefined {
   for (const module of modules) {
-    const actions = actionRegistry.get(module)?.[method];
+    const actions = getActionRegistry(namespace).get(module)?.[method];
     if (actions && Object.hasOwn(actions, id)) return actions[id];
   }
 }
@@ -54,9 +63,9 @@ export function findAction(modules: readonly string[], method: string, id: strin
 export function actionUrl(id: string, scope: Record<string, unknown>, context?: Context): string {
   const binding = getActionBinding(context ?? getContext());
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
-    if (findAction(binding.modules, method, id)) {
+    if (findAction(binding.modules, method, id, binding.namespace)) {
       return signedUrl({ routeId: binding.routeId, pathname: binding.pathname, method, actionId: id, scope },
-        binding.secret, binding.base);
+        binding.sign, binding.base);
     }
   }
   throw new Error(`Action ${id} is not reachable from ${binding.routeId}`);

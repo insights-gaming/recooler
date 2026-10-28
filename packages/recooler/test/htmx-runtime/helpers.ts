@@ -10,7 +10,7 @@ export { manifest };
 export const secret = 'test-only runtime key';
 export const headers = { 'HX-Request': 'true', Origin: 'http://localhost', 'Sec-Fetch-Site': 'same-origin' };
 export const Page = () => 'page';
-export function app(input: Manifest, table: ActionTable | (() => ActionTable), options: Partial<HtmxOptions> = {}) {
+export function app(input: Manifest, table: ActionTable, options: Partial<HtmxOptions> = {}) {
   return createApp(input, { pages: jsxPages(), extensions: [htmx({ table, secret, ...options })] });
 }
 export function actionApp(action: Action, method = 'POST', module: ModuleNs = {}) {
