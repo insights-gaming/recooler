@@ -1,6 +1,6 @@
 # Recooler conformance
 
-The checked-in source trees and JSON expectations test the published **farm-plugin-recooler 0.0.27** through **Farm 1.7.11**. They are independent of the Rust checkout and the future TypeScript adapter. [SCENARIOS.md](SCENARIOS.md) indexes every runnable scenario and its provenance.
+The checked-in source trees and JSON expectations test the published **farm-plugin-recooler 0.0.27** through **Farm 1.7.11**. They are independent of the Rust checkout. The `ts` target builds the same source trees with Vite 8 and `recooler()` for implemented non-htmx features. [SCENARIOS.md](SCENARIOS.md) indexes every runnable scenario and its provenance.
 
 ```sh
 pnpm install
@@ -16,7 +16,11 @@ CONFORMANCE_TARGETS=farm-0.0.27,ts pnpm --filter recooler-conformance test
 CONFORMANCE_DIRS=../fixtures/example/scenario CONFORMANCE_SCENARIOS=scenario pnpm --filter recooler-conformance test
 ```
 
-`ts` fails when explicitly selected while a public entrypoint (`recooler/router`, `recooler/jsx`, `recooler/htmx` or `recooler/vite`) is not built. Set `CONFORMANCE_ALLOW_SKIP=1` to opt into skipping a missing entrypoint. Syntax/evaluation errors, missing transitive dependencies and an invalid `createApp` export are broken builds: they fail even with skip permission. Once the entrypoints exist, the stub fails with an explicit instruction to implement the adapter. It never substitutes the Farm adapter for the TypeScript implementation.
+`ts` requires built `recooler/router`, `recooler/jsx` and `recooler/vite` entrypoints. Run `pnpm --filter recooler build` first. Set `CONFORMANCE_ALLOW_SKIP=1` to opt into skipping a missing entrypoint; broken builds still fail. JSX is evaluated through its Vite bundle because the engine cannot load as native Node ESM.
+
+The adapter uses `recooler()` and `ssr.noExternal: true`, emits a single self-contained SSR module per content hash, imports it in the runner's realm, and calls `fetch`. Every import receives a fresh instance query; bundled dependencies therefore reset too, even when source-identical scenarios reuse bytes or `CONFORMANCE_REBUILD=1` overwrites the same output. The TS hash includes source names/bytes, adapter/builder, compiled recooler implementation, lockfile, tsconfig, Node version, platform and architecture. Legacy `farm-plugin-recooler/helpers` imports map to `recooler/jsx` for the shared page/root helpers.
+
+Until the htmx branch is integrated, `Target.skipReason` reports explicit scenario skips for extracted actions, reserved `action` probes, htmx settings, client-chunk assertions, source `hx-*` action/event attributes and `onLoad`/action helpers. Mixed routing/action scenarios skip as a whole; their routing checks are not counted as passing. Ordinary Hono `onPost` handlers do not imply htmx and do run. The adapter does not claim client chunk support yet.
 
 Each directory contains `src/` and `scenario.json`. The source tree follows the normal `root.tsx`, `routes/**/index.tsx`, `layout.tsx`, and `middleware[@name].ts` conventions. Imported support files live in `src/lib` or `src/components`. Recovered fixture sources preserve their original import spelling; the runner uses NodeNext and `.js` imports.
 
@@ -69,10 +73,31 @@ The recovered middleware records ordered entries in `globalThis.__t`. The common
 
 `changes` can annotate a scenario or individual request with a decision and reason. An annotation alone leaves assertions intact. An optional request-level `ts` object supplies a **complete replacement expectation**, such as the D7 rejection of an action without `HX-Request`. Scenario-level replacements are rejected; put HTTP differences on individual requests and diagnostic differences in `buildErrors`. Multiple replacements for one request are rejected. Targets use `expectationFamily: "ts"` to opt into these expectations independently of their display/version name. `targets: ["ts"]` makes a scenario applicable only to that family; target exclusions are intentional skips, separate from unavailable-target skips. D3/D6 action URL changes are handled through extraction, D4 changes client script expectations, and D9 preserves the plain-before-group middleware ordering. D1/D2/D5/D8/D10/D11/D12 do not require different HTTP expectations in these fixtures. Security settings and helper import remapping for the future TS build belong in its adapter.
 
-Builds run in separate Node processes with `persistentCache: false`, no decorators, and a single ESM output. The npm alias `farm-recooler-oracle` prevents pnpm from resolving the oracle to the local workspace package. The adapter explicitly maps `farm-plugin-recooler/helpers` to that published package. A custom Farm logger throws after reporting errors, preserving diagnostics instead of exiting the runner. Native crashes and timeouts fail as infrastructure errors and cannot satisfy a build-error expectation.
+Farm builds run in separate Node processes with `persistentCache: false`, no decorators, and a single ESM output. The npm alias `farm-recooler-oracle` prevents pnpm from resolving the oracle to the local workspace package. The adapter explicitly maps `farm-plugin-recooler/helpers` to that published package. A custom Farm logger throws after reporting errors, preserving diagnostics instead of exiting the runner. Native crashes and timeouts fail as infrastructure errors and cannot satisfy a build-error expectation.
 
 Outputs and build diagnostics are cached in ignored `conformance/.cache/<sha256>/`. The key includes source paths and bytes, plugin options, builder and adapter code, lockfile, Node version, platform and architecture. Expectations are checked on every run even when the build is reused. Filenames use code-point sorting for deterministic cache keys. Imports include the scenario directory as a URL query, so identical source trees reuse bytes while getting independent module instances, including during a forced rebuild. `CONFORMANCE_REBUILD=1` forces recompilation. Keep the cache in the workspace: Farm's native resolver fails to resolve JSX dependencies from some external build roots despite `node_modules` symlinks. External scenario trees are copied into this cache before compiling and are never modified.
 
 Oracle defects are documented under [known-issues](known-issues/README.md). Seven TS-only scenarios cover their intended 0.1.0 contracts, including the new root `scripts: string[]` signature; m17 remains only a known issue. They are skipped on Farm instead of freezing broken oracle behaviour. Legacy `Root(Content, clientScript)` fixtures remain to exercise the one-release compatibility shim.
 
-The [review response](REVIEW-RESPONSE.md) records the per-finding changes, verification commands and mutation results. The source tree contains **123 scenarios**: 116 oracle scenarios (477 request checks and 35 diagnostic checks) and seven TS-only scenarios (five request checks and two startup diagnostics). Together with 21 runner contract checks, an oracle run reports **533 passed, 7 skipped**. Selecting the unavailable TS stub fails; explicitly allowing skips reports 21 runner checks passed and 519 target checks skipped.
+The [review response](REVIEW-RESPONSE.md) records the per-finding changes, verification commands and mutation results. The source tree contains **123 scenarios**: 116 oracle scenarios (477 request checks and 35 diagnostic checks) and seven TS-only scenarios (five request checks and two startup diagnostics). The suite also has 21 request/runner contract checks and two TS adapter cache/feature checks.
+
+## TS integration results (2026-10-27)
+
+The non-htmx run executes 84 scenarios: 82 pass and two have incorrect diagnostic expectations. All HTTP assertions pass after the explicit D4 annotation below. 39 scenarios (327 checks) skip for unimplemented htmx features. These skips are never reported as passes.
+
+- **Router bug fixed separately:** `m15` exported a class. `typeof class === "function"` previously admitted it as middleware; startup now rejects class/non-callable defaults with a middleware diagnostic. A regression test runs on Hono 4.12, 4.13 and 5. `m14`'s namespace object receives the same diagnostic contract. No JSX source changes were necessary.
+- **Intended diagnostic ID difference:** c1, c2, c3, c3b, c4, c7; d1, d2, d4, d5, d6, d7, d9, d10, d11; error-layout-alias, error-param-alias; m14, m15; p1, p2, p3, p5, p8, p10, p11 now have explicit `buildErrors.ts` annotations using `srcDir`-relative manifest IDs (`routes/...`), as designed in plan §1.1. Oracle expectations are unchanged. p5 also rejects nonportable backslash directory names, while still reporting its method conflict.
+- **Intended D4 HTML difference:** `head-isolation` has an explicit request-level TS expectation for `<body data-recooler-route="/">`. Its head contents, mutation isolation, charset counts, page contents and middleware trace assertions remain the same.
+- **Wrong expectation, left failing:** `error-duplicate-layout` requires `src/routes/index.tsx` in a duplicate-layout diagnostic. The generator correctly reports `src/routes/layout.jsx` and `src/routes/layout.tsx`, plus “only one layout file may be used per directory”. The unrelated page is not the cause. Its expectation is preserved for review.
+- **Wrong expectation, left failing:** `error-layout-alias` requires `routes/[id]/index.tsx` in a layout-path collision. The generator correctly reports `routes/:id/layout.tsx` and `routes/[id]/layout.tsx`, plus “only one layout may be used per path”. The unrelated page is not the cause. The `srcDir` prefix annotation is applied, but the incorrect page assertion remains for review.
+
+Package tests cover a real Vite SSR CLI build, plain dev HTTP request and added-route watch, default-only virtual exports, a thrown route error whose SSR map resolves to `src/routes/index.tsx:3`, and Cloudflare 1.65 build plus a local workerd dev HTTP request with a custom environment name. Cache tests verify byte reuse, dependency state reset across identical scenarios, and forced rebuilds.
+
+
+Final verification on Node 22.22.2, Vite 8.3.5 and Cloudflare plugin 1.65.0:
+
+- `pnpm --filter recooler test`: **590 passed**.
+- Package typecheck/build and conformance typecheck: **passed**.
+- TS target: **190 passed, 327 skipped, 2 failed** target checks; **213 passed, 327 skipped, 2 failed** including the 23 harness/adapter checks.
+- Farm 0.0.27: **512 passed, 7 skipped, 0 failed** target checks; **535 passed, 7 skipped, 0 failed** including the same 23 harness/adapter checks.
+- Combined `CONFORMANCE_TARGETS=farm-0.0.27,ts`: **725 passed, 334 skipped, 2 failed** (shared checks run once). The two failures are the wrong expectations described above; the suite intentionally remains red until they are reviewed.

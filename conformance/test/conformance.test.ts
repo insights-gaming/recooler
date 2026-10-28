@@ -19,11 +19,13 @@ for (const name of selected) {
   if (!target) throw new Error(`Unknown conformance target ${name}`);
   const reason = await target.unavailable?.();
   if (reason && process.env.CONFORMANCE_ALLOW_SKIP !== "1") throw new Error(`Selected target ${name} is unavailable: ${reason}. Set CONFORMANCE_ALLOW_SKIP=1 to allow skipping.`);
+  const skips = new Map(await Promise.all(filtered.map(async ({ dir, data }) => [dir, await target.skipReason?.(dir, data)] as const)));
   describe.skipIf(!!reason)(`${name}${reason ? ` (${reason})` : ""}`, () => {
     for (const { dir, data: scenario } of filtered) {
       const applies = !scenario.targets || scenario.targets.includes(name) || scenario.targets.includes(targetKey(target));
       const buildError = buildErrorFor(scenario, target);
-      describe.skipIf(!applies)(scenario.name, () => {
+      const skip = skips.get(dir);
+      describe.skipIf(!applies || !!skip)(scenario.name + (skip ? ` (skipped: ${skip})` : ""), () => {
         let result: BuildResult;
         let fetch: ReturnType<typeof observe>;
         const responses = new Map<string, { body: string; url: string }>();

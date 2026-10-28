@@ -25,7 +25,26 @@
           "<meta charset=": 1
         }
       },
-      "repeat": 3
+      "repeat": 3,
+      "changes": [
+        {
+          "decision": "D4",
+          "reason": "The default TS root emits route metadata even before client scripts are implemented. Head-only layout and isolation assertions remain identical.",
+          "ts": {
+            "status": 200,
+            "includes": [
+              "<title>Layout|page</title>",
+              "<body data-recooler-route=\"/\"><p>bare page</p></body>"
+            ],
+            "trace": [],
+            "counts": {
+              "name=\"added\"": 1,
+              "name=\"stable\"": 1,
+              "<meta charset=": 1
+            }
+          }
+        }
+      ]
     }
   ]
 }

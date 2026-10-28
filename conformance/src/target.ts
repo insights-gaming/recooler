@@ -23,6 +23,8 @@ export interface Target {
   expectationFamily?: "ts";
   /** Return a skip reason when the implementation is not installed/built yet. */
   unavailable?(): Promise<string | undefined>;
+  /** Explicit unsupported-feature skip; always surfaced in the suite name. */
+  skipReason?(scenarioDir: string, scenario: Scenario): Promise<string | undefined>;
   build(scenarioDir: string, scenario: Scenario): Promise<BuildResult>;
 }
 

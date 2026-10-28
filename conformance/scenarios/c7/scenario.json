@@ -8,8 +8,8 @@
   ],
   "buildErrors": {
     "ts": [
-      "src/routes/(x)/[[a]]/index.tsx",
-      "src/routes/(y)/[[b]]/index.tsx",
+      "routes/(x)/[[a]]/index.tsx",
+      "routes/(y)/[[b]]/index.tsx",
       "GET"
     ]
   }

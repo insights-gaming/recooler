@@ -109,7 +109,7 @@ describe("portable request contract", () => {
     expect(new URL(seen[1]!.url).searchParams.get("sig")).toBe("abc");
   });
 
-  test.each(["recooler/htmx", "recooler/vite"])("allows a missing public entrypoint to skip: %s", async (missing) => {
+  test.each(["recooler/jsx", "recooler/vite"])("allows a missing public entrypoint to skip: %s", async (missing) => {
     const reason = await tsUnavailable(async (name) => {
       if (name === missing) throw Object.assign(new Error("missing entry"), { code: "ERR_MODULE_NOT_FOUND", url: import.meta.resolve(name) });
       return { createApp() {} };
