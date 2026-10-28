@@ -4,35 +4,6 @@ export const internalClient = '\0' + clientId;
 export const routeClientId = 'virtual:recooler/route/';
 export const sliceQuery = 'recooler-handlers';
 export const clientFile = 'assets/recooler-client.js';
-export const gateFile = 'assets/recooler-gate.js';
-
-/** A classic, parser-blocking external script: installed before streamed htmx.process. */
-export function clientGate(dev = false): string {
-  return `globalThis.__recooler_gate ??= (() => {
-    const resumed = new WeakSet();
-    // htmx 1 can emit a synchronous load confirm before installing hx-on.
-    // Allow that processing stack to finish, then use its public continuation.
-    document.addEventListener('htmx:confirm', event => {
-      if (resumed.has(event) || typeof event.detail?.issueRequest !== 'function') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      queueMicrotask(() => {
-        if (!event.target.isConnected) return;
-        const next = new CustomEvent(event.type, { bubbles: true, cancelable: true, detail: event.detail });
-        resumed.add(next);
-        if (event.target.dispatchEvent(next)) event.detail.issueRequest(true);
-      });
-    }, true);
-    return true;
-  })();
-  globalThis.$rc ??= (id, scope, element, event) => {
-    if (['htmx:confirm', 'htmx:configRequest', 'htmx:config-request', 'htmx:beforeRequest', 'htmx:before-request'].includes(event.type)) {
-      if (event.type === 'htmx:confirm') event.preventDefault();
-      (globalThis.__recooler_pending ??= []).push([id, scope, element, event]);
-    } else { ${dev ? "console.warn('recooler: dropped ' + event.type + ' while route handlers load');" : ''} }
-  };`;
-}
-
 export interface ClientRoute {
   slices: string[];
   /** Only the owning page's onLoad runs, even if it imports another page. */
@@ -157,14 +128,14 @@ function register(entries) {
   init();
 }
 const waiting = new WeakMap();
-globalThis.$rc = (id, scope, element, event) => {
+function dispatch(id, scope, element, event, deferred = false) {
   if (markers().some(node => !checkVersion(node))) return;
-  if (available(id) && !waiting.has(event)) {
+  if (!deferred && available(id) && !waiting.has(event)) {
     return invoke(id, scope, element, event);
   }
-  // Only confirm has a safe public continuation. Config/beforeRequest run
-  // late; other events are dropped without touching their defaults.
-  if (!['htmx:confirm', 'htmx:configRequest', 'htmx:config-request', 'htmx:beforeRequest', 'htmx:before-request'].includes(event.type)) {
+  // Only confirm has a safe public continuation. Other unavailable handlers
+  // are dropped without touching event defaults.
+  if (event.type !== 'htmx:confirm' || typeof event.detail?.issueRequest !== 'function') {
     init();
     ${dev ? `console.warn('recooler: dropped ' + event.type + ' while route handlers load');` : ''}
     return;
@@ -196,13 +167,16 @@ globalThis.$rc = (id, scope, element, event) => {
           if (!available(id)) { cancelled = true; continue; }
           try { await invoke(id, scope, target, late); } catch (error) { cancelled = true; report(error); }
         }
-        if (confirm && !cancelled && !issued && event.detail.elt?.isConnected !== false) event.detail.issueRequest(true);
+        if (confirm && !cancelled && !issued && event.detail.elt?.isConnected !== false) event.detail.issueRequest();
       } catch (error) { report(error); }
     });
   }
   batch.records.push([id, scope, element]);
-};
-for (const args of globalThis.__recooler_pending ?? []) globalThis.$rc(...args);
+}
+globalThis.$rc = dispatch;
+// A static slice can register before this wrapper: held events must still
+// take the deferred path, even when their handler is already available.
+for (const args of globalThis.__recooler_pending ?? []) dispatch(...args, true);
 delete globalThis.__recooler_pending;
 for (const name of ['htmx:afterSwap', 'htmx:afterSettle', 'htmx:historyRestore']) document.addEventListener(name, init);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });

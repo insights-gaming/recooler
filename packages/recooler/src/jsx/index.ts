@@ -146,19 +146,24 @@ export function jsxPages(options: JSXPagesOptions = {}): PageAdapter {
         const source = route.rootFile ?? `root (used by ${route.file})`;
         throw new RouteValidationError([`Invalid root in ${source}: default export is not a function`]);
       }
-      // Content carries startup for custom/legacy roots too. The blocking external
-      // gate precedes any streamed htmx.process; async modules register during the
-      // stream and the identical deferred URLs still hold DOMContentLoaded.
+      // Full documents start async modules during streaming; identical deferred
+      // URLs still hold DOMContentLoaded. Fragment scripts follow the content so
+      // htmx 1 chooses the correct table/select parsing context.
       {
         const Page = Content;
         Content = (props: RouteProps) => {
           const modules = props.scripts.filter(recoolerScript);
           const entry = modules.find(src => /(?:recooler-client\.js|virtual:recooler\/client)/.test(src));
+          const fragment = props.ctx.req.header('hx-request') === 'true' && !props.ctx.req.header('hx-boosted');
+          const startup = [
+            ...(!fragment && Root !== DefaultRootHOC ? props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href })) ?? [] : []),
+            ...modules.map(src => createElement('script', { type: 'module', src })),
+          ];
           return createElement(Fragment, {},
-            entry && createElement('script', { src: entry.replace(/(?:assets\/recooler-client\.js|@id\/virtual:recooler\/client)/, 'assets/recooler-gate.js') }),
-            ...(Root !== DefaultRootHOC ? props.preloads?.map(href => createElement('link', { rel: 'modulepreload', href })) ?? [] : []),
-            ...modules.flatMap(src => [createElement('script', { type: 'module', async: true, src }), createElement('script', { type: 'module', src })]),
+            ...(!fragment ? modules.map(src => createElement('script', { type: 'module', async: true, src })) : []),
+            ...(!fragment ? startup : []),
             createElement(Page, props),
+            ...(fragment ? startup : []),
             modules.length > 0 && createElement('template', { 'data-recooler-marker': 'true', 'data-recooler-route': props.route,
               'data-recooler-version': entry && new URL(entry, props.url).searchParams.get('v') }));
         };

@@ -270,9 +270,10 @@ export function transform(code: string, options: TransformOptions): TransformRes
           ? `\`${escapeTemplate(ref)}(\${${helper("handlerScope")}(${scopeAtSite(c)})}).call(this, event)\``
           : JSON.stringify(`${ref}.call(this, event)`);
         if (options.queueHandlers) {
-          // Static route modules install dispatch before htmx initializes.
-          // An unavailable entry must never suppress a native event default.
-          const dispatch = `globalThis.$rc?.`;
+          // Only htmx:confirm exposes a safe continuation. The fallback is
+          // local to this listener and never suppresses native event defaults.
+          const warning = options.dev ? `console.warn('recooler: dropped '+e.type+' while route handlers load')` : '0';
+          const dispatch = `(self.$rc||((...a)=>{let e=a[3];e.type=="htmx:confirm"?(e.preventDefault(),(self.__recooler_pending??=[]).push(a)):${warning}}))`;
           const prefix = `${dispatch}(${JSON.stringify(c.id)},`;
           replacement = c.variables.length
             ? `\`${escapeTemplate(prefix)}\${${helper("handlerScope")}(${scopeAtSite(c)})},this,event)\``
